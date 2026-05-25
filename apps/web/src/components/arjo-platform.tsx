@@ -1457,15 +1457,19 @@ function PageHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
 function FilterBar({ fields }: { fields: string[] }) {
 	return (
 		<div className={`${panelClass} p-3`}>
-			<div className="flex flex-col gap-3 md:flex-row md:items-center">
+			<div className="flex flex-col gap-2 md:flex-row md:items-center">
 				{fields.map((field, index) => (
 					<Input
-						className={index === 0 ? "md:max-w-64" : "md:max-w-48"}
+						className={`bg-white ${index === 0 ? "md:max-w-64" : "md:max-w-44"}`}
 						key={field}
 						placeholder={field}
 						readOnly
 					/>
 				))}
+				<Button className={primaryActionClass} size="sm">
+					<SearchIcon className="size-3.5" />
+					Apply
+				</Button>
 			</div>
 		</div>
 	);
