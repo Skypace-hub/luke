@@ -1,1 +1,10 @@
 @import "@luke/ui/globals.css";
+
+::selection {
+	color: #134e4a;
+	background: #99f6e4;
+}
+
+body {
+	background: #f5f7fa;
+}

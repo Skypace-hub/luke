@@ -1,0 +1,9 @@
+
+我需要做一个saas系统，支持多租户，比如ARJO HONG KONG就是其中一个租户
+
+整个系统分为
+-管理后台：prd/info 中是之前实现的一个例子，你可以登录进去参考。整体风格要参考它。
+-工程师端app
+
+
+产品文档在  prd/Utiliti_Arjo_HK_Early_Release_Scope_v1.pdf
