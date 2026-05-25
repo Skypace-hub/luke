@@ -1,0 +1,44 @@
+{
+  "name": "luke",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:tui": "turbo -F tui dev",
+    "db:push": "turbo -F @luke/db db:push",
+    "db:studio": "turbo -F @luke/db db:studio",
+    "db:generate": "turbo -F @luke/db db:generate",
+    "db:migrate": "turbo -F @luke/db db:migrate",
+    "db:start": "turbo -F @luke/db db:start",
+    "db:watch": "turbo -F @luke/db db:watch",
+    "db:stop": "turbo -F @luke/db db:stop",
+    "db:down": "turbo -F @luke/db db:down",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@luke/env": "*",
+    "dotenv": "^17.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.15",
+    "@luke/config": "*",
+    "@types/node": "^22.13.14",
+    "husky": "latest",
+    "lefthook": "latest",
+    "turbo": "^2.8.12",
+    "typescript": "^6",
+    "ultracite": "7.7.0"
+  },
+  "packageManager": "npm@10.9.7"
+}

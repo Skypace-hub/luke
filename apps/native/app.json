@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "scheme": "luke",
+    "userInterfaceStyle": "automatic",
+    "orientation": "default",
+    "web": {
+      "bundler": "metro"
+    },
+    "name": "luke",
+    "slug": "luke",
+    "plugins": ["expo-font"],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
