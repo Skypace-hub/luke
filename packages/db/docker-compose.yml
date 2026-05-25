@@ -2,7 +2,7 @@ name: luke
 
 services:
   postgres:
-    image: postgres
+    image: pgvector/pgvector:pg17
     container_name: luke-postgres
     environment:
       POSTGRES_DB: luke

@@ -1,5 +1,5 @@
-import ArjoPlatform from "@/components/arjo-platform";
+import ServiceOpsPage from "../service-ops-page";
 
 export default function DashboardPage() {
-	return <ArjoPlatform />;
+	return <ServiceOpsPage />;
 }

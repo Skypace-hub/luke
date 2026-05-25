@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Utiliti x Arjo HK",
-	description: "Early release service operations platform for Arjo Hong Kong",
+	title: "Utiliti Service Operations",
+	description: "Multi-tenant service operations platform",
 };
 
 export default function RootLayout({

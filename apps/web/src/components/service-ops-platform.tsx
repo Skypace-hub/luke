@@ -9,8 +9,10 @@ import {
 } from "@luke/ui/components/card";
 import { Input } from "@luke/ui/components/input";
 import { Label } from "@luke/ui/components/label";
+import { useQuery } from "@tanstack/react-query";
 import {
 	ActivityIcon,
+	AlertTriangleIcon,
 	ArrowRightIcon,
 	BellRingIcon,
 	CalendarIcon,
@@ -37,31 +39,19 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-
 import {
-	assets,
 	type BackOfficeView,
 	type ContractStatus,
-	contracts,
 	type EngineerStatus,
-	engineers,
 	type FaultStatus,
-	faultReports,
-	hospitals,
 	type Job,
 	type JobStatus,
-	jobs,
-	liveAlerts,
 	type ManualAnswer,
-	manualAnswers,
 	navigationItems,
-	parts,
-	reportMetrics,
+	type ServiceOpsSnapshot,
 	serviceStateMachine,
-	shortages,
-	systemParameters,
-	tenant,
-} from "@/lib/arjo-data";
+} from "@/lib/service-ops-data";
+import { trpc } from "@/utils/trpc";
 
 type AppMode = "back-office" | "engineer" | "hospital";
 
@@ -110,33 +100,6 @@ const faultStatusStyles: Record<FaultStatus, string> = {
 	Received: "border-amber-200 bg-amber-50 text-amber-700",
 	Resolved: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
-
-const dashboardStats = [
-	{
-		id: "open-jobs",
-		label: "Open jobs",
-		value: "11",
-		meta: "4 urgent, 1 anomaly",
-	},
-	{
-		id: "engineers",
-		label: "Active engineers",
-		value: "3/4",
-		meta: "GPS updates every 2 min",
-	},
-	{
-		id: "faults",
-		label: "Fault reports",
-		value: "7",
-		meta: "2 high or critical",
-	},
-	{
-		id: "contracts",
-		label: "Contract warnings",
-		value: "2",
-		meta: "30-day warning window",
-	},
-];
 
 const workflowCards = [
 	{
@@ -187,6 +150,14 @@ const getFirstItem = <T,>(items: T[], label: string): T => {
 	return firstItem;
 };
 
+const alertIconByType = {
+	contract: ShieldCheckIcon,
+	geofence: AlertTriangleIcon,
+	pm: BellRingIcon,
+	status: ActivityIcon,
+	stock: ReceiptTextIcon,
+} as const;
+
 const backOfficeTitles: Record<BackOfficeView, string> = {
 	assets: "Installed Assets",
 	config: "System Config",
@@ -215,7 +186,19 @@ const getHashBackOfficeView = (): BackOfficeView | null => {
 	return navigationItem?.id ?? null;
 };
 
-export default function ArjoPlatform() {
+export default function ServiceOpsPlatform({
+	initialData,
+}: {
+	initialData: ServiceOpsSnapshot;
+}) {
+	const snapshotQuery = useQuery(
+		trpc.serviceOps.snapshot.queryOptions(
+			{ tenantId: initialData.tenant.id },
+			{ initialData, staleTime: 30_000 }
+		)
+	);
+	const data = snapshotQuery.data ?? initialData;
+	const { assets, engineers, jobs, manualAnswers, tenant } = data;
 	const [mode, setMode] = useState<AppMode>("back-office");
 	const [activeView, setActiveView] = useState<BackOfficeView>("dashboard");
 	const firstJob = getFirstItem(jobs, "Job");
@@ -249,7 +232,7 @@ export default function ArjoPlatform() {
 				.toLowerCase()
 				.includes(firstTerm ?? "");
 		});
-	}, [manualQuery]);
+	}, [manualAnswers, manualQuery]);
 
 	useEffect(() => {
 		const syncViewFromUrl = () => {
@@ -366,6 +349,7 @@ export default function ArjoPlatform() {
 							>
 								<BackOfficeViewPanel
 									activeView={activeView}
+									data={data}
 									selectedJob={selectedJob}
 									selectedJobId={selectedJobId}
 									setSelectedJobId={setSelectedJobId}
@@ -479,15 +463,34 @@ function ModeButton({
 
 function BackOfficeViewPanel({
 	activeView,
+	data,
 	selectedJob,
 	selectedJobId,
 	setSelectedJobId,
 }: {
 	activeView: BackOfficeView;
+	data: ServiceOpsSnapshot;
 	selectedJob?: Job;
 	selectedJobId: string;
 	setSelectedJobId: (jobId: string) => void;
 }) {
+	const {
+		assets,
+		contracts,
+		costRecords,
+		dashboardStats,
+		engineers,
+		faultReports,
+		hospitals,
+		jobs,
+		liveAlerts,
+		parts,
+		products,
+		reportMetrics,
+		shortages,
+		systemParameters,
+	} = data;
+
 	if (activeView === "jobs") {
 		return (
 			<PageFrame
@@ -631,39 +634,17 @@ function BackOfficeViewPanel({
 					]}
 					description="Product models, PM cycles, parts lists, and engineer-facing manual access."
 					filterLabels={["PM cycle", "Manual"]}
-					rows={[
-						{
-							cells: [
-								"Maxi Move Floor Lift",
-								"6 months",
-								"Sling bar, castor kit, battery module",
-								"maxi-move-service.pdf",
-								"Read-only",
-							],
-							id: "product-maxi-move",
-						},
-						{
-							cells: [
-								"Sara Flex Standing Aid",
-								"6 months",
-								"Battery module, hand control, actuator",
-								"sara-flex-manual.pdf",
-								"Read-only",
-							],
-							id: "product-sara-flex",
-						},
-						{
-							cells: [
-								"Citadel Patient Therapy System",
-								"3 months",
-								"Pump filter, mattress cell, control panel",
-								"citadel-therapy.pdf",
-								"Read-only",
-							],
-							id: "product-citadel",
-						},
-					]}
-					title="3 Products"
+					rows={products.map((product) => ({
+						cells: [
+							product.modelName,
+							`${product.defaultPmCycleMonths} months`,
+							product.partsList.join(", ") || "No parts linked",
+							product.manualFileName,
+							product.engineerAccess,
+						],
+						id: product.id,
+					}))}
+					title={`${products.length} Products`}
 				/>
 			</PageFrame>
 		);
@@ -844,7 +825,7 @@ function BackOfficeViewPanel({
 					</div>
 					<div className="space-y-3">
 						{liveAlerts.map((alert) => {
-							const Icon = alert.icon;
+							const Icon = alertIconByType[alert.type];
 
 							return (
 								<Card className={panelClass} key={alert.id}>
@@ -1008,28 +989,18 @@ function BackOfficeViewPanel({
 						]}
 						description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
 						filterLabels={["Cost type", "Billing"]}
-						rows={[
-							{
-								cells: [
-									"J-1048",
-									"HK$899",
-									"HK$72",
-									"HK$0",
-									"HK$0",
-									"HK$1,580",
-								],
-								id: "J-1048-cost",
-							},
-							{
-								cells: ["J-1032", "HK$661", "HK$54", "HK$85", "HK$180", "HK$0"],
-								id: "J-1032-cost",
-							},
-							{
-								cells: ["J-1038", "HK$350", "HK$42", "HK$0", "HK$0", "Pending"],
-								id: "J-1038-cost",
-							},
-						]}
-						title="3 Cost Records"
+						rows={costRecords.map((record) => ({
+							cells: [
+								record.job,
+								record.labour,
+								record.mileage,
+								record.meals,
+								record.partsAbsorbed,
+								record.partsBillable,
+							],
+							id: record.id,
+						}))}
+						title={`${costRecords.length} Cost Records`}
 					/>
 				</div>
 			</PageFrame>
@@ -1094,7 +1065,7 @@ function BackOfficeViewPanel({
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2 pt-0">
 						{liveAlerts.map((alert) => {
-							const Icon = alert.icon;
+							const Icon = alertIconByType[alert.type];
 
 							return (
 								<div
@@ -1191,7 +1162,7 @@ function EngineerWorkspace({
 	manualAnswers: ManualAnswer[];
 	manualQuery: string;
 	onJobAction: (action: JobAction) => void;
-	selectedAsset: (typeof assets)[number];
+	selectedAsset: ServiceOpsSnapshot["assets"][number];
 	selectedEngineer: string;
 	selectedJob?: Job;
 	setManualQuery: (query: string) => void;
@@ -1369,7 +1340,7 @@ function HospitalFaultPortal({
 					/>
 					<FeatureTile
 						icon={<MessageSquareTextIcon className="size-5" />}
-						text="Hospitals can check status without calling Arjo coordinators."
+						text="Hospitals can check status without calling service coordinators."
 						title="Status tracking"
 					/>
 					<FeatureTile
@@ -1672,7 +1643,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 function DashboardStatCard({
 	stat,
 }: {
-	stat: (typeof dashboardStats)[number];
+	stat: ServiceOpsSnapshot["dashboardStats"][number];
 }) {
 	return (
 		<Card className={`${panelClass} border-t-2 border-t-[#0f766e]`}>
