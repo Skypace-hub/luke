@@ -13,9 +13,12 @@ import {
 	ActivityIcon,
 	ArrowRightIcon,
 	BellRingIcon,
+	CalendarIcon,
 	CheckCircle2Icon,
 	ClipboardCheckIcon,
 	ClockIcon,
+	CreditCardIcon,
+	DownloadIcon,
 	FileQuestionIcon,
 	HospitalIcon,
 	LocateFixedIcon,
@@ -27,6 +30,7 @@ import {
 	ReceiptTextIcon,
 	SearchIcon,
 	ShieldCheckIcon,
+	SlidersHorizontalIcon,
 	SmartphoneIcon,
 	UploadIcon,
 	UsersIcon,
@@ -66,6 +70,14 @@ type JobAction = "start" | "pause" | "resume" | "complete";
 interface TableRow {
 	cells: ReactNode[];
 	id: string;
+}
+
+interface DataTableProps {
+	columns: string[];
+	description?: string;
+	filterLabels?: string[];
+	rows: TableRow[];
+	title?: string;
 }
 
 const statusStyles: Record<JobStatus, string> = {
@@ -161,9 +173,9 @@ const primaryActionClass =
 	"border-[#0f766e] bg-[#0f766e] text-white shadow-sm hover:bg-[#0b5f58]";
 
 const panelClass =
-	"border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]";
+	"rounded-[16px] border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]";
 
-const mutedPanelClass = "border border-[#d8dee8] bg-[#f8fafc]";
+const mutedPanelClass = "rounded-[12px] border border-[#d8dee8] bg-[#f8fafc]";
 
 const getFirstItem = <T,>(items: T[], label: string): T => {
 	const [firstItem] = items;
@@ -490,14 +502,6 @@ function BackOfficeViewPanel({
 			>
 				<div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
 					<div className="space-y-4">
-						<FilterBar
-							fields={[
-								"Search jobs...",
-								"All statuses",
-								"All job types",
-								"All engineers",
-							]}
-						/>
 						<DataTable
 							columns={[
 								"Job",
@@ -507,6 +511,8 @@ function BackOfficeViewPanel({
 								"Engineer",
 								"Schedule",
 							]}
+							description="Recent service jobs with dispatch state, priority, engineer ownership, and schedule activity."
+							filterLabels={["Status", "Job type", "Engineer"]}
 							rows={jobs.map((job) => ({
 								cells: [
 									<button
@@ -530,6 +536,7 @@ function BackOfficeViewPanel({
 								],
 								id: job.id,
 							}))}
+							title={`${jobs.length} Jobs`}
 						/>
 					</div>
 					<Card className={panelClass}>
@@ -580,6 +587,8 @@ function BackOfficeViewPanel({
 						"Coverage",
 						"Next PM",
 					]}
+					description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
+					filterLabels={["Coverage", "Hospital"]}
 					rows={assets.map((asset) => ({
 						cells: [
 							<span className="font-medium" key={`${asset.id}-label`}>
@@ -594,6 +603,7 @@ function BackOfficeViewPanel({
 						],
 						id: asset.id,
 					}))}
+					title={`${assets.length} Assets`}
 				/>
 			</PageFrame>
 		);
@@ -619,6 +629,8 @@ function BackOfficeViewPanel({
 						"Manual",
 						"Engineer access",
 					]}
+					description="Product models, PM cycles, parts lists, and engineer-facing manual access."
+					filterLabels={["PM cycle", "Manual"]}
 					rows={[
 						{
 							cells: [
@@ -651,6 +663,7 @@ function BackOfficeViewPanel({
 							id: "product-citadel",
 						},
 					]}
+					title="3 Products"
 				/>
 			</PageFrame>
 		);
@@ -677,6 +690,8 @@ function BackOfficeViewPanel({
 						"Open jobs",
 						"Location",
 					]}
+					description="Hospital sites with contract state, asset count, and open field-service demand."
+					filterLabels={["Contract", "District"]}
 					rows={hospitals.map((hospital) => ({
 						cells: [
 							hospital.name,
@@ -693,6 +708,7 @@ function BackOfficeViewPanel({
 						],
 						id: hospital.id,
 					}))}
+					title={`${hospitals.length} Hospitals`}
 				/>
 			</PageFrame>
 		);
@@ -720,6 +736,8 @@ function BackOfficeViewPanel({
 						"Mileage",
 						"Meal cap",
 					]}
+					description="Engineer profiles with live status, service region, and billing rate configuration."
+					filterLabels={["Status", "Region"]}
 					rows={engineers.map((engineer) => ({
 						cells: [
 							engineer.name,
@@ -740,6 +758,7 @@ function BackOfficeViewPanel({
 						],
 						id: engineer.id,
 					}))}
+					title={`${engineers.length} Engineers`}
 				/>
 			</PageFrame>
 		);
@@ -868,6 +887,8 @@ function BackOfficeViewPanel({
 						"Status",
 						"Description",
 					]}
+					description="Fault reports submitted from hospital web forms and converted into repair workflow."
+					filterLabels={["Severity", "Status"]}
 					rows={faultReports.map((fault) => ({
 						cells: [
 							<span className="font-medium" key={`${fault.id}-label`}>
@@ -886,6 +907,7 @@ function BackOfficeViewPanel({
 						],
 						id: fault.id,
 					}))}
+					title={`${faultReports.length} Fault Reports`}
 				/>
 			</PageFrame>
 		);
@@ -907,6 +929,8 @@ function BackOfficeViewPanel({
 							"Minimum",
 							"Unit cost",
 						]}
+						description="Parts stock levels, minimum thresholds, supplier records, and unit cost controls."
+						filterLabels={["Stock status", "Supplier"]}
 						rows={parts.map((part) => ({
 							cells: [
 								<span className="font-medium" key={`${part.id}-label`}>
@@ -925,6 +949,7 @@ function BackOfficeViewPanel({
 							],
 							id: part.id,
 						}))}
+						title={`${parts.length} Parts`}
 					/>
 					<Card className={panelClass}>
 						<CardHeader>
@@ -981,6 +1006,8 @@ function BackOfficeViewPanel({
 							"Parts absorbed",
 							"Parts billable",
 						]}
+						description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
+						filterLabels={["Cost type", "Billing"]}
 						rows={[
 							{
 								cells: [
@@ -1002,6 +1029,7 @@ function BackOfficeViewPanel({
 								id: "J-1038-cost",
 							},
 						]}
+						title="3 Cost Records"
 					/>
 				</div>
 			</PageFrame>
@@ -1113,7 +1141,6 @@ function BackOfficeViewPanel({
 				</Card>
 			</div>
 			<div className="mt-3">
-				<PanelHeader title="Today jobs" />
 				<DataTable
 					columns={[
 						"Job",
@@ -1123,6 +1150,8 @@ function BackOfficeViewPanel({
 						"Status",
 						"Schedule",
 					]}
+					description="Recent field-service work with hospital, assigned engineer, live status, and schedule."
+					filterLabels={["Status", "Engineer"]}
 					rows={jobs.slice(0, 5).map((job) => ({
 						cells: [
 							<span className="font-medium text-[#0f766e]" key={`${job.id}-id`}>
@@ -1141,6 +1170,7 @@ function BackOfficeViewPanel({
 						],
 						id: `${job.id}-dashboard`,
 					}))}
+					title="Today jobs"
 				/>
 			</div>
 		</PageFrame>
@@ -1454,72 +1484,163 @@ function PageHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
 	);
 }
 
-function FilterBar({ fields }: { fields: string[] }) {
+function DataTable({
+	columns,
+	description,
+	filterLabels = ["Status", "Date"],
+	rows,
+	title,
+}: DataTableProps) {
 	return (
-		<div className={`${panelClass} p-3`}>
-			<div className="flex flex-col gap-2 md:flex-row md:items-center">
-				{fields.map((field, index) => (
-					<Input
-						className={`bg-white ${index === 0 ? "md:max-w-64" : "md:max-w-44"}`}
-						key={field}
-						placeholder={field}
-						readOnly
-					/>
-				))}
-				<Button className={primaryActionClass} size="sm">
-					<SearchIcon className="size-3.5" />
-					Apply
-				</Button>
+		<div className={`${panelClass} overflow-hidden bg-white`}>
+			<div className="flex flex-col gap-4 px-5 pt-5 pb-4">
+				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+					<div>
+						<p className="font-semibold text-[#111827] text-lg">
+							{title ?? `${rows.length} Records`}
+						</p>
+						<p className="mt-1 text-[#6b7280] text-sm">
+							{description ??
+								"Recent service records with status, ownership, and schedule activity."}
+						</p>
+					</div>
+					<Button size="sm" variant="outline">
+						<DownloadIcon className="size-4" />
+						Export
+					</Button>
+				</div>
+				<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+						<div className="relative sm:w-[340px]">
+							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#6b7280]" />
+							<Input
+								className="h-9 rounded-[10px] bg-white pl-9 text-sm"
+								placeholder="Search records..."
+								readOnly
+							/>
+						</div>
+						{filterLabels.map((label) => (
+							<TableToolbarButton key={label} label={label} />
+						))}
+					</div>
+					<div className="flex flex-wrap gap-2">
+						<TableToolbarButton icon={<CreditCardIcon />} label="Billing" />
+						<TableToolbarButton icon={<SlidersHorizontalIcon />} label="Sort" />
+					</div>
+				</div>
 			</div>
-		</div>
-	);
-}
-
-function DataTable({ columns, rows }: { columns: string[]; rows: TableRow[] }) {
-	return (
-		<div className={`${panelClass} overflow-hidden`}>
-			<div className="overflow-x-auto">
-				<table className="w-full min-w-[760px] border-collapse text-[13px]">
-					<thead className="bg-[#f8fafc] text-[#64748b]">
-						<tr>
-							{columns.map((column) => (
-								<th
-									className="border-[#d8dee8] border-b px-3 py-2 text-left font-medium text-[11px] uppercase tracking-[0.08em]"
-									key={column}
-								>
-									{column}
+			<div className="mx-5 overflow-hidden rounded-[14px] border border-[#e5e7eb]">
+				<div className="overflow-x-auto">
+					<table className="w-full min-w-[820px] border-collapse text-sm">
+						<thead className="bg-white text-[#202124]">
+							<tr className="border-[#e5e7eb] border-b">
+								<th className="w-16 px-5 py-4 text-left">
+									<RowCheckbox label="Select all rows" />
 								</th>
-							))}
-						</tr>
-					</thead>
-					<tbody>
-						{rows.map((row) => (
-							<tr
-								className="border-[#eef2f7] border-b transition-colors last:border-b-0 hover:bg-[#f8fafc]"
-								key={row.id}
-							>
-								{row.cells.map((cell, cellIndex) => (
-									<td
-										className="px-3 py-2.5 align-top text-[#334155]"
-										key={`${row.id}-${columns[cellIndex] ?? "cell"}`}
+								{columns.map((column) => (
+									<th
+										className="px-5 py-4 text-left font-semibold"
+										key={column}
 									>
-										{cell}
-									</td>
+										{column}
+									</th>
 								))}
 							</tr>
-						))}
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							{rows.map((row) => (
+								<tr
+									className="border-[#e5e7eb] border-b transition-colors last:border-b-0 hover:bg-[#fafafa]"
+									key={row.id}
+								>
+									<td className="px-5 py-4 align-middle">
+										<RowCheckbox label={`Select ${row.id}`} />
+									</td>
+									{row.cells.map((cell, cellIndex) => (
+										<td
+											className="px-5 py-4 align-middle text-[#202124]"
+											key={`${row.id}-${columns[cellIndex] ?? "cell"}`}
+										>
+											{cell}
+										</td>
+									))}
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div className="flex flex-col gap-3 px-5 py-4 text-[#6b7280] text-sm lg:flex-row lg:items-center lg:justify-between">
+				<p>0 of {rows.length} row(s) selected.</p>
+				<div className="flex flex-wrap items-center gap-3">
+					<div className="flex items-center gap-2">
+						<span className="font-medium text-[#202124]">Rows per page</span>
+						<button
+							className="inline-flex h-9 min-w-16 items-center justify-between rounded-[10px] border border-[#e5e7eb] bg-white px-3 font-medium text-[#202124]"
+							type="button"
+						>
+							10
+							<span className="text-[#6b7280]">⌄</span>
+						</button>
+					</div>
+					<span className="font-medium text-[#202124]">Page 1 of 1</span>
+					<div className="flex gap-2">
+						<PaginationButton label="First page">‹‹</PaginationButton>
+						<PaginationButton label="Previous page">‹</PaginationButton>
+						<PaginationButton label="Next page">›</PaginationButton>
+						<PaginationButton label="Last page">››</PaginationButton>
+					</div>
+				</div>
 			</div>
 		</div>
 	);
 }
 
-function PanelHeader({ title }: { title: string }) {
+function TableToolbarButton({
+	icon,
+	label,
+}: {
+	icon?: ReactNode;
+	label: string;
+}) {
 	return (
-		<div className="border-[#d8dee8] border-x border-t bg-white px-4 py-3">
-			<p className="font-medium text-sm">{title}</p>
-		</div>
+		<Button
+			className="h-9 rounded-[10px] bg-white text-sm"
+			size="sm"
+			variant="outline"
+		>
+			{icon ?? <CalendarIcon className="size-4" />}
+			{label}
+		</Button>
+	);
+}
+
+function RowCheckbox({ label }: { label: string }) {
+	return (
+		<input
+			aria-label={label}
+			className="size-5 rounded-[6px] border border-[#e5e7eb] bg-white accent-[#0f766e]"
+			readOnly
+			type="checkbox"
+		/>
+	);
+}
+
+function PaginationButton({
+	children,
+	label,
+}: {
+	children: ReactNode;
+	label: string;
+}) {
+	return (
+		<button
+			aria-label={label}
+			className="inline-flex size-9 items-center justify-center rounded-[10px] border border-[#e5e7eb] bg-white font-semibold text-[#202124] text-lg leading-none transition-colors hover:bg-[#f8fafc]"
+			type="button"
+		>
+			{children}
+		</button>
 	);
 }
 
