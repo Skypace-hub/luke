@@ -32,7 +32,7 @@ import {
 	UsersIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
 	assets,
@@ -184,6 +184,17 @@ const backOfficeTitles: Record<BackOfficeView, string> = {
 
 const getBackOfficeTitle = (view: BackOfficeView) => backOfficeTitles[view];
 
+const getHashBackOfficeView = (): BackOfficeView | null => {
+	if (typeof window === "undefined") {
+		return null;
+	}
+
+	const hashView = window.location.hash.replace("#", "");
+	const navigationItem = navigationItems.find((item) => item.id === hashView);
+
+	return navigationItem?.id ?? null;
+};
+
 export default function ArjoPlatform() {
 	const [mode, setMode] = useState<AppMode>("back-office");
 	const [activeView, setActiveView] = useState<BackOfficeView>("dashboard");
@@ -220,6 +231,23 @@ export default function ArjoPlatform() {
 		});
 	}, [manualQuery]);
 
+	useEffect(() => {
+		const syncViewFromUrl = () => {
+			const hashView = getHashBackOfficeView();
+
+			setActiveView(hashView ?? "dashboard");
+		};
+
+		syncViewFromUrl();
+		window.addEventListener("hashchange", syncViewFromUrl);
+		window.addEventListener("popstate", syncViewFromUrl);
+
+		return () => {
+			window.removeEventListener("hashchange", syncViewFromUrl);
+			window.removeEventListener("popstate", syncViewFromUrl);
+		};
+	}, []);
+
 	const applyJobAction = (action: JobAction) => {
 		const nextStatusByAction: Record<JobAction, JobStatus> = {
 			complete: "Completed",
@@ -229,6 +257,24 @@ export default function ArjoPlatform() {
 		};
 
 		setJobRuntimeStatus(nextStatusByAction[action]);
+	};
+
+	const selectBackOfficeView = (view: BackOfficeView) => {
+		setActiveView(view);
+
+		const nextUrl = `${window.location.pathname}${window.location.search}#${view}`;
+
+		if (window.location.href !== new URL(nextUrl, window.location.href).href) {
+			window.history.pushState({ backOfficeView: view }, "", nextUrl);
+		}
+
+		if (window.matchMedia("(max-width: 1023px)").matches) {
+			window.requestAnimationFrame(() => {
+				document
+					.getElementById("back-office-content")
+					?.scrollIntoView({ behavior: "smooth", block: "start" });
+			});
+		}
 	};
 
 	return (
@@ -252,13 +298,14 @@ export default function ArjoPlatform() {
 
 									return (
 										<button
-											className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm transition ${
+											aria-current={activeView === item.id ? "page" : undefined}
+											className={`flex h-10 w-full cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm transition ${
 												activeView === item.id
 													? "bg-[#0f766e] text-white"
 													: "text-white/70 hover:bg-white/10 hover:text-white"
 											}`}
 											key={item.id}
-											onClick={() => setActiveView(item.id)}
+											onClick={() => selectBackOfficeView(item.id)}
 											type="button"
 										>
 											<Icon className="size-4" />
@@ -291,7 +338,7 @@ export default function ArjoPlatform() {
 								</div>
 								<SurfaceSwitcher mode={mode} setMode={setMode} />
 							</header>
-							<section className="min-w-0 p-4 lg:p-6">
+							<section className="min-w-0 p-4 lg:p-6" id="back-office-content">
 								<BackOfficeViewPanel
 									activeView={activeView}
 									selectedJob={selectedJob}
