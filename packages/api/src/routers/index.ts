@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { protectedProcedure, publicProcedure, router } from "../index";
 import {
+	ensureDefaultTenantForUser,
 	getDefaultTenantIdForUser,
 	getServiceOpsSnapshot,
 	userCanAccessTenant,
@@ -26,7 +27,8 @@ export const appRouter = router({
 			.query(async ({ ctx, input }) => {
 				const requestedTenantId =
 					input?.tenantId ??
-					(await getDefaultTenantIdForUser(ctx.session.user.id));
+					(await getDefaultTenantIdForUser(ctx.session.user.id)) ??
+					(await ensureDefaultTenantForUser(ctx.session.user));
 
 				if (!requestedTenantId) {
 					throw new TRPCError({

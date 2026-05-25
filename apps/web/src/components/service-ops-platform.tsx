@@ -9,6 +9,7 @@ import {
 } from "@luke/ui/components/card";
 import { Input } from "@luke/ui/components/input";
 import { Label } from "@luke/ui/components/label";
+import { cn } from "@luke/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import {
 	ActivityIcon,
@@ -17,8 +18,14 @@ import {
 	BellRingIcon,
 	CalendarIcon,
 	CheckCircle2Icon,
+	ChevronDownIcon,
+	ChevronLeftIcon,
+	ChevronRightIcon,
+	ChevronsLeftIcon,
+	ChevronsRightIcon,
 	ClipboardCheckIcon,
 	ClockIcon,
+	CommandIcon,
 	CreditCardIcon,
 	DownloadIcon,
 	FileQuestionIcon,
@@ -34,6 +41,7 @@ import {
 	ShieldCheckIcon,
 	SlidersHorizontalIcon,
 	SmartphoneIcon,
+	TrendingUpIcon,
 	UploadIcon,
 	UsersIcon,
 } from "lucide-react";
@@ -132,23 +140,36 @@ const workflowCards = [
 	},
 ];
 
-const primaryActionClass =
-	"border-[#0f766e] bg-[#0f766e] text-white shadow-sm hover:bg-[#0b5f58]";
+const primaryActionClass = "rounded-md shadow-xs";
 
-const panelClass =
-	"rounded-[16px] border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]";
+const panelClass = "rounded-lg border bg-card text-card-foreground shadow-xs";
 
-const mutedPanelClass = "rounded-[12px] border border-[#d8dee8] bg-[#f8fafc]";
+const mutedPanelClass = "rounded-lg border bg-muted/35";
 
-const getFirstItem = <T,>(items: T[], label: string): T => {
-	const [firstItem] = items;
+const iconTileClass =
+	"flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground";
 
-	if (!firstItem) {
-		throw new Error(`${label} seed data is required`);
-	}
+const compactButtonClass = "rounded-md";
 
-	return firstItem;
-};
+const hospitalMapPositions = [
+	{ left: "18%", top: "2rem" },
+	{ right: "20%", top: "34%" },
+	{ bottom: "22%", right: "34%" },
+	{ bottom: "14%", left: "24%" },
+] as const;
+
+const engineerMapPositions = [
+	{ left: "32%", top: "22%" },
+	{ right: "28%", top: "48%" },
+	{ bottom: "30%", left: "42%" },
+] as const;
+
+const roleLabels = [
+	"admin",
+	"coordinator",
+	"engineer",
+	"hospital_user",
+] as const;
 
 const alertIconByType = {
 	contract: ShieldCheckIcon,
@@ -201,9 +222,9 @@ export default function ServiceOpsPlatform({
 	const { assets, engineers, jobs, manualAnswers, tenant } = data;
 	const [mode, setMode] = useState<AppMode>("back-office");
 	const [activeView, setActiveView] = useState<BackOfficeView>("dashboard");
-	const firstJob = getFirstItem(jobs, "Job");
-	const firstAsset = getFirstItem(assets, "Asset");
-	const [selectedJobId, setSelectedJobId] = useState(firstJob.id);
+	const [firstJob] = jobs;
+	const [firstAsset] = assets;
+	const [selectedJobId, setSelectedJobId] = useState(firstJob?.id ?? "");
 	const [jobRuntimeStatus, setJobRuntimeStatus] =
 		useState<JobStatus>("Assigned");
 	const [faultStatus, setFaultStatus] = useState<FaultStatus>("Received");
@@ -212,11 +233,18 @@ export default function ServiceOpsPlatform({
 	);
 
 	const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? firstJob;
-	const selectedAsset =
-		assets.find((asset) => asset.id === selectedJob.asset) ?? firstAsset;
+	const selectedAsset = selectedJob
+		? (assets.find((asset) => asset.id === selectedJob.asset) ?? firstAsset)
+		: firstAsset;
 	const selectedEngineer = engineers.find(
 		(engineer) => engineer.name === selectedJob?.engineer
 	);
+
+	useEffect(() => {
+		if (!selectedJobId && firstJob) {
+			setSelectedJobId(firstJob.id);
+		}
+	}, [firstJob, selectedJobId]);
 
 	const filteredManualAnswers = useMemo(() => {
 		const normalizedQuery = manualQuery.toLowerCase();
@@ -262,6 +290,25 @@ export default function ServiceOpsPlatform({
 		setJobRuntimeStatus(nextStatusByAction[action]);
 	};
 
+	const engineerModeContent =
+		selectedJob && selectedAsset ? (
+			<EngineerWorkspace
+				jobRuntimeStatus={jobRuntimeStatus}
+				manualAnswers={filteredManualAnswers}
+				manualQuery={manualQuery}
+				onJobAction={applyJobAction}
+				selectedAsset={selectedAsset}
+				selectedEngineer={selectedEngineer?.name ?? "Engineer"}
+				selectedJob={selectedJob}
+				setManualQuery={setManualQuery}
+			/>
+		) : (
+			<EmptyWorkspace
+				eyebrow="Engineer workflow"
+				title="No assigned jobs yet"
+			/>
+		);
+
 	const selectBackOfficeView = (view: BackOfficeView) => {
 		setActiveView(view);
 
@@ -281,70 +328,75 @@ export default function ServiceOpsPlatform({
 	};
 
 	return (
-		<main className="min-h-svh bg-[#eef2f6] text-[#1f2937]">
+		<main className="min-h-svh bg-background text-foreground">
 			<div className="min-h-svh">
 				{mode === "back-office" ? (
-					<div className="grid min-h-svh lg:grid-cols-[256px_1fr]">
-						<aside className="flex min-h-svh flex-col border-[#202a3b] border-r bg-[#111827] text-white">
-							<div className="flex h-[68px] items-center gap-3 border-white/10 border-b px-5">
-								<div className="flex size-9 items-center justify-center rounded-sm bg-[#0f766e] font-semibold text-white shadow-sm">
-									U
+					<div className="grid min-h-svh grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
+						<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-sidebar text-sidebar-foreground lg:min-h-svh lg:border-r lg:border-b-0">
+							<div className="flex h-14 items-center gap-3 border-b px-4">
+								<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
+									<CommandIcon className="size-4" />
 								</div>
-								<div>
-									<p className="font-semibold text-base">Utiliti</p>
-									<p className="text-[11px] text-white/45 uppercase tracking-[0.12em]">
+								<div className="min-w-0">
+									<p className="truncate font-semibold text-sm">Utiliti</p>
+									<p className="truncate text-muted-foreground text-xs">
 										{tenant.name}
 									</p>
 								</div>
 							</div>
-							<nav className="flex flex-col gap-1 p-3">
+							<nav className="flex min-w-0 max-w-full gap-1 overflow-x-auto px-3 py-2 lg:flex-col lg:overflow-visible lg:py-4">
 								{navigationItems.map((item) => {
 									const Icon = item.icon;
+									const isActive = activeView === item.id;
 
 									return (
 										<button
-											aria-current={activeView === item.id ? "page" : undefined}
-											className={`flex h-9 w-full cursor-pointer items-center gap-3 rounded-sm px-3 text-left text-[13px] transition ${
-												activeView === item.id
-													? "bg-[#0f766e] text-white shadow-sm"
-													: "text-white/58 hover:bg-white/8 hover:text-white"
-											}`}
+											aria-current={isActive ? "page" : undefined}
+											className={cn(
+												"flex h-9 min-w-max cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm transition-colors lg:w-full",
+												isActive
+													? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
+													: "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+											)}
 											key={item.id}
 											onClick={() => selectBackOfficeView(item.id)}
 											type="button"
 										>
-											<Icon className="size-3.5" />
+											<Icon className="size-4" />
 											{item.label}
 										</button>
 									);
 								})}
 							</nav>
-							<div className="mt-auto border-white/10 border-t p-4">
-								<div className="flex items-center gap-3 rounded-sm bg-white/6 p-2">
-									<div className="flex size-8 items-center justify-center rounded-sm bg-white/95 font-semibold text-[#111827] text-xs">
+							<div className="mt-auto hidden border-t p-3 lg:block">
+								<div className="flex items-center gap-3 rounded-lg border bg-card/80 p-2 shadow-xs">
+									<div className="flex size-8 items-center justify-center rounded-md bg-muted font-semibold text-xs">
 										AU
 									</div>
-									<div>
-										<p className="font-medium text-[13px]">Admin User</p>
-										<p className="text-[11px] text-white/45">admin</p>
+									<div className="min-w-0">
+										<p className="truncate font-medium text-sm">Admin User</p>
+										<p className="text-muted-foreground text-xs">admin</p>
 									</div>
 								</div>
 							</div>
 						</aside>
 						<div className="min-w-0">
-							<header className="flex min-h-[68px] flex-col gap-3 border-[#d8dee8] border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-								<div>
-									<h1 className="font-semibold text-lg tracking-tight">
+							<header className="sticky top-0 z-20 flex min-h-14 flex-col gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur lg:flex-row lg:items-center lg:justify-between lg:px-6">
+								<div className="min-w-0">
+									<p className="text-muted-foreground text-xs">
+										Service Operations
+									</p>
+									<h1 className="truncate font-semibold text-lg">
 										{getBackOfficeTitle(activeView)}
 									</h1>
-									<p className="mt-0.5 text-[#64748b] text-xs">
+									<p className="mt-0.5 text-muted-foreground text-xs">
 										{tenant.release} · {tenant.region} service operations
 									</p>
 								</div>
 								<SurfaceSwitcher mode={mode} setMode={setMode} />
 							</header>
 							<section
-								className="min-w-0 px-4 py-5 lg:px-6"
+								className="@container/main min-w-0 px-4 py-4 md:py-6 lg:px-6"
 								id="back-office-content"
 							>
 								<BackOfficeViewPanel
@@ -359,17 +411,17 @@ export default function ServiceOpsPlatform({
 					</div>
 				) : (
 					<>
-						<header className="border-[#d8dee8] border-b bg-white">
+						<header className="border-b bg-background">
 							<div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
 								<div className="flex items-center gap-3">
-									<div className="flex size-10 items-center justify-center rounded-sm bg-[#0f766e] text-white">
+									<div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
 										<ActivityIcon className="size-5" />
 									</div>
-									<div>
-										<p className="text-[#64748b] text-xs uppercase tracking-[0.16em]">
+									<div className="min-w-0">
+										<p className="text-muted-foreground text-xs">
 											{tenant.release}
 										</p>
-										<h1 className="font-semibold text-xl">
+										<h1 className="truncate font-semibold text-xl">
 											{tenant.name} Service Operations
 										</h1>
 									</div>
@@ -377,18 +429,7 @@ export default function ServiceOpsPlatform({
 								<SurfaceSwitcher mode={mode} setMode={setMode} />
 							</div>
 						</header>
-						{mode === "engineer" ? (
-							<EngineerWorkspace
-								jobRuntimeStatus={jobRuntimeStatus}
-								manualAnswers={filteredManualAnswers}
-								manualQuery={manualQuery}
-								onJobAction={applyJobAction}
-								selectedAsset={selectedAsset}
-								selectedEngineer={selectedEngineer?.name ?? "Engineer"}
-								selectedJob={selectedJob}
-								setManualQuery={setManualQuery}
-							/>
-						) : null}
+						{mode === "engineer" ? engineerModeContent : null}
 
 						{mode === "hospital" ? (
 							<HospitalFaultPortal
@@ -411,7 +452,7 @@ function SurfaceSwitcher({
 	setMode: (mode: AppMode) => void;
 }) {
 	return (
-		<div className="flex flex-wrap gap-1.5 rounded-sm border border-[#d8dee8] bg-[#f8fafc] p-1">
+		<div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
 			<ModeButton
 				active={mode === "back-office"}
 				onClick={() => setMode("back-office")}
@@ -448,10 +489,10 @@ function ModeButton({
 }) {
 	return (
 		<button
-			className={`inline-flex h-7 items-center gap-1.5 rounded-sm border px-2.5 text-xs transition ${
+			className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs transition-colors ${
 				active
-					? "border-white bg-white text-[#111827] shadow-sm"
-					: "border-transparent bg-transparent text-[#64748b] hover:bg-white/70 hover:text-[#111827]"
+					? "bg-background text-foreground shadow-xs"
+					: "text-muted-foreground hover:bg-background/70 hover:text-foreground"
 			}`}
 			onClick={onClick}
 			type="button"
@@ -519,7 +560,7 @@ function BackOfficeViewPanel({
 							rows={jobs.map((job) => ({
 								cells: [
 									<button
-										className="font-medium text-[#0f766e] hover:underline"
+										className="font-medium text-primary hover:underline"
 										key={`${job.id}-button`}
 										onClick={() => setSelectedJobId(job.id)}
 										type="button"
@@ -550,9 +591,11 @@ function BackOfficeViewPanel({
 						</CardHeader>
 						<CardContent className="space-y-4">
 							<StateMachine currentStatus={selectedJob?.status ?? "Created"} />
-							<div className="rounded-sm border border-[#d8dee8] bg-[#f8fafc] p-3 text-sm">
+							<div className={`${mutedPanelClass} p-3 text-sm`}>
 								<p className="font-medium">Latest event</p>
-								<p className="mt-1 text-[#64748b]">{selectedJob?.audit}</p>
+								<p className="mt-1 text-muted-foreground">
+									{selectedJob?.audit ?? "No audit events yet."}
+								</p>
 							</div>
 							<div className="grid grid-cols-2 gap-3 text-sm">
 								<Metric
@@ -746,104 +789,16 @@ function BackOfficeViewPanel({
 	}
 
 	if (activeView === "contracts") {
-		return (
-			<PageFrame
-				action={
-					<Button className={primaryActionClass}>
-						<PlusIcon className="size-4" />
-						New contract
-					</Button>
-				}
-				eyebrow="C. Contract Management"
-				title="Coverage and expiry controls"
-			>
-				<div className="grid gap-4 lg:grid-cols-3">
-					{contracts.map((contract) => (
-						<Card className={panelClass} key={contract.id}>
-							<CardHeader>
-								<div className="flex items-start justify-between gap-3">
-									<CardTitle>{contract.hospital}</CardTitle>
-									<StatusPill className={contractStatusStyles[contract.status]}>
-										{contract.status}
-									</StatusPill>
-								</div>
-							</CardHeader>
-							<CardContent className="space-y-3 text-sm">
-								<Metric label="Contract" value={contract.id} />
-								<Metric label="Type" value={contract.type} />
-								<Metric label="SLA" value={`${contract.slaHours}h response`} />
-								<Metric label="Expiry" value={contract.expiry} />
-								<div>
-									<p className="text-[#64748b] text-xs">Covered models</p>
-									<p className="mt-1">{contract.coveredModels.join(", ")}</p>
-								</div>
-							</CardContent>
-						</Card>
-					))}
-				</div>
-			</PageFrame>
-		);
+		return <ContractsView contracts={contracts} />;
 	}
 
 	if (activeView === "map") {
 		return (
-			<PageFrame
-				eyebrow="F. Location Operations"
-				title="Live map and geofence alerts"
-			>
-				<div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-					<div className="relative min-h-[560px] overflow-hidden rounded-sm border border-[#cbd5e1] bg-[#dbeafe]">
-						<div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,118,110,.08)_1px,transparent_1px),linear-gradient(rgba(15,118,110,.08)_1px,transparent_1px)] bg-[size:44px_44px]" />
-						<div className="absolute top-8 left-[18%]">
-							<MapPin label="Queen Mary" status="Active" />
-						</div>
-						<div className="absolute top-[34%] right-[20%]">
-							<MapPin label="Prince of Wales" status="Expiring" />
-						</div>
-						<div className="absolute right-[34%] bottom-[22%]">
-							<MapPin label="United Christian" status="Active" />
-						</div>
-						<div className="absolute bottom-[14%] left-[24%]">
-							<MapPin label="Princess Margaret" status="Expired" />
-						</div>
-						<div className="absolute top-[22%] left-[32%]">
-							<EngineerDot engineer="Kelvin" status="On-site" />
-						</div>
-						<div className="absolute top-[48%] right-[28%]">
-							<EngineerDot engineer="Mandy" status="In transit" />
-						</div>
-						<div className="absolute bottom-[30%] left-[42%]">
-							<EngineerDot engineer="Ivy" status="Timer anomaly" />
-						</div>
-						<div className="absolute right-4 bottom-4 rounded-sm border border-[#cbd5e1] bg-white/95 p-3 text-xs shadow-sm">
-							<p className="font-medium">Google Maps layer placeholder</p>
-							<p className="mt-1 text-[#64748b]">
-								Hospital pins and live engineer GPS dots share the same location
-								stack.
-							</p>
-						</div>
-					</div>
-					<div className="space-y-3">
-						{liveAlerts.map((alert) => {
-							const Icon = alertIconByType[alert.type];
-
-							return (
-								<Card className={panelClass} key={alert.id}>
-									<CardContent className="flex gap-3 pt-4">
-										<Icon className="mt-0.5 size-5 text-[#0f766e]" />
-										<div>
-											<p className="font-medium text-sm">{alert.title}</p>
-											<p className="mt-1 text-[#64748b] text-xs leading-relaxed">
-												{alert.message}
-											</p>
-										</div>
-									</CardContent>
-								</Card>
-							);
-						})}
-					</div>
-				</div>
-			</PageFrame>
+			<MapView
+				engineers={engineers}
+				hospitals={hospitals}
+				liveAlerts={liveAlerts}
+			/>
 		);
 	}
 
@@ -895,49 +850,207 @@ function BackOfficeViewPanel({
 	}
 
 	if (activeView === "parts") {
+		return <PartsView parts={parts} shortages={shortages} />;
+	}
+
+	if (activeView === "reports") {
 		return (
-			<PageFrame
-				eyebrow="H. Parts & Inventory"
-				title="Inventory and shortage queue"
-			>
-				<div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-					<DataTable
-						columns={[
-							"Part",
-							"Name",
-							"Supplier",
-							"Stock",
-							"Minimum",
-							"Unit cost",
-						]}
-						description="Parts stock levels, minimum thresholds, supplier records, and unit cost controls."
-						filterLabels={["Stock status", "Supplier"]}
-						rows={parts.map((part) => ({
-							cells: [
-								<span className="font-medium" key={`${part.id}-label`}>
-									{part.id}
-								</span>,
-								part.name,
-								part.supplier,
-								<span
-									className={part.stock < part.minimum ? "text-rose-600" : ""}
-									key={`${part.id}-stock`}
-								>
-									{part.stock}
-								</span>,
-								part.minimum,
-								`HK$${part.unitCost}`,
-							],
-							id: part.id,
-						}))}
-						title={`${parts.length} Parts`}
-					/>
-					<Card className={panelClass}>
-						<CardHeader>
-							<CardTitle>Shortage queue</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							{shortages.map((shortage) => (
+			<ReportsView costRecords={costRecords} reportMetrics={reportMetrics} />
+		);
+	}
+
+	if (activeView === "config") {
+		return <ConfigView systemParameters={systemParameters} />;
+	}
+
+	return (
+		<DashboardView
+			dashboardStats={dashboardStats}
+			jobs={jobs}
+			liveAlerts={liveAlerts}
+		/>
+	);
+}
+
+function ContractsView({
+	contracts,
+}: {
+	contracts: ServiceOpsSnapshot["contracts"];
+}) {
+	return (
+		<PageFrame
+			action={
+				<Button className={primaryActionClass}>
+					<PlusIcon className="size-4" />
+					New contract
+				</Button>
+			}
+			eyebrow="C. Contract Management"
+			title="Coverage and expiry controls"
+		>
+			<div className="grid gap-4 lg:grid-cols-3">
+				{contracts.length > 0 ? (
+					contracts.map((contract) => (
+						<Card className={panelClass} key={contract.id}>
+							<CardHeader>
+								<div className="flex items-start justify-between gap-3">
+									<CardTitle>{contract.hospital}</CardTitle>
+									<StatusPill className={contractStatusStyles[contract.status]}>
+										{contract.status}
+									</StatusPill>
+								</div>
+							</CardHeader>
+							<CardContent className="space-y-3 text-sm">
+								<Metric label="Contract" value={contract.id} />
+								<Metric label="Type" value={contract.type} />
+								<Metric label="SLA" value={`${contract.slaHours}h response`} />
+								<Metric label="Expiry" value={contract.expiry} />
+								<div>
+									<p className="text-muted-foreground text-xs">
+										Covered models
+									</p>
+									<p className="mt-1">{contract.coveredModels.join(", ")}</p>
+								</div>
+							</CardContent>
+						</Card>
+					))
+				) : (
+					<div className="lg:col-span-3">
+						<EmptyInline message="No contracts yet." />
+					</div>
+				)}
+			</div>
+		</PageFrame>
+	);
+}
+
+function MapView({
+	engineers,
+	hospitals,
+	liveAlerts,
+}: {
+	engineers: ServiceOpsSnapshot["engineers"];
+	hospitals: ServiceOpsSnapshot["hospitals"];
+	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
+}) {
+	const hasLiveAlerts = liveAlerts.length > 0;
+
+	return (
+		<PageFrame
+			eyebrow="F. Location Operations"
+			title="Live map and geofence alerts"
+		>
+			<div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+				<div className="relative min-h-[560px] overflow-hidden rounded-lg border bg-muted/40">
+					<div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(148,163,184,.22)_1px,transparent_1px),linear-gradient(rgba(148,163,184,.22)_1px,transparent_1px)] bg-[size:44px_44px]" />
+					<div className="absolute inset-0 bg-gradient-to-br from-background/70 via-transparent to-primary/10" />
+					{hospitals.slice(0, 4).map((hospital, index) => (
+						<div
+							className="absolute"
+							key={hospital.id}
+							style={hospitalMapPositions[index] ?? hospitalMapPositions[0]}
+						>
+							<MapPin label={hospital.name} status={hospital.contractStatus} />
+						</div>
+					))}
+					{engineers.slice(0, 3).map((engineer, index) => (
+						<div
+							className="absolute"
+							key={engineer.id}
+							style={engineerMapPositions[index] ?? engineerMapPositions[0]}
+						>
+							<EngineerDot engineer={engineer.name} status={engineer.status} />
+						</div>
+					))}
+					<div className="absolute right-4 bottom-4 rounded-lg border bg-card/95 p-3 text-xs shadow-xs backdrop-blur">
+						<p className="font-medium">Google Maps layer placeholder</p>
+						<p className="mt-1 text-muted-foreground">
+							Hospital pins and live engineer GPS dots share the same location
+							stack.
+						</p>
+					</div>
+				</div>
+				<div className="space-y-3">
+					{hasLiveAlerts ? (
+						liveAlerts.map((alert) => {
+							const Icon = alertIconByType[alert.type];
+
+							return (
+								<Card className={panelClass} key={alert.id}>
+									<CardContent className="flex gap-3 pt-4">
+										<span className={iconTileClass}>
+											<Icon className="size-4" />
+										</span>
+										<div>
+											<p className="font-medium text-sm">{alert.title}</p>
+											<p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+												{alert.message}
+											</p>
+										</div>
+									</CardContent>
+								</Card>
+							);
+						})
+					) : (
+						<EmptyInline message="No live alerts on the map." />
+					)}
+				</div>
+			</div>
+		</PageFrame>
+	);
+}
+
+function PartsView({
+	parts,
+	shortages,
+}: {
+	parts: ServiceOpsSnapshot["parts"];
+	shortages: ServiceOpsSnapshot["shortages"];
+}) {
+	return (
+		<PageFrame
+			eyebrow="H. Parts & Inventory"
+			title="Inventory and shortage queue"
+		>
+			<div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+				<DataTable
+					columns={[
+						"Part",
+						"Name",
+						"Supplier",
+						"Stock",
+						"Minimum",
+						"Unit cost",
+					]}
+					description="Parts stock levels, minimum thresholds, supplier records, and unit cost controls."
+					filterLabels={["Stock status", "Supplier"]}
+					rows={parts.map((part) => ({
+						cells: [
+							<span className="font-medium" key={`${part.id}-label`}>
+								{part.id}
+							</span>,
+							part.name,
+							part.supplier,
+							<span
+								className={part.stock < part.minimum ? "text-rose-600" : ""}
+								key={`${part.id}-stock`}
+							>
+								{part.stock}
+							</span>,
+							part.minimum,
+							`HK$${part.unitCost}`,
+						],
+						id: part.id,
+					}))}
+					title={`${parts.length} Parts`}
+				/>
+				<Card className={panelClass}>
+					<CardHeader>
+						<CardTitle>Shortage queue</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3">
+						{shortages.length > 0 ? (
+							shortages.map((shortage) => (
 								<div
 									className={`${mutedPanelClass} p-3 text-sm`}
 									key={shortage.id}
@@ -948,108 +1061,142 @@ function BackOfficeViewPanel({
 											{shortage.status}
 										</StatusPill>
 									</div>
-									<p className="mt-1 text-[#64748b]">
+									<p className="mt-1 text-muted-foreground">
 										{shortage.part} requested by {shortage.engineer}
 									</p>
 								</div>
-							))}
-						</CardContent>
-					</Card>
-				</div>
-			</PageFrame>
-		);
-	}
+							))
+						) : (
+							<EmptyInline message="No shortage requests yet." />
+						)}
+					</CardContent>
+				</Card>
+			</div>
+		</PageFrame>
+	);
+}
 
-	if (activeView === "reports") {
-		return (
-			<PageFrame
-				eyebrow="I. Reports"
-				title="Operational report and job-level cost view"
-			>
-				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-					{reportMetrics.map((metric) => (
+function ReportsView({
+	costRecords,
+	reportMetrics,
+}: {
+	costRecords: ServiceOpsSnapshot["costRecords"];
+	reportMetrics: ServiceOpsSnapshot["reportMetrics"];
+}) {
+	return (
+		<PageFrame
+			eyebrow="I. Reports"
+			title="Operational report and job-level cost view"
+		>
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+				{reportMetrics.length > 0 ? (
+					reportMetrics.map((metric) => (
 						<Card className={panelClass} key={metric.id}>
 							<CardContent className="pt-4">
-								<p className="text-[#64748b] text-xs">{metric.label}</p>
+								<p className="text-muted-foreground text-xs">{metric.label}</p>
 								<p className="mt-2 font-semibold text-2xl">{metric.value}</p>
-								<p className="mt-1 text-[#0f766e] text-xs">{metric.trend}</p>
+								<p className="mt-1 text-primary text-xs">{metric.trend}</p>
 							</CardContent>
 						</Card>
-					))}
-				</div>
-				<div className="mt-4">
-					<DataTable
-						columns={[
-							"Job",
-							"Labour",
-							"Mileage",
-							"Meals",
-							"Parts absorbed",
-							"Parts billable",
-						]}
-						description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
-						filterLabels={["Cost type", "Billing"]}
-						rows={costRecords.map((record) => ({
-							cells: [
-								record.job,
-								record.labour,
-								record.mileage,
-								record.meals,
-								record.partsAbsorbed,
-								record.partsBillable,
-							],
-							id: record.id,
-						}))}
-						title={`${costRecords.length} Cost Records`}
-					/>
-				</div>
-			</PageFrame>
-		);
-	}
+					))
+				) : (
+					<div className="md:col-span-2 xl:col-span-4">
+						<EmptyInline message="No report metrics yet." />
+					</div>
+				)}
+			</div>
+			<div className="mt-4">
+				<DataTable
+					columns={[
+						"Job",
+						"Labour",
+						"Mileage",
+						"Meals",
+						"Parts absorbed",
+						"Parts billable",
+					]}
+					description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
+					filterLabels={["Cost type", "Billing"]}
+					rows={costRecords.map((record) => ({
+						cells: [
+							record.job,
+							record.labour,
+							record.mileage,
+							record.meals,
+							record.partsAbsorbed,
+							record.partsBillable,
+						],
+						id: record.id,
+					}))}
+					title={`${costRecords.length} Cost Records`}
+				/>
+			</div>
+		</PageFrame>
+	);
+}
 
-	if (activeView === "config") {
-		return (
-			<PageFrame
-				eyebrow="J. System Configuration"
-				title="Parameters, roles and notifications"
-			>
-				<div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-					<Card className={panelClass}>
-						<CardHeader>
-							<CardTitle>System parameters</CardTitle>
-						</CardHeader>
-						<CardContent className="grid gap-3 md:grid-cols-2">
-							{systemParameters.map((parameter) => (
+function ConfigView({
+	systemParameters,
+}: {
+	systemParameters: ServiceOpsSnapshot["systemParameters"];
+}) {
+	return (
+		<PageFrame
+			eyebrow="J. System Configuration"
+			title="Parameters, roles and notifications"
+		>
+			<div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+				<Card className={panelClass}>
+					<CardHeader>
+						<CardTitle>System parameters</CardTitle>
+					</CardHeader>
+					<CardContent className="grid gap-3 md:grid-cols-2">
+						{systemParameters.length > 0 ? (
+							systemParameters.map((parameter) => (
 								<Metric
 									key={parameter.id}
 									label={parameter.label}
 									value={parameter.value}
 								/>
-							))}
-						</CardContent>
-					</Card>
-					<Card className={panelClass}>
-						<CardHeader>
-							<CardTitle>User roles</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-3 text-sm">
-							{["admin", "coordinator", "engineer", "hospital_user"].map(
-								(role) => (
-									<div
-										className="flex items-center justify-between border-[#d8dee8] border-b pb-2 last:border-b-0"
-										key={role}
-									>
-										<span>{role}</span>
-										<ShieldCheckIcon className="size-4 text-[#0f766e]" />
-									</div>
-								)
-							)}
-						</CardContent>
-					</Card>
-				</div>
-			</PageFrame>
-		);
-	}
+							))
+						) : (
+							<div className="md:col-span-2">
+								<EmptyInline message="No system parameters yet." />
+							</div>
+						)}
+					</CardContent>
+				</Card>
+				<Card className={panelClass}>
+					<CardHeader>
+						<CardTitle>User roles</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-3 text-sm">
+						{roleLabels.map((role) => (
+							<div
+								className="flex items-center justify-between border-b pb-2 last:border-b-0"
+								key={role}
+							>
+								<span>{role}</span>
+								<ShieldCheckIcon className="size-4 text-primary" />
+							</div>
+						))}
+					</CardContent>
+				</Card>
+			</div>
+		</PageFrame>
+	);
+}
+
+function DashboardView({
+	dashboardStats,
+	jobs,
+	liveAlerts,
+}: {
+	dashboardStats: ServiceOpsSnapshot["dashboardStats"];
+	jobs: Job[];
+	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
+}) {
+	const hasLiveAlerts = liveAlerts.length > 0;
 
 	return (
 		<PageFrame eyebrow="Operational Command" title="Today at a glance">
@@ -1060,34 +1207,38 @@ function BackOfficeViewPanel({
 			</div>
 			<div className="mt-3 grid gap-3 xl:grid-cols-[1fr_360px]">
 				<Card className={panelClass}>
-					<CardHeader className="border-[#e2e8f0] border-b pb-3">
+					<CardHeader className="border-b pb-3">
 						<CardTitle>Live exception queue</CardTitle>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2 pt-0">
-						{liveAlerts.map((alert) => {
-							const Icon = alertIconByType[alert.type];
+						{hasLiveAlerts ? (
+							liveAlerts.map((alert) => {
+								const Icon = alertIconByType[alert.type];
 
-							return (
-								<div
-									className="flex gap-3 border-[#eef2f7] border-b py-3 last:border-b-0"
-									key={alert.id}
-								>
-									<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-[#ecfdf5] text-[#0f766e]">
-										<Icon className="size-3.5" />
+								return (
+									<div
+										className="flex gap-3 border-b py-3 last:border-b-0"
+										key={alert.id}
+									>
+										<span className={iconTileClass}>
+											<Icon className="size-4" />
+										</span>
+										<div>
+											<p className="font-medium text-sm">{alert.title}</p>
+											<p className="mt-0.5 text-muted-foreground text-xs">
+												{alert.message}
+											</p>
+										</div>
 									</div>
-									<div>
-										<p className="font-medium text-[13px]">{alert.title}</p>
-										<p className="mt-0.5 text-[#64748b] text-xs">
-											{alert.message}
-										</p>
-									</div>
-								</div>
-							);
-						})}
+								);
+							})
+						) : (
+							<EmptyInline message="No live exceptions." />
+						)}
 					</CardContent>
 				</Card>
 				<Card className={panelClass}>
-					<CardHeader className="border-[#e2e8f0] border-b pb-3">
+					<CardHeader className="border-b pb-3">
 						<CardTitle>Release scope coverage</CardTitle>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-3 pt-0">
@@ -1096,12 +1247,12 @@ function BackOfficeViewPanel({
 
 							return (
 								<div className="flex gap-3" key={card.id}>
-									<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-[#f1f5f9] text-[#0f766e]">
-										<Icon className="size-3.5" />
-									</div>
+									<span className={iconTileClass}>
+										<Icon className="size-4" />
+									</span>
 									<div>
-										<p className="font-medium text-[13px]">{card.title}</p>
-										<p className="text-[#64748b] text-xs leading-relaxed">
+										<p className="font-medium text-sm">{card.title}</p>
+										<p className="text-muted-foreground text-xs leading-relaxed">
 											{card.detail}
 										</p>
 									</div>
@@ -1125,7 +1276,7 @@ function BackOfficeViewPanel({
 					filterLabels={["Status", "Engineer"]}
 					rows={jobs.slice(0, 5).map((job) => ({
 						cells: [
-							<span className="font-medium text-[#0f766e]" key={`${job.id}-id`}>
+							<span className="font-medium text-primary" key={`${job.id}-id`}>
 								{job.id}
 							</span>,
 							job.hospital,
@@ -1168,15 +1319,13 @@ function EngineerWorkspace({
 	setManualQuery: (query: string) => void;
 }) {
 	return (
-		<section className="grid flex-1 gap-4 p-4 lg:grid-cols-[390px_1fr] lg:p-6">
-			<div className="rounded-[28px] border border-[#1f2937] bg-[#111827] p-3 shadow-xl">
-				<div className="overflow-hidden rounded-[22px] bg-white">
-					<div className="bg-[#0f766e] px-4 py-5 text-white">
-						<p className="text-white/70 text-xs uppercase tracking-[0.16em]">
-							Engineer App
-						</p>
+		<section className="mx-auto grid w-full max-w-[1320px] flex-1 gap-4 p-4 lg:grid-cols-[390px_1fr] lg:p-6">
+			<div className="rounded-2xl border bg-foreground p-2 shadow-lg">
+				<div className="overflow-hidden rounded-xl bg-card">
+					<div className="bg-primary px-4 py-5 text-primary-foreground">
+						<p className="text-primary-foreground/70 text-xs">Engineer App</p>
 						<h2 className="mt-1 font-semibold text-xl">{selectedEngineer}</h2>
-						<p className="text-sm text-white/80">
+						<p className="text-primary-foreground/80 text-sm">
 							Clocked in · GPS active · Weak WiFi queue ready
 						</p>
 					</div>
@@ -1191,13 +1340,15 @@ function EngineerWorkspace({
 										{jobRuntimeStatus}
 									</StatusPill>
 								</div>
-								<p className="text-[#64748b] text-sm">
+								<p className="text-muted-foreground text-sm">
 									{selectedJob?.hospital}
 								</p>
-								<div className="rounded-sm bg-[#f8fafc] p-3 text-sm">
+								<div className={`${mutedPanelClass} p-3 text-sm`}>
 									<p className="font-medium">{selectedAsset.model}</p>
-									<p className="text-[#64748b]">{selectedAsset.location}</p>
-									<p className="mt-2 text-[#0f766e] text-xs">
+									<p className="text-muted-foreground">
+										{selectedAsset.location}
+									</p>
+									<p className="mt-2 text-primary text-xs">
 										NFC UID: {selectedAsset.nfcUid}
 									</p>
 								</div>
@@ -1210,6 +1361,7 @@ function EngineerWorkspace({
 										NFC start
 									</Button>
 									<Button
+										className={compactButtonClass}
 										onClick={() => onJobAction("pause")}
 										variant="outline"
 									>
@@ -1217,6 +1369,7 @@ function EngineerWorkspace({
 										Parts pause
 									</Button>
 									<Button
+										className={compactButtonClass}
 										onClick={() => onJobAction("resume")}
 										variant="outline"
 									>
@@ -1224,6 +1377,7 @@ function EngineerWorkspace({
 										Resume
 									</Button>
 									<Button
+										className={compactButtonClass}
 										onClick={() => onJobAction("complete")}
 										variant="outline"
 									>
@@ -1270,39 +1424,56 @@ function EngineerWorkspace({
 						title="Push notifications"
 					/>
 				</div>
-				<Card className={panelClass}>
-					<CardHeader>
-						<CardTitle>Natural language service manual Q&A</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="flex gap-2">
-							<Input
-								onChange={(event) => setManualQuery(event.target.value)}
-								placeholder="Ask the scanned device manual..."
-								value={manualQuery}
-							/>
-							<Button className={primaryActionClass}>
+				<div className={panelClass}>
+					<div className="flex flex-col gap-4 px-5 pt-5 pb-4">
+						<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+							<div>
+								<p className="font-semibold text-lg">
+									Natural language service manual Q&A
+								</p>
+								<p className="mt-1 text-muted-foreground text-sm">
+									Search the scanned device manual and return page-backed
+									answers.
+								</p>
+							</div>
+							<Button className={primaryActionClass} size="sm">
 								<SearchIcon className="size-4" />
 								Search
 							</Button>
 						</div>
-						<div className="grid gap-3">
-							{manualAnswers.map((answer) => (
-								<div className={`${mutedPanelClass} p-3`} key={answer.id}>
+						<div className="relative">
+							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+							<Input
+								className="h-8 rounded-md bg-background pl-9 text-sm"
+								onChange={(event) => setManualQuery(event.target.value)}
+								placeholder="Ask the scanned device manual..."
+								value={manualQuery}
+							/>
+						</div>
+					</div>
+					<div className="mx-5 mb-5 overflow-hidden rounded-lg border">
+						{manualAnswers.length > 0 ? (
+							manualAnswers.map((answer) => (
+								<div
+									className="border-b p-4 last:border-b-0 hover:bg-muted/25"
+									key={answer.id}
+								>
 									<div className="flex items-center justify-between gap-3">
 										<p className="font-medium text-sm">{answer.title}</p>
 										<StatusPill className="border-blue-200 bg-blue-50 text-blue-700">
 											Page {answer.page}
 										</StatusPill>
 									</div>
-									<p className="mt-2 text-[#64748b] text-sm">
+									<p className="mt-2 text-muted-foreground text-sm">
 										{answer.excerpt}
 									</p>
 								</div>
-							))}
-						</div>
-					</CardContent>
-				</Card>
+							))
+						) : (
+							<EmptyInline message="No matching manual answers." />
+						)}
+					</div>
+				</div>
 			</div>
 		</section>
 	);
@@ -1322,7 +1493,7 @@ function HospitalFaultPortal({
 					eyebrow="Hospital mobile web"
 					title="Report a fault without installing an app"
 				/>
-				<p className="mt-3 max-w-xl text-[#64748b] text-sm leading-relaxed">
+				<p className="mt-3 max-w-xl text-muted-foreground text-sm leading-relaxed">
 					Hospital staff open a Utiliti link, scan an NFC sticker on Android or
 					search by asset, add fault details and photos, then track status from
 					received to resolved.
@@ -1356,13 +1527,13 @@ function HospitalFaultPortal({
 					<CardTitle>Fault report form</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					<div className="rounded-sm border border-[#d8dee8] bg-[#f8fafc] p-3">
-						<div className="flex items-center gap-2 text-[#0f766e] text-sm">
+					<div className={`${mutedPanelClass} p-3`}>
+						<div className="flex items-center gap-2 text-primary text-sm">
 							<NfcIcon className="size-4" />
 							NFC scan matched asset AST-10031
 						</div>
 						<p className="mt-2 font-medium">Sara Flex Standing Aid</p>
-						<p className="text-[#64748b] text-sm">
+						<p className="text-muted-foreground text-sm">
 							Prince of Wales Hospital · Ward 10B / Bay 3
 						</p>
 					</div>
@@ -1373,13 +1544,13 @@ function HospitalFaultPortal({
 					<div>
 						<Label htmlFor="fault-description">Fault description</Label>
 						<textarea
-							className="mt-2 min-h-28 w-full rounded-sm border border-[#cbd5e1] bg-white p-3 text-sm outline-none focus:border-[#0f766e]"
+							className="mt-2 min-h-28 w-full rounded-md border bg-background p-3 text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring/50"
 							defaultValue="Standing aid battery does not hold charge and shows warning after short use."
 							id="fault-description"
 						/>
 					</div>
 					<div className="flex flex-wrap gap-2">
-						<Button variant="outline">
+						<Button className={compactButtonClass} variant="outline">
 							<UploadIcon className="size-4" />
 							Add photos
 						</Button>
@@ -1402,11 +1573,12 @@ function HospitalFaultPortal({
 								] as const
 							).map((status) => (
 								<button
-									className={`rounded-sm border px-2 py-2 text-xs ${
+									className={cn(
+										"rounded-md border px-2 py-2 text-xs transition-colors",
 										faultStatus === status
 											? faultStatusStyles[status]
-											: "border-[#d8dee8] bg-white text-[#64748b]"
-									}`}
+											: "bg-background text-muted-foreground hover:bg-muted"
+									)}
 									key={status}
 									onClick={() => setFaultStatus(status)}
 									type="button"
@@ -1422,6 +1594,38 @@ function HospitalFaultPortal({
 	);
 }
 
+function EmptyWorkspace({
+	eyebrow,
+	title,
+}: {
+	eyebrow: string;
+	title: string;
+}) {
+	return (
+		<section className="mx-auto w-full max-w-4xl p-4 lg:p-6">
+			<PageFrame eyebrow={eyebrow} title={title}>
+				<Card className={panelClass}>
+					<CardContent className="pt-4">
+						<p className="text-muted-foreground text-sm">
+							Create records from Back Office to start using this workflow.
+						</p>
+					</CardContent>
+				</Card>
+			</PageFrame>
+		</section>
+	);
+}
+
+function EmptyInline({ message }: { message: string }) {
+	return (
+		<div
+			className={`${mutedPanelClass} p-4 text-center text-muted-foreground text-sm`}
+		>
+			{message}
+		</div>
+	);
+}
+
 function PageFrame({
 	action,
 	children,
@@ -1434,8 +1638,8 @@ function PageFrame({
 	title: string;
 }) {
 	return (
-		<div className="mx-auto max-w-[1240px]">
-			<div className="mb-4 flex flex-col gap-3 border-[#d8dee8] border-b pb-3 sm:flex-row sm:items-end sm:justify-between">
+		<div className="mx-auto flex max-w-[1320px] flex-col gap-4 md:gap-6">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 				<PageHeader eyebrow={eyebrow} title={title} />
 				{action}
 			</div>
@@ -1447,10 +1651,8 @@ function PageFrame({
 function PageHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
 	return (
 		<div>
-			<p className="font-medium text-[#0f766e] text-[11px] uppercase tracking-[0.14em]">
-				{eyebrow}
-			</p>
-			<h2 className="mt-1 font-semibold text-[22px] tracking-tight">{title}</h2>
+			<p className="font-medium text-muted-foreground text-xs">{eyebrow}</p>
+			<h2 className="mt-1 font-semibold text-2xl">{title}</h2>
 		</div>
 	);
 }
@@ -1463,19 +1665,19 @@ function DataTable({
 	title,
 }: DataTableProps) {
 	return (
-		<div className={`${panelClass} overflow-hidden bg-white`}>
+		<div className={`${panelClass} overflow-hidden`}>
 			<div className="flex flex-col gap-4 px-5 pt-5 pb-4">
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 					<div>
-						<p className="font-semibold text-[#111827] text-lg">
+						<p className="font-semibold text-lg">
 							{title ?? `${rows.length} Records`}
 						</p>
-						<p className="mt-1 text-[#6b7280] text-sm">
+						<p className="mt-1 text-muted-foreground text-sm">
 							{description ??
 								"Recent service records with status, ownership, and schedule activity."}
 						</p>
 					</div>
-					<Button size="sm" variant="outline">
+					<Button className={compactButtonClass} size="sm" variant="outline">
 						<DownloadIcon className="size-4" />
 						Export
 					</Button>
@@ -1483,9 +1685,9 @@ function DataTable({
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 						<div className="relative sm:w-[340px]">
-							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#6b7280]" />
+							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 							<Input
-								className="h-9 rounded-[10px] bg-white pl-9 text-sm"
+								className="h-8 rounded-md bg-background pl-9 text-sm"
 								placeholder="Search records..."
 								readOnly
 							/>
@@ -1500,17 +1702,17 @@ function DataTable({
 					</div>
 				</div>
 			</div>
-			<div className="mx-5 overflow-hidden rounded-[14px] border border-[#e5e7eb]">
+			<div className="mx-5 overflow-hidden rounded-lg border">
 				<div className="overflow-x-auto">
 					<table className="w-full min-w-[820px] border-collapse text-sm">
-						<thead className="bg-white text-[#202124]">
-							<tr className="border-[#e5e7eb] border-b">
-								<th className="w-16 px-5 py-4 text-left">
+						<thead className="bg-muted/20">
+							<tr className="border-b">
+								<th className="h-11 w-14 px-4 text-left align-middle">
 									<RowCheckbox label="Select all rows" />
 								</th>
 								{columns.map((column) => (
 									<th
-										className="px-5 py-4 text-left font-semibold"
+										className="h-11 px-4 text-left align-middle font-medium"
 										key={column}
 									>
 										{column}
@@ -1519,47 +1721,66 @@ function DataTable({
 							</tr>
 						</thead>
 						<tbody>
-							{rows.map((row) => (
-								<tr
-									className="border-[#e5e7eb] border-b transition-colors last:border-b-0 hover:bg-[#fafafa]"
-									key={row.id}
-								>
-									<td className="px-5 py-4 align-middle">
-										<RowCheckbox label={`Select ${row.id}`} />
-									</td>
-									{row.cells.map((cell, cellIndex) => (
-										<td
-											className="px-5 py-4 align-middle text-[#202124]"
-											key={`${row.id}-${columns[cellIndex] ?? "cell"}`}
-										>
-											{cell}
+							{rows.length > 0 ? (
+								rows.map((row) => (
+									<tr
+										className="border-b transition-colors last:border-b-0 hover:bg-muted/25"
+										key={row.id}
+									>
+										<td className="px-4 py-3 align-middle">
+											<RowCheckbox label={`Select ${row.id}`} />
 										</td>
-									))}
+										{row.cells.map((cell, cellIndex) => (
+											<td
+												className="px-4 py-3 align-middle"
+												key={`${row.id}-${columns[cellIndex] ?? "cell"}`}
+											>
+												{cell}
+											</td>
+										))}
+									</tr>
+								))
+							) : (
+								<tr>
+									<td
+										className="h-24 px-4 text-center text-muted-foreground"
+										colSpan={columns.length + 1}
+									>
+										No records yet.
+									</td>
 								</tr>
-							))}
+							)}
 						</tbody>
 					</table>
 				</div>
 			</div>
-			<div className="flex flex-col gap-3 px-5 py-4 text-[#6b7280] text-sm lg:flex-row lg:items-center lg:justify-between">
+			<div className="flex flex-col gap-3 px-5 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
 				<p>0 of {rows.length} row(s) selected.</p>
 				<div className="flex flex-wrap items-center gap-3">
 					<div className="flex items-center gap-2">
-						<span className="font-medium text-[#202124]">Rows per page</span>
+						<span className="font-medium text-foreground">Rows per page</span>
 						<button
-							className="inline-flex h-9 min-w-16 items-center justify-between rounded-[10px] border border-[#e5e7eb] bg-white px-3 font-medium text-[#202124]"
+							className="inline-flex h-8 min-w-16 items-center justify-between rounded-md border bg-background px-3 font-medium text-foreground transition-colors hover:bg-muted"
 							type="button"
 						>
 							10
-							<span className="text-[#6b7280]">⌄</span>
+							<ChevronDownIcon className="size-4 text-muted-foreground" />
 						</button>
 					</div>
-					<span className="font-medium text-[#202124]">Page 1 of 1</span>
+					<span className="font-medium text-foreground">Page 1 of 1</span>
 					<div className="flex gap-2">
-						<PaginationButton label="First page">‹‹</PaginationButton>
-						<PaginationButton label="Previous page">‹</PaginationButton>
-						<PaginationButton label="Next page">›</PaginationButton>
-						<PaginationButton label="Last page">››</PaginationButton>
+						<PaginationButton label="First page">
+							<ChevronsLeftIcon className="size-4" />
+						</PaginationButton>
+						<PaginationButton label="Previous page">
+							<ChevronLeftIcon className="size-4" />
+						</PaginationButton>
+						<PaginationButton label="Next page">
+							<ChevronRightIcon className="size-4" />
+						</PaginationButton>
+						<PaginationButton label="Last page">
+							<ChevronsRightIcon className="size-4" />
+						</PaginationButton>
 					</div>
 				</div>
 			</div>
@@ -1576,7 +1797,7 @@ function TableToolbarButton({
 }) {
 	return (
 		<Button
-			className="h-9 rounded-[10px] bg-white text-sm"
+			className="h-8 rounded-md bg-background text-sm"
 			size="sm"
 			variant="outline"
 		>
@@ -1590,7 +1811,7 @@ function RowCheckbox({ label }: { label: string }) {
 	return (
 		<input
 			aria-label={label}
-			className="size-5 rounded-[6px] border border-[#e5e7eb] bg-white accent-[#0f766e]"
+			className="size-4 rounded border bg-background accent-primary"
 			readOnly
 			type="checkbox"
 		/>
@@ -1607,7 +1828,7 @@ function PaginationButton({
 	return (
 		<button
 			aria-label={label}
-			className="inline-flex size-9 items-center justify-center rounded-[10px] border border-[#e5e7eb] bg-white font-semibold text-[#202124] text-lg leading-none transition-colors hover:bg-[#f8fafc]"
+			className="inline-flex size-8 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 			type="button"
 		>
 			{children}
@@ -1624,7 +1845,7 @@ function StatusPill({
 }) {
 	return (
 		<span
-			className={`inline-flex items-center rounded-sm border px-2 py-0.5 font-medium text-[11px] ${className}`}
+			className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium text-xs ${className}`}
 		>
 			{children}
 		</span>
@@ -1634,7 +1855,7 @@ function StatusPill({
 function Metric({ label, value }: { label: string; value: string }) {
 	return (
 		<div className={`${mutedPanelClass} p-3`}>
-			<p className="text-[#64748b] text-xs">{label}</p>
+			<p className="text-muted-foreground text-xs">{label}</p>
 			<p className="mt-1 font-medium text-sm">{value}</p>
 		</div>
 	);
@@ -1646,20 +1867,18 @@ function DashboardStatCard({
 	stat: ServiceOpsSnapshot["dashboardStats"][number];
 }) {
 	return (
-		<Card className={`${panelClass} border-t-2 border-t-[#0f766e]`}>
-			<CardContent className="pt-3">
+		<Card className={`${panelClass} bg-gradient-to-t from-primary/5 to-card`}>
+			<CardContent>
 				<div className="flex items-start justify-between gap-3">
 					<div>
-						<p className="text-[#64748b] text-[11px] uppercase tracking-[0.08em]">
-							{stat.label}
-						</p>
-						<p className="mt-2 font-semibold text-2xl text-[#0f172a]">
-							{stat.value}
-						</p>
+						<p className="text-muted-foreground text-xs">{stat.label}</p>
+						<p className="mt-2 font-semibold text-2xl">{stat.value}</p>
 					</div>
-					<span className="mt-0.5 size-2 rounded-full bg-[#0f766e]" />
+					<span className={iconTileClass}>
+						<TrendingUpIcon className="size-4" />
+					</span>
 				</div>
-				<p className="mt-2 border-[#eef2f7] border-t pt-2 text-[#64748b] text-xs">
+				<p className="mt-3 border-t pt-3 text-muted-foreground text-xs">
 					{stat.meta}
 				</p>
 			</CardContent>
@@ -1671,7 +1890,7 @@ function Field({ label, value }: { label: string; value: string }) {
 	return (
 		<div>
 			<Label>{label}</Label>
-			<Input className="mt-2" defaultValue={value} />
+			<Input className="mt-2 rounded-md" defaultValue={value} />
 		</div>
 	);
 }
@@ -1691,13 +1910,15 @@ function StateMachine({ currentStatus }: { currentStatus: JobStatus }) {
 						<span
 							className={`flex size-5 items-center justify-center rounded-full border ${
 								complete
-									? "border-[#0f766e] bg-[#0f766e] text-white"
-									: "border-[#cbd5e1] bg-white"
+									? "border-primary bg-primary text-primary-foreground"
+									: "bg-background text-muted-foreground"
 							}`}
 						>
 							{complete ? <CheckCircle2Icon className="size-3" /> : index + 1}
 						</span>
-						<span className={complete ? "font-medium" : "text-[#64748b]"}>
+						<span
+							className={complete ? "font-medium" : "text-muted-foreground"}
+						>
 							{state}
 						</span>
 					</div>
@@ -1718,11 +1939,11 @@ function FeatureTile({
 }) {
 	return (
 		<div className={`${panelClass} p-4`}>
-			<div className="flex size-9 items-center justify-center rounded-sm bg-[#ecfdf5] text-[#0f766e]">
-				{icon}
-			</div>
+			<div className={iconTileClass}>{icon}</div>
 			<p className="mt-3 font-medium text-sm">{title}</p>
-			<p className="mt-1 text-[#64748b] text-xs leading-relaxed">{text}</p>
+			<p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+				{text}
+			</p>
 		</div>
 	);
 }
@@ -1735,7 +1956,7 @@ function MapPin({ label, status }: { label: string; status: ContractStatus }) {
 	};
 
 	return (
-		<div className="flex items-center gap-2 rounded-sm border border-[#cbd5e1] bg-white px-2 py-1 text-xs shadow-sm">
+		<div className="flex items-center gap-2 rounded-md border bg-card px-2 py-1 text-xs shadow-xs">
 			<span className={`size-3 rounded-full ${colorByStatus[status]}`} />
 			{label}
 		</div>
@@ -1750,7 +1971,7 @@ function EngineerDot({
 	status: EngineerStatus;
 }) {
 	return (
-		<div className="flex items-center gap-2 rounded-sm bg-[#172033] px-2 py-1 text-white text-xs shadow-sm">
+		<div className="flex items-center gap-2 rounded-md bg-foreground px-2 py-1 text-background text-xs shadow-xs">
 			<span className={`size-3 rounded-full ${engineerStatusStyles[status]}`} />
 			{engineer}
 		</div>

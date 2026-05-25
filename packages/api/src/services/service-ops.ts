@@ -52,7 +52,57 @@ import type {
 type TenantRow = typeof tenants.$inferSelect;
 type JobRow = typeof jobs.$inferSelect;
 
+const defaultRegion = "Hong Kong";
+const defaultReleaseLabel = "Early Release v1";
+const maxTenantIdLength = 56;
+const nonAlphanumericRegex = /[^a-z0-9]+/g;
+const edgeHyphenRegex = /^-+|-+$/g;
+
+const defaultSystemParameters = [
+	{
+		description: "Days before contract expiry to show warnings.",
+		key: "contract_expiry_warning_days",
+		value: 30,
+		valueType: "number",
+	},
+	{
+		description: "Geofence radius used for on-site validation.",
+		key: "geofence_radius_meters",
+		value: 200,
+		valueType: "number",
+	},
+	{
+		description: "Advance window for opportunistic PM alerts.",
+		key: "pm_advance_window_days",
+		value: 2,
+		valueType: "number",
+	},
+] as const;
+
 const numberFrom = (value: null | string): number => Number(value ?? 0);
+
+const slugify = (value: string): string =>
+	value
+		.toLowerCase()
+		.replace(nonAlphanumericRegex, "-")
+		.replace(edgeHyphenRegex, "")
+		.slice(0, 32);
+
+const getTenantSeed = (user: {
+	email?: null | string;
+	id: string;
+	name?: null | string;
+}) => {
+	const emailDomain = user.email?.split("@").at(1);
+	const baseName = user.name?.trim() || emailDomain || "Workspace";
+	const slugBase = slugify(emailDomain ?? baseName) || "workspace";
+	const userSuffix = slugify(user.id).slice(0, 12) || "user";
+
+	return {
+		id: `tenant-${slugBase}-${userSuffix}`.slice(0, maxTenantIdLength),
+		name: `${baseName} Workspace`,
+	};
+};
 
 const dateLabel = (value: Date | null): string => {
 	if (!value) {
@@ -239,6 +289,64 @@ export async function getDefaultTenantIdForUser(
 		.limit(1);
 
 	return membership?.tenantId ?? null;
+}
+
+export async function ensureDefaultTenantForUser(user: {
+	email?: null | string;
+	id: string;
+	name?: null | string;
+}): Promise<string> {
+	const existingTenantId = await getDefaultTenantIdForUser(user.id);
+
+	if (existingTenantId) {
+		return existingTenantId;
+	}
+
+	const tenantSeed = getTenantSeed(user);
+
+	await db.transaction(async (tx) => {
+		await tx
+			.insert(tenants)
+			.values({
+				id: tenantSeed.id,
+				name: tenantSeed.name,
+				region: defaultRegion,
+				releaseLabel: defaultReleaseLabel,
+			})
+			.onConflictDoNothing();
+
+		await tx
+			.insert(tenantMemberships)
+			.values({
+				permissions: ["*"],
+				role: "admin",
+				status: "active",
+				tenantId: tenantSeed.id,
+				userId: user.id,
+			})
+			.onConflictDoNothing();
+
+		await tx
+			.insert(systemParameters)
+			.values(
+				defaultSystemParameters.map((parameter) => ({
+					description: parameter.description,
+					key: parameter.key,
+					tenantId: tenantSeed.id,
+					value: parameter.value,
+					valueType: parameter.valueType,
+				}))
+			)
+			.onConflictDoNothing();
+	});
+
+	const tenantId = await getDefaultTenantIdForUser(user.id);
+
+	if (!tenantId) {
+		throw new Error("Unable to create tenant membership for this user.");
+	}
+
+	return tenantId;
 }
 
 export async function userCanAccessTenant(

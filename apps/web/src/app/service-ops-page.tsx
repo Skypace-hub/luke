@@ -1,4 +1,5 @@
 import {
+	ensureDefaultTenantForUser,
 	getDefaultTenantIdForUser,
 	getServiceOpsSnapshot,
 } from "@luke/api/services/service-ops";
@@ -17,11 +18,9 @@ export default async function ServiceOpsPage() {
 		redirect("/login");
 	}
 
-	const tenantId = await getDefaultTenantIdForUser(session.user.id);
-
-	if (!tenantId) {
-		throw new Error("No active tenant membership found for this user.");
-	}
+	const tenantId =
+		(await getDefaultTenantIdForUser(session.user.id)) ??
+		(await ensureDefaultTenantForUser(session.user));
 
 	const initialData = await getServiceOpsSnapshot(tenantId);
 
