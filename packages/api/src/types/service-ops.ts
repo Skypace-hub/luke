@@ -43,7 +43,9 @@ export interface DashboardStat {
 }
 
 export interface Hospital {
+	address: null | string;
 	assets: number;
+	code: string;
 	contractStatus: ContractStatus;
 	district: string;
 	id: string;
@@ -51,81 +53,121 @@ export interface Hospital {
 	lng: number;
 	name: string;
 	openJobs: number;
+	primaryContactEmail: null | string;
+	primaryContactName: null | string;
+	primaryContactPhone: null | string;
 }
 
 export interface Engineer {
+	code: string;
 	currentJob: string;
+	email: null | string;
 	grade: string;
 	hourlyRate: number;
 	id: string;
 	mealCap: number;
 	mileageRate: number;
 	name: string;
+	phone: null | string;
 	region: string;
 	status: EngineerStatus;
+	statusValue: string;
 }
 
 export interface Asset {
 	contractCoverage: "In contract" | "Billable exception" | "Expired";
+	contractCoverageValue: string;
 	designatedEngineer: string;
+	designatedEngineerId: null | string;
 	hospital: string;
+	hospitalId: string;
 	id: string;
+	installationDate: string;
 	location: string;
 	model: string;
 	nextPmDue: string;
 	nfcUid: string;
+	productModelId: string;
+	recordId: string;
 	serial: string;
 	warrantyExpiry: string;
 }
 
 export interface Job {
 	asset: string;
+	assetId: string;
 	audit: string;
 	cost: number;
+	description: string;
 	engineer: string;
+	engineerId: null | string;
 	hospital: string;
+	hospitalId: string;
 	id: string;
 	priority: Priority;
+	priorityValue: string;
+	recordId: string;
 	scheduledFor: string;
+	scheduledStartAt: null | string;
 	status: JobStatus;
+	statusValue: string;
 	timerMinutes: number;
 	type: JobType;
+	typeValue: string;
 }
 
 export interface ProductModel {
+	category: string;
+	code: string;
 	defaultPmCycleMonths: number;
 	engineerAccess: string;
 	id: string;
+	isEngineerReadOnly: boolean;
 	manualFileName: string;
+	manufacturer: string;
 	modelName: string;
 	partsList: string[];
 }
 
 export interface Contract {
 	accountManager: string;
+	coveredModelIds: string[];
 	coveredModels: string[];
 	expiry: string;
 	hospital: string;
+	hospitalId: string;
 	id: string;
+	recordId: string;
 	slaHours: number;
+	startDate: string;
 	status: ContractStatus;
+	statusValue: string;
 	type: "Full" | "Partial" | "Emergency only";
+	typeValue: string;
 }
 
 export interface FaultReport {
 	asset: string;
+	assetId: null | string;
 	description: string;
 	hospital: string;
+	hospitalId: string;
 	id: string;
+	recordId: string;
 	severity: Severity;
+	severityValue: string;
 	status: FaultStatus;
+	statusValue: string;
 	submittedAt: string;
+	submittedByContact: null | string;
+	submittedByName: string;
 }
 
 export interface Part {
 	id: string;
 	minimum: number;
 	name: string;
+	recordId: string;
 	stock: number;
 	supplier: string;
 	unitCost: number;

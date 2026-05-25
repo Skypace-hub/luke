@@ -2,15 +2,20 @@ import { db } from "@luke/db";
 import {
 	assets,
 	contractModelCoverage,
+	contractPartCoverage,
 	contracts,
 	engineers,
 	faultReports,
 	geofenceEvents,
 	hospitals,
 	jobCosts,
+	jobExpenses,
+	jobPartsUsage,
 	jobStateEvents,
 	jobs,
 	jobTimers,
+	nfcEvents,
+	nfcTags,
 	opportunisticPmAlerts,
 	partInventory,
 	parts,
@@ -51,6 +56,110 @@ import type {
 
 type TenantRow = typeof tenants.$inferSelect;
 type JobRow = typeof jobs.$inferSelect;
+type AssetRow = typeof assets.$inferSelect;
+type ContractRow = typeof contracts.$inferSelect;
+type EngineerRow = typeof engineers.$inferSelect;
+type FaultReportRow = typeof faultReports.$inferSelect;
+type HospitalInsert = typeof hospitals.$inferInsert;
+type EngineerInsert = typeof engineers.$inferInsert;
+type ProductInsert = typeof productModels.$inferInsert;
+type PartInsert = typeof parts.$inferInsert;
+type AssetInsert = typeof assets.$inferInsert;
+type JobInsert = typeof jobs.$inferInsert;
+type ContractInsert = typeof contracts.$inferInsert;
+type FaultReportInsert = typeof faultReports.$inferInsert;
+
+export interface HospitalMutationInput {
+	address?: null | string;
+	code: string;
+	district: string;
+	latitude?: null | number;
+	longitude?: null | number;
+	name: string;
+	primaryContactEmail?: null | string;
+	primaryContactName?: null | string;
+	primaryContactPhone?: null | string;
+}
+
+export interface EngineerMutationInput {
+	code: string;
+	email?: null | string;
+	grade: string;
+	hourlyRate: number;
+	mealCap: number;
+	mileageRate: number;
+	name: string;
+	phone?: null | string;
+	region: string;
+	status: EngineerRow["status"];
+}
+
+export interface ProductMutationInput {
+	category: string;
+	code: string;
+	defaultPmCycleMonths: number;
+	isEngineerReadOnly: boolean;
+	manufacturer: string;
+	modelName: string;
+}
+
+export interface PartMutationInput {
+	minimumStock: number;
+	name: string;
+	partNumber: string;
+	stockOnHand: number;
+	supplier: string;
+	unitCost: number;
+}
+
+export interface AssetMutationInput {
+	assetNumber: string;
+	contractCoverageStatus: AssetRow["contractCoverageStatus"];
+	designatedEngineerId?: null | string;
+	hospitalId: string;
+	installationDate?: null | string;
+	locationLabel: string;
+	nextPmDueDate?: null | string;
+	nfcUid: string;
+	productModelId: string;
+	serialNumber: string;
+	warrantyExpiryDate?: null | string;
+}
+
+export interface JobMutationInput {
+	assetId: string;
+	assignedEngineerId?: null | string;
+	description: string;
+	hospitalId: string;
+	jobNumber: string;
+	priority: JobRow["priority"];
+	scheduledStartAt?: null | string;
+	status: JobRow["status"];
+	type: JobRow["type"];
+}
+
+export interface ContractMutationInput {
+	accountManagerName: string;
+	contractNumber: string;
+	coveredModelIds: string[];
+	endDate: string;
+	hospitalId: string;
+	responseSlaHours: number;
+	startDate: string;
+	status: ContractRow["status"];
+	type: ContractRow["type"];
+}
+
+export interface FaultMutationInput {
+	assetId?: null | string;
+	description: string;
+	hospitalId: string;
+	reportNumber: string;
+	severity: FaultReportRow["severity"];
+	status: FaultReportRow["status"];
+	submittedByContact?: null | string;
+	submittedByName: string;
+}
 
 const defaultRegion = "Hong Kong";
 const defaultReleaseLabel = "Early Release v1";
@@ -382,10 +491,113 @@ const getTenant = async (tenantId: string): Promise<TenantRow> => {
 	return tenant;
 };
 
+const toNullableString = (value: null | string | undefined): null | string =>
+	value?.trim() ? value.trim() : null;
+
+const toDateValue = (value: null | string | undefined): null | string =>
+	value?.trim() ? value.trim() : null;
+
+const toTimestampValue = (value: null | string | undefined): Date | null =>
+	value?.trim() ? new Date(value) : null;
+
+const toMoneyValue = (value: number): string => value.toFixed(2);
+
+const ensureRecordBelongsToTenant = async <T>(
+	tableName: string,
+	lookup: Promise<T | undefined>
+): Promise<T> => {
+	const row = await lookup;
+
+	if (!row) {
+		throw new Error(`${tableName} record was not found for this tenant`);
+	}
+
+	return row;
+};
+
+const getTenantHospitalRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Hospital",
+		db.query.hospitals.findFirst({
+			where: and(eq(hospitals.id, id), eq(hospitals.tenantId, tenantId)),
+		})
+	);
+
+const getTenantEngineerRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Engineer",
+		db.query.engineers.findFirst({
+			where: and(eq(engineers.id, id), eq(engineers.tenantId, tenantId)),
+		})
+	);
+
+const getTenantProductRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Product",
+		db.query.productModels.findFirst({
+			where: and(
+				eq(productModels.id, id),
+				eq(productModels.tenantId, tenantId)
+			),
+		})
+	);
+
+const getTenantPartRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Part",
+		db.query.parts.findFirst({
+			where: and(eq(parts.id, id), eq(parts.tenantId, tenantId)),
+		})
+	);
+
+const getTenantAssetRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Asset",
+		db.query.assets.findFirst({
+			where: and(eq(assets.id, id), eq(assets.tenantId, tenantId)),
+		})
+	);
+
+const getTenantJobRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Job",
+		db.query.jobs.findFirst({
+			where: and(eq(jobs.id, id), eq(jobs.tenantId, tenantId)),
+		})
+	);
+
+const getTenantContractRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Contract",
+		db.query.contracts.findFirst({
+			where: and(eq(contracts.id, id), eq(contracts.tenantId, tenantId)),
+		})
+	);
+
+const getTenantFaultRecord = (tenantId: string, id: string) =>
+	ensureRecordBelongsToTenant(
+		"Fault report",
+		db.query.faultReports.findFirst({
+			where: and(eq(faultReports.id, id), eq(faultReports.tenantId, tenantId)),
+		})
+	);
+
+const validateOptionalTenantRecord = async (
+	tenantId: string,
+	id: null | string | undefined,
+	lookup: (tenantId: string, id: string) => Promise<unknown>
+) => {
+	if (id) {
+		await lookup(tenantId, id);
+	}
+};
+
 const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 	const rows = await db
 		.select({
+			address: hospitals.address,
 			assetCount: sql<number>`count(distinct ${assets.id})`.mapWith(Number),
+			code: hospitals.code,
 			contractStatus: sql<typeof contracts.$inferSelect.status | null>`case
 				when bool_or(${contracts.status} = 'expired') then 'expired'
 				when bool_or(${contracts.status} = 'expiring') then 'expiring'
@@ -401,6 +613,9 @@ const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 				sql<number>`count(distinct ${jobs.id}) filter (where ${jobs.status} <> 'completed' and ${jobs.status} <> 'cancelled')`.mapWith(
 					Number
 				),
+			primaryContactEmail: hospitals.primaryContactEmail,
+			primaryContactName: hospitals.primaryContactName,
+			primaryContactPhone: hospitals.primaryContactPhone,
 		})
 		.from(hospitals)
 		.leftJoin(
@@ -418,18 +633,25 @@ const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 				eq(contracts.tenantId, tenantId)
 			)
 		)
-		.where(eq(hospitals.tenantId, tenantId))
+		.where(and(eq(hospitals.tenantId, tenantId), eq(hospitals.isActive, true)))
 		.groupBy(
 			hospitals.id,
+			hospitals.code,
 			hospitals.name,
 			hospitals.district,
+			hospitals.address,
 			hospitals.latitude,
-			hospitals.longitude
+			hospitals.longitude,
+			hospitals.primaryContactName,
+			hospitals.primaryContactEmail,
+			hospitals.primaryContactPhone
 		)
 		.orderBy(asc(hospitals.name));
 
 	return rows.map((row) => ({
+		address: row.address,
 		assets: row.assetCount,
+		code: row.code,
 		contractStatus: row.contractStatus
 			? mapContractStatus(row.contractStatus)
 			: "Expired",
@@ -439,44 +661,73 @@ const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 		lng: numberFrom(row.longitude),
 		name: row.name,
 		openJobs: row.openJobs,
+		primaryContactEmail: row.primaryContactEmail,
+		primaryContactName: row.primaryContactName,
+		primaryContactPhone: row.primaryContactPhone,
 	}));
 };
 
 const getEngineers = async (tenantId: string): Promise<Engineer[]> => {
 	const rows = await db
 		.select({
-			currentJob: jobs.jobNumber,
+			code: engineers.code,
+			email: engineers.email,
 			grade: engineers.grade,
 			hourlyRateHkd: engineers.hourlyRateHkd,
 			id: engineers.id,
 			mealCapHkd: engineers.mealCapHkd,
 			mileageRateHkdPerKm: engineers.mileageRateHkdPerKm,
 			name: engineers.name,
+			phone: engineers.phone,
 			region: engineers.region,
 			status: engineers.status,
 		})
 		.from(engineers)
-		.leftJoin(
-			jobs,
-			and(
-				eq(jobs.assignedEngineerId, engineers.id),
-				ne(jobs.status, "completed"),
-				ne(jobs.status, "cancelled")
-			)
+		.where(
+			and(eq(engineers.tenantId, tenantId), ne(engineers.status, "off_duty"))
 		)
-		.where(eq(engineers.tenantId, tenantId))
 		.orderBy(asc(engineers.code));
+	const engineerIds = rows.map((engineer) => engineer.id);
+	const currentJobRows =
+		engineerIds.length > 0
+			? await db
+					.select({
+						engineerId: jobs.assignedEngineerId,
+						jobNumber: jobs.jobNumber,
+					})
+					.from(jobs)
+					.where(
+						and(
+							eq(jobs.tenantId, tenantId),
+							inArray(jobs.assignedEngineerId, engineerIds),
+							ne(jobs.status, "completed"),
+							ne(jobs.status, "cancelled")
+						)
+					)
+					.orderBy(desc(jobs.scheduledStartAt))
+			: [];
+	const currentJobByEngineerId = new Map<string, string>();
+
+	for (const job of currentJobRows) {
+		if (job.engineerId && !currentJobByEngineerId.has(job.engineerId)) {
+			currentJobByEngineerId.set(job.engineerId, job.jobNumber);
+		}
+	}
 
 	return rows.map((row) => ({
-		currentJob: row.currentJob ?? "Available",
+		code: row.code,
+		currentJob: currentJobByEngineerId.get(row.id) ?? "Available",
+		email: row.email,
 		grade: row.grade,
 		hourlyRate: numberFrom(row.hourlyRateHkd),
 		id: row.id,
 		mealCap: numberFrom(row.mealCapHkd),
 		mileageRate: numberFrom(row.mileageRateHkdPerKm),
 		name: row.name,
+		phone: row.phone,
 		region: row.region,
 		status: mapEngineerStatus(row.status),
+		statusValue: row.status,
 	}));
 };
 
@@ -485,12 +736,17 @@ const getAssets = async (tenantId: string): Promise<Asset[]> => {
 		.select({
 			assetNumber: assets.assetNumber,
 			contractCoverageStatus: assets.contractCoverageStatus,
+			designatedEngineerId: assets.designatedEngineerId,
 			designatedEngineer: engineers.name,
 			hospital: hospitals.name,
+			hospitalId: assets.hospitalId,
+			installationDate: assets.installationDate,
 			locationLabel: assets.locationLabel,
 			modelName: productModels.modelName,
 			nextPmDueDate: assets.nextPmDueDate,
 			nfcUid: assets.nfcUid,
+			productModelId: assets.productModelId,
+			recordId: assets.id,
 			serialNumber: assets.serialNumber,
 			warrantyExpiryDate: assets.warrantyExpiryDate,
 		})
@@ -507,18 +763,24 @@ const getAssets = async (tenantId: string): Promise<Asset[]> => {
 			and(eq(hospitals.id, assets.hospitalId), eq(hospitals.tenantId, tenantId))
 		)
 		.leftJoin(engineers, eq(engineers.id, assets.designatedEngineerId))
-		.where(eq(assets.tenantId, tenantId))
+		.where(and(eq(assets.tenantId, tenantId), eq(assets.isActive, true)))
 		.orderBy(asc(assets.assetNumber));
 
 	return rows.map((row) => ({
 		contractCoverage: mapCoverage(row.contractCoverageStatus),
+		contractCoverageValue: row.contractCoverageStatus,
 		designatedEngineer: row.designatedEngineer ?? "Unassigned",
+		designatedEngineerId: row.designatedEngineerId,
 		hospital: row.hospital,
+		hospitalId: row.hospitalId,
 		id: row.assetNumber,
+		installationDate: dateOnly(row.installationDate),
 		location: row.locationLabel,
 		model: row.modelName,
 		nextPmDue: dateOnly(row.nextPmDueDate),
 		nfcUid: row.nfcUid,
+		productModelId: row.productModelId,
+		recordId: row.recordId,
 		serial: row.serialNumber,
 		warrantyExpiry: dateOnly(row.warrantyExpiryDate),
 	}));
@@ -527,13 +789,18 @@ const getAssets = async (tenantId: string): Promise<Asset[]> => {
 const getJobs = async (tenantId: string): Promise<Job[]> => {
 	const rows = await db
 		.select({
+			assetId: jobs.assetId,
 			assetNumber: assets.assetNumber,
 			audit: jobStateEvents.eventLabel,
 			cost: jobCosts.labourCostHkd,
+			description: jobs.description,
+			engineerId: jobs.assignedEngineerId,
 			engineerName: engineers.name,
+			hospitalId: jobs.hospitalId,
 			hospitalName: hospitals.name,
 			jobNumber: jobs.jobNumber,
 			priority: jobs.priority,
+			recordId: jobs.id,
 			scheduledStartAt: jobs.scheduledStartAt,
 			status: jobs.status,
 			timerMinutes: jobTimers.durationMinutes,
@@ -560,16 +827,25 @@ const getJobs = async (tenantId: string): Promise<Job[]> => {
 		seen.add(row.jobNumber);
 		mapped.push({
 			asset: row.assetNumber,
+			assetId: row.assetId,
 			audit: row.audit ?? "No state events recorded",
 			cost: Math.round(numberFrom(row.cost)),
+			description: row.description,
 			engineer: row.engineerName ?? "Unassigned",
+			engineerId: row.engineerId,
 			hospital: row.hospitalName,
+			hospitalId: row.hospitalId,
 			id: row.jobNumber,
 			priority: mapPriority(row.priority),
+			priorityValue: row.priority,
+			recordId: row.recordId,
 			scheduledFor: dateLabel(row.scheduledStartAt),
+			scheduledStartAt: row.scheduledStartAt?.toISOString() ?? null,
 			status: mapJobStatus(row.status),
+			statusValue: row.status,
 			timerMinutes: row.timerMinutes ?? 0,
 			type: mapJobType(row.type),
+			typeValue: row.type,
 		});
 	}
 
@@ -579,8 +855,11 @@ const getJobs = async (tenantId: string): Promise<Job[]> => {
 const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
 	const rows = await db
 		.select({
+			category: productModels.category,
+			code: productModels.code,
 			defaultPmCycleMonths: productModels.defaultPmCycleMonths,
 			isEngineerReadOnly: productModels.isEngineerReadOnly,
+			manufacturer: productModels.manufacturer,
 			manualFileName: serviceManuals.fileName,
 			modelName: productModels.modelName,
 			partName: parts.name,
@@ -613,9 +892,13 @@ const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
 		}
 
 		byModel.set(row.productModelId, {
+			category: row.category,
+			code: row.code,
 			defaultPmCycleMonths: row.defaultPmCycleMonths,
 			engineerAccess: row.isEngineerReadOnly ? "Read-only" : "Editable",
 			id: row.productModelId,
+			isEngineerReadOnly: row.isEngineerReadOnly,
+			manufacturer: row.manufacturer,
 			manualFileName: row.manualFileName ?? "Not uploaded",
 			modelName: row.modelName,
 			partsList: row.partName ? [row.partName] : [],
@@ -630,10 +913,14 @@ const getContracts = async (tenantId: string): Promise<Contract[]> => {
 		.select({
 			accountManagerName: contracts.accountManagerName,
 			contractNumber: contracts.contractNumber,
+			contractId: contracts.id,
 			endDate: contracts.endDate,
+			hospitalId: contracts.hospitalId,
 			hospitalName: hospitals.name,
+			productModelId: productModels.id,
 			modelName: productModels.modelName,
 			responseSlaHours: contracts.responseSlaHours,
+			startDate: contracts.startDate,
 			status: contracts.status,
 			type: contracts.type,
 		})
@@ -659,19 +946,28 @@ const getContracts = async (tenantId: string): Promise<Contract[]> => {
 			if (row.modelName) {
 				existing.coveredModels.push(row.modelName);
 			}
+			if (row.productModelId) {
+				existing.coveredModelIds.push(row.productModelId);
+			}
 
 			continue;
 		}
 
 		byContract.set(row.contractNumber, {
 			accountManager: row.accountManagerName,
+			coveredModelIds: row.productModelId ? [row.productModelId] : [],
 			coveredModels: row.modelName ? [row.modelName] : [],
 			expiry: row.endDate,
 			hospital: row.hospitalName,
+			hospitalId: row.hospitalId,
 			id: row.contractNumber,
+			recordId: row.contractId,
 			slaHours: row.responseSlaHours,
+			startDate: row.startDate,
 			status: mapContractStatus(row.status),
+			statusValue: row.status,
 			type: mapContractType(row.type),
+			typeValue: row.type,
 		});
 	}
 
@@ -681,13 +977,18 @@ const getContracts = async (tenantId: string): Promise<Contract[]> => {
 const getFaultReports = async (tenantId: string): Promise<FaultReport[]> => {
 	const rows = await db
 		.select({
+			assetId: faultReports.assetId,
 			assetNumber: assets.assetNumber,
 			createdAt: faultReports.createdAt,
 			description: faultReports.description,
+			hospitalId: faultReports.hospitalId,
 			hospitalName: hospitals.name,
 			reportNumber: faultReports.reportNumber,
+			recordId: faultReports.id,
 			severity: faultReports.severity,
 			status: faultReports.status,
+			submittedByContact: faultReports.submittedByContact,
+			submittedByName: faultReports.submittedByName,
 		})
 		.from(faultReports)
 		.innerJoin(hospitals, eq(hospitals.id, faultReports.hospitalId))
@@ -697,11 +998,18 @@ const getFaultReports = async (tenantId: string): Promise<FaultReport[]> => {
 
 	return rows.map((row) => ({
 		asset: row.assetNumber ?? "Manual lookup",
+		assetId: row.assetId,
 		description: row.description,
 		hospital: row.hospitalName,
+		hospitalId: row.hospitalId,
 		id: row.reportNumber,
+		recordId: row.recordId,
 		severity: mapSeverity(row.severity),
+		severityValue: row.severity,
 		status: mapFaultStatus(row.status),
+		statusValue: row.status,
+		submittedByContact: row.submittedByContact,
+		submittedByName: row.submittedByName,
 		submittedAt: dateLabel(row.createdAt),
 	}));
 };
@@ -712,19 +1020,21 @@ const getParts = async (tenantId: string): Promise<Part[]> => {
 			minimumStock: partInventory.minimumStock,
 			name: parts.name,
 			partNumber: parts.partNumber,
+			recordId: parts.id,
 			stockOnHand: partInventory.stockOnHand,
 			supplier: parts.supplier,
 			unitCostHkd: parts.unitCostHkd,
 		})
 		.from(parts)
 		.leftJoin(partInventory, eq(partInventory.partId, parts.id))
-		.where(eq(parts.tenantId, tenantId))
+		.where(and(eq(parts.tenantId, tenantId), eq(parts.isActive, true)))
 		.orderBy(asc(parts.partNumber));
 
 	return rows.map((row) => ({
 		id: row.partNumber,
 		minimum: row.minimumStock ?? 0,
 		name: row.name,
+		recordId: row.recordId,
 		stock: row.stockOnHand ?? 0,
 		supplier: row.supplier,
 		unitCost: numberFrom(row.unitCostHkd),
@@ -1072,4 +1382,657 @@ export async function getServiceOpsSnapshot(
 			release: tenant.releaseLabel,
 		},
 	};
+}
+
+export async function createHospital(
+	tenantId: string,
+	input: HospitalMutationInput
+) {
+	await db.insert(hospitals).values({
+		address: toNullableString(input.address),
+		code: input.code,
+		district: input.district,
+		latitude: input.latitude === null ? null : String(input.latitude ?? 0),
+		longitude: input.longitude === null ? null : String(input.longitude ?? 0),
+		name: input.name,
+		primaryContactEmail: toNullableString(input.primaryContactEmail),
+		primaryContactName: toNullableString(input.primaryContactName),
+		primaryContactPhone: toNullableString(input.primaryContactPhone),
+		tenantId,
+	} satisfies HospitalInsert);
+}
+
+export async function updateHospital(
+	tenantId: string,
+	id: string,
+	input: HospitalMutationInput
+) {
+	await getTenantHospitalRecord(tenantId, id);
+	await db
+		.update(hospitals)
+		.set({
+			address: toNullableString(input.address),
+			code: input.code,
+			district: input.district,
+			latitude: input.latitude === null ? null : String(input.latitude ?? 0),
+			longitude: input.longitude === null ? null : String(input.longitude ?? 0),
+			name: input.name,
+			primaryContactEmail: toNullableString(input.primaryContactEmail),
+			primaryContactName: toNullableString(input.primaryContactName),
+			primaryContactPhone: toNullableString(input.primaryContactPhone),
+		})
+		.where(and(eq(hospitals.id, id), eq(hospitals.tenantId, tenantId)));
+}
+
+export async function deleteHospital(tenantId: string, id: string) {
+	await getTenantHospitalRecord(tenantId, id);
+	await db
+		.update(hospitals)
+		.set({ isActive: false })
+		.where(and(eq(hospitals.id, id), eq(hospitals.tenantId, tenantId)));
+}
+
+export async function createEngineer(
+	tenantId: string,
+	input: EngineerMutationInput
+) {
+	await db.insert(engineers).values({
+		code: input.code,
+		email: toNullableString(input.email),
+		grade: input.grade,
+		hourlyRateHkd: toMoneyValue(input.hourlyRate),
+		mealCapHkd: toMoneyValue(input.mealCap),
+		mileageRateHkdPerKm: toMoneyValue(input.mileageRate),
+		name: input.name,
+		phone: toNullableString(input.phone),
+		region: input.region,
+		status: input.status,
+		tenantId,
+	} satisfies EngineerInsert);
+}
+
+export async function updateEngineer(
+	tenantId: string,
+	id: string,
+	input: EngineerMutationInput
+) {
+	await getTenantEngineerRecord(tenantId, id);
+	await db
+		.update(engineers)
+		.set({
+			code: input.code,
+			email: toNullableString(input.email),
+			grade: input.grade,
+			hourlyRateHkd: toMoneyValue(input.hourlyRate),
+			mealCapHkd: toMoneyValue(input.mealCap),
+			mileageRateHkdPerKm: toMoneyValue(input.mileageRate),
+			name: input.name,
+			phone: toNullableString(input.phone),
+			region: input.region,
+			status: input.status,
+		})
+		.where(and(eq(engineers.id, id), eq(engineers.tenantId, tenantId)));
+}
+
+export async function deleteEngineer(tenantId: string, id: string) {
+	await getTenantEngineerRecord(tenantId, id);
+	await db
+		.update(engineers)
+		.set({ status: "off_duty" })
+		.where(and(eq(engineers.id, id), eq(engineers.tenantId, tenantId)));
+}
+
+export async function createProduct(
+	tenantId: string,
+	input: ProductMutationInput
+) {
+	await db.insert(productModels).values({
+		category: input.category,
+		code: input.code,
+		defaultPmCycleMonths: input.defaultPmCycleMonths,
+		isEngineerReadOnly: input.isEngineerReadOnly,
+		manufacturer: input.manufacturer,
+		modelName: input.modelName,
+		tenantId,
+	} satisfies ProductInsert);
+}
+
+export async function updateProduct(
+	tenantId: string,
+	id: string,
+	input: ProductMutationInput
+) {
+	await getTenantProductRecord(tenantId, id);
+	await db
+		.update(productModels)
+		.set({
+			category: input.category,
+			code: input.code,
+			defaultPmCycleMonths: input.defaultPmCycleMonths,
+			isEngineerReadOnly: input.isEngineerReadOnly,
+			manufacturer: input.manufacturer,
+			modelName: input.modelName,
+		})
+		.where(and(eq(productModels.id, id), eq(productModels.tenantId, tenantId)));
+}
+
+export async function deleteProduct(tenantId: string, id: string) {
+	await getTenantProductRecord(tenantId, id);
+	await db.transaction(async (tx) => {
+		const manualRows = await tx
+			.select({ id: serviceManuals.id })
+			.from(serviceManuals)
+			.where(
+				and(
+					eq(serviceManuals.productModelId, id),
+					eq(serviceManuals.tenantId, tenantId)
+				)
+			);
+		const manualIds = manualRows.map((manual) => manual.id);
+
+		if (manualIds.length > 0) {
+			await tx
+				.delete(serviceManualSections)
+				.where(
+					and(
+						eq(serviceManualSections.tenantId, tenantId),
+						inArray(serviceManualSections.manualId, manualIds)
+					)
+				);
+		}
+
+		await tx
+			.delete(serviceManuals)
+			.where(
+				and(
+					eq(serviceManuals.productModelId, id),
+					eq(serviceManuals.tenantId, tenantId)
+				)
+			);
+		await tx
+			.delete(productModelParts)
+			.where(
+				and(
+					eq(productModelParts.productModelId, id),
+					eq(productModelParts.tenantId, tenantId)
+				)
+			);
+		await tx
+			.delete(contractModelCoverage)
+			.where(
+				and(
+					eq(contractModelCoverage.productModelId, id),
+					eq(contractModelCoverage.tenantId, tenantId)
+				)
+			);
+		await tx
+			.delete(productModels)
+			.where(
+				and(eq(productModels.id, id), eq(productModels.tenantId, tenantId))
+			);
+	});
+}
+
+export async function createPart(tenantId: string, input: PartMutationInput) {
+	await db.transaction(async (tx) => {
+		const [part] = await tx
+			.insert(parts)
+			.values({
+				name: input.name,
+				partNumber: input.partNumber,
+				supplier: input.supplier,
+				tenantId,
+				unitCostHkd: toMoneyValue(input.unitCost),
+			} satisfies PartInsert)
+			.returning({ id: parts.id });
+
+		if (!part) {
+			throw new Error("Unable to create part");
+		}
+
+		await tx.insert(partInventory).values({
+			minimumStock: input.minimumStock,
+			partId: part.id,
+			stockOnHand: input.stockOnHand,
+			tenantId,
+		});
+	});
+}
+
+export async function updatePart(
+	tenantId: string,
+	id: string,
+	input: PartMutationInput
+) {
+	await getTenantPartRecord(tenantId, id);
+	await db.transaction(async (tx) => {
+		await tx
+			.update(parts)
+			.set({
+				name: input.name,
+				partNumber: input.partNumber,
+				supplier: input.supplier,
+				unitCostHkd: toMoneyValue(input.unitCost),
+			})
+			.where(and(eq(parts.id, id), eq(parts.tenantId, tenantId)));
+
+		const [inventory] = await tx
+			.select({ id: partInventory.id })
+			.from(partInventory)
+			.where(
+				and(eq(partInventory.partId, id), eq(partInventory.tenantId, tenantId))
+			)
+			.limit(1);
+
+		if (inventory) {
+			await tx
+				.update(partInventory)
+				.set({
+					minimumStock: input.minimumStock,
+					stockOnHand: input.stockOnHand,
+				})
+				.where(eq(partInventory.id, inventory.id));
+			return;
+		}
+
+		await tx.insert(partInventory).values({
+			minimumStock: input.minimumStock,
+			partId: id,
+			stockOnHand: input.stockOnHand,
+			tenantId,
+		});
+	});
+}
+
+export async function deletePart(tenantId: string, id: string) {
+	await getTenantPartRecord(tenantId, id);
+	await db
+		.update(parts)
+		.set({ isActive: false })
+		.where(and(eq(parts.id, id), eq(parts.tenantId, tenantId)));
+}
+
+export async function createAsset(tenantId: string, input: AssetMutationInput) {
+	await getTenantProductRecord(tenantId, input.productModelId);
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	await validateOptionalTenantRecord(
+		tenantId,
+		input.designatedEngineerId,
+		getTenantEngineerRecord
+	);
+	await db.transaction(async (tx) => {
+		const [asset] = await tx
+			.insert(assets)
+			.values({
+				assetNumber: input.assetNumber,
+				contractCoverageStatus: input.contractCoverageStatus,
+				designatedEngineerId: input.designatedEngineerId ?? null,
+				hospitalId: input.hospitalId,
+				installationDate: toDateValue(input.installationDate),
+				locationLabel: input.locationLabel,
+				nextPmDueDate: toDateValue(input.nextPmDueDate),
+				nfcUid: input.nfcUid,
+				productModelId: input.productModelId,
+				serialNumber: input.serialNumber,
+				tenantId,
+				warrantyExpiryDate: toDateValue(input.warrantyExpiryDate),
+			} satisfies AssetInsert)
+			.returning({ id: assets.id });
+
+		if (!asset) {
+			throw new Error("Unable to create asset");
+		}
+
+		await tx.insert(nfcTags).values({
+			assetId: asset.id,
+			commissionedAt: new Date(),
+			ndefPayload: { uid: input.nfcUid, v: 1 },
+			status: "commissioned",
+			tenantId,
+			uid: input.nfcUid,
+		});
+	});
+}
+
+export async function updateAsset(
+	tenantId: string,
+	id: string,
+	input: AssetMutationInput
+) {
+	await getTenantAssetRecord(tenantId, id);
+	await getTenantProductRecord(tenantId, input.productModelId);
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	await validateOptionalTenantRecord(
+		tenantId,
+		input.designatedEngineerId,
+		getTenantEngineerRecord
+	);
+	await db.transaction(async (tx) => {
+		await tx
+			.update(assets)
+			.set({
+				assetNumber: input.assetNumber,
+				contractCoverageStatus: input.contractCoverageStatus,
+				designatedEngineerId: input.designatedEngineerId ?? null,
+				hospitalId: input.hospitalId,
+				installationDate: toDateValue(input.installationDate),
+				locationLabel: input.locationLabel,
+				nextPmDueDate: toDateValue(input.nextPmDueDate),
+				nfcUid: input.nfcUid,
+				productModelId: input.productModelId,
+				serialNumber: input.serialNumber,
+				warrantyExpiryDate: toDateValue(input.warrantyExpiryDate),
+			})
+			.where(and(eq(assets.id, id), eq(assets.tenantId, tenantId)));
+		await tx
+			.update(nfcTags)
+			.set({ ndefPayload: { uid: input.nfcUid, v: 1 }, uid: input.nfcUid })
+			.where(and(eq(nfcTags.assetId, id), eq(nfcTags.tenantId, tenantId)));
+	});
+}
+
+export async function deleteAsset(tenantId: string, id: string) {
+	await getTenantAssetRecord(tenantId, id);
+	await db
+		.update(assets)
+		.set({ isActive: false })
+		.where(and(eq(assets.id, id), eq(assets.tenantId, tenantId)));
+}
+
+export async function createJob(
+	tenantId: string,
+	userId: string,
+	input: JobMutationInput
+) {
+	const asset = await getTenantAssetRecord(tenantId, input.assetId);
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	await validateOptionalTenantRecord(
+		tenantId,
+		input.assignedEngineerId,
+		getTenantEngineerRecord
+	);
+	await db.transaction(async (tx) => {
+		const [job] = await tx
+			.insert(jobs)
+			.values({
+				assetId: input.assetId,
+				assignedEngineerId: input.assignedEngineerId ?? null,
+				createdByUserId: userId,
+				description: input.description,
+				hospitalId: input.hospitalId || asset.hospitalId,
+				jobNumber: input.jobNumber,
+				priority: input.priority,
+				scheduledStartAt: toTimestampValue(input.scheduledStartAt),
+				status: input.status,
+				tenantId,
+				type: input.type,
+			} satisfies JobInsert)
+			.returning({ id: jobs.id });
+
+		if (!job) {
+			throw new Error("Unable to create job");
+		}
+
+		await tx.insert(jobStateEvents).values({
+			actorUserId: userId,
+			eventLabel: `Created with ${titleCase(input.status)} status`,
+			jobId: job.id,
+			tenantId,
+			toStatus: input.status,
+		});
+	});
+}
+
+export async function updateJob(
+	tenantId: string,
+	userId: string,
+	id: string,
+	input: JobMutationInput
+) {
+	const existingJob = await getTenantJobRecord(tenantId, id);
+	const asset = await getTenantAssetRecord(tenantId, input.assetId);
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	await validateOptionalTenantRecord(
+		tenantId,
+		input.assignedEngineerId,
+		getTenantEngineerRecord
+	);
+	await db.transaction(async (tx) => {
+		await tx
+			.update(jobs)
+			.set({
+				assetId: input.assetId,
+				assignedEngineerId: input.assignedEngineerId ?? null,
+				description: input.description,
+				hospitalId: input.hospitalId || asset.hospitalId,
+				jobNumber: input.jobNumber,
+				priority: input.priority,
+				scheduledStartAt: toTimestampValue(input.scheduledStartAt),
+				status: input.status,
+				type: input.type,
+			})
+			.where(and(eq(jobs.id, id), eq(jobs.tenantId, tenantId)));
+
+		if (existingJob.status !== input.status) {
+			await tx.insert(jobStateEvents).values({
+				actorUserId: userId,
+				eventLabel: `Status changed to ${titleCase(input.status)}`,
+				fromStatus: existingJob.status,
+				jobId: id,
+				tenantId,
+				toStatus: input.status,
+			});
+		}
+	});
+}
+
+export async function deleteJob(tenantId: string, id: string) {
+	await getTenantJobRecord(tenantId, id);
+	await db.transaction(async (tx) => {
+		await tx
+			.delete(jobCosts)
+			.where(and(eq(jobCosts.jobId, id), eq(jobCosts.tenantId, tenantId)));
+		await tx
+			.delete(jobExpenses)
+			.where(
+				and(eq(jobExpenses.jobId, id), eq(jobExpenses.tenantId, tenantId))
+			);
+		await tx
+			.delete(jobPartsUsage)
+			.where(
+				and(eq(jobPartsUsage.jobId, id), eq(jobPartsUsage.tenantId, tenantId))
+			);
+		await tx
+			.delete(partsShortages)
+			.where(
+				and(eq(partsShortages.jobId, id), eq(partsShortages.tenantId, tenantId))
+			);
+		await tx
+			.delete(jobTimers)
+			.where(and(eq(jobTimers.jobId, id), eq(jobTimers.tenantId, tenantId)));
+		await tx
+			.delete(geofenceEvents)
+			.where(
+				and(eq(geofenceEvents.jobId, id), eq(geofenceEvents.tenantId, tenantId))
+			);
+		await tx
+			.delete(nfcEvents)
+			.where(and(eq(nfcEvents.jobId, id), eq(nfcEvents.tenantId, tenantId)));
+		await tx
+			.delete(jobStateEvents)
+			.where(
+				and(eq(jobStateEvents.jobId, id), eq(jobStateEvents.tenantId, tenantId))
+			);
+		await tx
+			.delete(jobs)
+			.where(and(eq(jobs.id, id), eq(jobs.tenantId, tenantId)));
+	});
+}
+
+export async function createContract(
+	tenantId: string,
+	input: ContractMutationInput
+) {
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	for (const productModelId of input.coveredModelIds) {
+		await getTenantProductRecord(tenantId, productModelId);
+	}
+
+	await db.transaction(async (tx) => {
+		const [contract] = await tx
+			.insert(contracts)
+			.values({
+				accountManagerName: input.accountManagerName,
+				contractNumber: input.contractNumber,
+				endDate: input.endDate,
+				hospitalId: input.hospitalId,
+				responseSlaHours: input.responseSlaHours,
+				startDate: input.startDate,
+				status: input.status,
+				tenantId,
+				type: input.type,
+			} satisfies ContractInsert)
+			.returning({ id: contracts.id });
+
+		if (!contract) {
+			throw new Error("Unable to create contract");
+		}
+
+		if (input.coveredModelIds.length > 0) {
+			await tx.insert(contractModelCoverage).values(
+				input.coveredModelIds.map((productModelId) => ({
+					contractId: contract.id,
+					coverageStatus: "in_contract" as const,
+					productModelId,
+					tenantId,
+				}))
+			);
+		}
+	});
+}
+
+export async function updateContract(
+	tenantId: string,
+	id: string,
+	input: ContractMutationInput
+) {
+	await getTenantContractRecord(tenantId, id);
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	for (const productModelId of input.coveredModelIds) {
+		await getTenantProductRecord(tenantId, productModelId);
+	}
+
+	await db.transaction(async (tx) => {
+		await tx
+			.update(contracts)
+			.set({
+				accountManagerName: input.accountManagerName,
+				contractNumber: input.contractNumber,
+				endDate: input.endDate,
+				hospitalId: input.hospitalId,
+				responseSlaHours: input.responseSlaHours,
+				startDate: input.startDate,
+				status: input.status,
+				type: input.type,
+			})
+			.where(and(eq(contracts.id, id), eq(contracts.tenantId, tenantId)));
+		await tx
+			.delete(contractModelCoverage)
+			.where(
+				and(
+					eq(contractModelCoverage.contractId, id),
+					eq(contractModelCoverage.tenantId, tenantId)
+				)
+			);
+		if (input.coveredModelIds.length > 0) {
+			await tx.insert(contractModelCoverage).values(
+				input.coveredModelIds.map((productModelId) => ({
+					contractId: id,
+					coverageStatus: "in_contract" as const,
+					productModelId,
+					tenantId,
+				}))
+			);
+		}
+	});
+}
+
+export async function deleteContract(tenantId: string, id: string) {
+	await getTenantContractRecord(tenantId, id);
+	await db.transaction(async (tx) => {
+		await tx
+			.delete(contractModelCoverage)
+			.where(
+				and(
+					eq(contractModelCoverage.contractId, id),
+					eq(contractModelCoverage.tenantId, tenantId)
+				)
+			);
+		await tx
+			.delete(contractPartCoverage)
+			.where(
+				and(
+					eq(contractPartCoverage.contractId, id),
+					eq(contractPartCoverage.tenantId, tenantId)
+				)
+			);
+		await tx
+			.delete(contracts)
+			.where(and(eq(contracts.id, id), eq(contracts.tenantId, tenantId)));
+	});
+}
+
+export async function createFault(tenantId: string, input: FaultMutationInput) {
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	await validateOptionalTenantRecord(
+		tenantId,
+		input.assetId,
+		getTenantAssetRecord
+	);
+	await db.insert(faultReports).values({
+		assetId: input.assetId ?? null,
+		description: input.description,
+		hospitalId: input.hospitalId,
+		reportNumber: input.reportNumber,
+		severity: input.severity,
+		source: "back_office",
+		status: input.status,
+		submittedByContact: toNullableString(input.submittedByContact),
+		submittedByName: input.submittedByName,
+		tenantId,
+	} satisfies FaultReportInsert);
+}
+
+export async function updateFault(
+	tenantId: string,
+	id: string,
+	input: FaultMutationInput
+) {
+	await getTenantFaultRecord(tenantId, id);
+	await getTenantHospitalRecord(tenantId, input.hospitalId);
+	await validateOptionalTenantRecord(
+		tenantId,
+		input.assetId,
+		getTenantAssetRecord
+	);
+	await db
+		.update(faultReports)
+		.set({
+			assetId: input.assetId ?? null,
+			description: input.description,
+			hospitalId: input.hospitalId,
+			reportNumber: input.reportNumber,
+			severity: input.severity,
+			status: input.status,
+			submittedByContact: toNullableString(input.submittedByContact),
+			submittedByName: input.submittedByName,
+		})
+		.where(and(eq(faultReports.id, id), eq(faultReports.tenantId, tenantId)));
+}
+
+export async function deleteFault(tenantId: string, id: string) {
+	await getTenantFaultRecord(tenantId, id);
+	await db
+		.delete(faultReports)
+		.where(and(eq(faultReports.id, id), eq(faultReports.tenantId, tenantId)));
 }
