@@ -8,14 +8,22 @@ import { queryClient } from "@/utils/trpc";
 
 import { ThemeProvider } from "./theme-provider";
 
+const shouldShowQueryDevtools =
+	process.env.NEXT_PUBLIC_QUERY_DEVTOOLS === "true";
+
 export default function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <QueryClientProvider client={queryClient}>
-        {children}
-        <ReactQueryDevtools />
-      </QueryClientProvider>
-      <Toaster richColors />
-    </ThemeProvider>
-  );
+	return (
+		<ThemeProvider
+			attribute="class"
+			defaultTheme="system"
+			disableTransitionOnChange
+			enableSystem
+		>
+			<QueryClientProvider client={queryClient}>
+				{children}
+				{shouldShowQueryDevtools ? <ReactQueryDevtools /> : null}
+			</QueryClientProvider>
+			<Toaster richColors />
+		</ThemeProvider>
+	);
 }

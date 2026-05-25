@@ -157,6 +157,14 @@ const workflowCards = [
 	},
 ];
 
+const primaryActionClass =
+	"border-[#0f766e] bg-[#0f766e] text-white shadow-sm hover:bg-[#0b5f58]";
+
+const panelClass =
+	"border border-[#d8dee8] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]";
+
+const mutedPanelClass = "border border-[#d8dee8] bg-[#f8fafc]";
+
 const getFirstItem = <T,>(items: T[], label: string): T => {
 	const [firstItem] = items;
 
@@ -278,67 +286,72 @@ export default function ArjoPlatform() {
 	};
 
 	return (
-		<main className="min-h-svh bg-[#f5f7fa] text-[#1f2937]">
+		<main className="min-h-svh bg-[#eef2f6] text-[#1f2937]">
 			<div className="min-h-svh">
 				{mode === "back-office" ? (
 					<div className="grid min-h-svh lg:grid-cols-[256px_1fr]">
-						<aside className="flex min-h-svh flex-col border-[#d8dee8] border-r bg-[#172033] text-white">
-							<div className="flex h-[73px] items-center gap-3 border-white/10 border-b px-6">
-								<div className="flex size-8 items-center justify-center rounded-md bg-[#0f766e] text-white">
+						<aside className="flex min-h-svh flex-col border-[#202a3b] border-r bg-[#111827] text-white">
+							<div className="flex h-[68px] items-center gap-3 border-white/10 border-b px-5">
+								<div className="flex size-9 items-center justify-center rounded-sm bg-[#0f766e] font-semibold text-white shadow-sm">
 									U
 								</div>
 								<div>
-									<p className="font-semibold text-lg">Utiliti</p>
-									<p className="text-white/50 text-xs">{tenant.name}</p>
+									<p className="font-semibold text-base">Utiliti</p>
+									<p className="text-[11px] text-white/45 uppercase tracking-[0.12em]">
+										{tenant.name}
+									</p>
 								</div>
 							</div>
-							<nav className="space-y-1 p-3">
+							<nav className="flex flex-col gap-1 p-3">
 								{navigationItems.map((item) => {
 									const Icon = item.icon;
 
 									return (
 										<button
 											aria-current={activeView === item.id ? "page" : undefined}
-											className={`flex h-10 w-full cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm transition ${
+											className={`flex h-9 w-full cursor-pointer items-center gap-3 rounded-sm px-3 text-left text-[13px] transition ${
 												activeView === item.id
-													? "bg-[#0f766e] text-white"
-													: "text-white/70 hover:bg-white/10 hover:text-white"
+													? "bg-[#0f766e] text-white shadow-sm"
+													: "text-white/58 hover:bg-white/8 hover:text-white"
 											}`}
 											key={item.id}
 											onClick={() => selectBackOfficeView(item.id)}
 											type="button"
 										>
-											<Icon className="size-4" />
+											<Icon className="size-3.5" />
 											{item.label}
 										</button>
 									);
 								})}
 							</nav>
 							<div className="mt-auto border-white/10 border-t p-4">
-								<div className="flex items-center gap-3 rounded-md bg-white/5 p-2">
-									<div className="flex size-8 items-center justify-center rounded-full bg-white text-[#172033] text-xs">
+								<div className="flex items-center gap-3 rounded-sm bg-white/6 p-2">
+									<div className="flex size-8 items-center justify-center rounded-sm bg-white/95 font-semibold text-[#111827] text-xs">
 										AU
 									</div>
 									<div>
-										<p className="font-medium text-sm">Admin User</p>
-										<p className="text-white/50 text-xs">admin</p>
+										<p className="font-medium text-[13px]">Admin User</p>
+										<p className="text-[11px] text-white/45">admin</p>
 									</div>
 								</div>
 							</div>
 						</aside>
 						<div className="min-w-0">
-							<header className="flex min-h-[61px] flex-col gap-3 border-[#d8dee8] border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+							<header className="flex min-h-[68px] flex-col gap-3 border-[#d8dee8] border-b bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
 								<div>
-									<h1 className="font-semibold text-xl">
+									<h1 className="font-semibold text-lg tracking-tight">
 										{getBackOfficeTitle(activeView)}
 									</h1>
-									<p className="text-[#64748b] text-xs">
+									<p className="mt-0.5 text-[#64748b] text-xs">
 										{tenant.release} · {tenant.region} service operations
 									</p>
 								</div>
 								<SurfaceSwitcher mode={mode} setMode={setMode} />
 							</header>
-							<section className="min-w-0 p-4 lg:p-6" id="back-office-content">
+							<section
+								className="min-w-0 px-4 py-5 lg:px-6"
+								id="back-office-content"
+							>
 								<BackOfficeViewPanel
 									activeView={activeView}
 									selectedJob={selectedJob}
@@ -402,7 +415,7 @@ function SurfaceSwitcher({
 	setMode: (mode: AppMode) => void;
 }) {
 	return (
-		<div className="flex flex-wrap gap-2">
+		<div className="flex flex-wrap gap-1.5 rounded-sm border border-[#d8dee8] bg-[#f8fafc] p-1">
 			<ModeButton
 				active={mode === "back-office"}
 				onClick={() => setMode("back-office")}
@@ -439,10 +452,10 @@ function ModeButton({
 }) {
 	return (
 		<button
-			className={`inline-flex h-9 items-center gap-2 rounded-sm border px-3 text-sm transition ${
+			className={`inline-flex h-7 items-center gap-1.5 rounded-sm border px-2.5 text-xs transition ${
 				active
-					? "border-[#0f766e] bg-[#0f766e] text-white"
-					: "border-[#cbd5e1] bg-white text-[#334155] hover:border-[#0f766e] hover:text-[#0f766e]"
+					? "border-white bg-white text-[#111827] shadow-sm"
+					: "border-transparent bg-transparent text-[#64748b] hover:bg-white/70 hover:text-[#111827]"
 			}`}
 			onClick={onClick}
 			type="button"
@@ -467,7 +480,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						New job
 					</Button>
@@ -519,7 +532,7 @@ function BackOfficeViewPanel({
 							}))}
 						/>
 					</div>
-					<Card className="border border-[#d8dee8] shadow-none">
+					<Card className={panelClass}>
 						<CardHeader>
 							<CardTitle>
 								{selectedJob?.id ?? selectedJobId} audit trail
@@ -549,7 +562,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						Register asset
 					</Button>
@@ -590,7 +603,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						New product
 					</Button>
@@ -647,7 +660,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						New hospital
 					</Button>
@@ -689,7 +702,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						New engineer
 					</Button>
@@ -736,7 +749,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						New contract
 					</Button>
@@ -746,10 +759,7 @@ function BackOfficeViewPanel({
 			>
 				<div className="grid gap-4 lg:grid-cols-3">
 					{contracts.map((contract) => (
-						<Card
-							className="border border-[#d8dee8] shadow-none"
-							key={contract.id}
-						>
+						<Card className={panelClass} key={contract.id}>
 							<CardHeader>
 								<div className="flex items-start justify-between gap-3">
 									<CardTitle>{contract.hospital}</CardTitle>
@@ -818,10 +828,7 @@ function BackOfficeViewPanel({
 							const Icon = alert.icon;
 
 							return (
-								<Card
-									className="border border-[#d8dee8] shadow-none"
-									key={alert.id}
-								>
+								<Card className={panelClass} key={alert.id}>
 									<CardContent className="flex gap-3 pt-4">
 										<Icon className="mt-0.5 size-5 text-[#0f766e]" />
 										<div>
@@ -844,7 +851,7 @@ function BackOfficeViewPanel({
 		return (
 			<PageFrame
 				action={
-					<Button className="bg-[#0f766e] text-white hover:bg-[#0b5f58]">
+					<Button className={primaryActionClass}>
 						<PlusIcon className="size-4" />
 						Manual fault
 					</Button>
@@ -919,14 +926,14 @@ function BackOfficeViewPanel({
 							id: part.id,
 						}))}
 					/>
-					<Card className="border border-[#d8dee8] shadow-none">
+					<Card className={panelClass}>
 						<CardHeader>
 							<CardTitle>Shortage queue</CardTitle>
 						</CardHeader>
 						<CardContent className="space-y-3">
 							{shortages.map((shortage) => (
 								<div
-									className="rounded-sm border border-[#d8dee8] p-3 text-sm"
+									className={`${mutedPanelClass} p-3 text-sm`}
 									key={shortage.id}
 								>
 									<div className="flex items-center justify-between gap-3">
@@ -955,10 +962,7 @@ function BackOfficeViewPanel({
 			>
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 					{reportMetrics.map((metric) => (
-						<Card
-							className="border border-[#d8dee8] shadow-none"
-							key={metric.id}
-						>
+						<Card className={panelClass} key={metric.id}>
 							<CardContent className="pt-4">
 								<p className="text-[#64748b] text-xs">{metric.label}</p>
 								<p className="mt-2 font-semibold text-2xl">{metric.value}</p>
@@ -1011,7 +1015,7 @@ function BackOfficeViewPanel({
 				title="Parameters, roles and notifications"
 			>
 				<div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-					<Card className="border border-[#d8dee8] shadow-none">
+					<Card className={panelClass}>
 						<CardHeader>
 							<CardTitle>System parameters</CardTitle>
 						</CardHeader>
@@ -1025,7 +1029,7 @@ function BackOfficeViewPanel({
 							))}
 						</CardContent>
 					</Card>
-					<Card className="border border-[#d8dee8] shadow-none">
+					<Card className={panelClass}>
 						<CardHeader>
 							<CardTitle>User roles</CardTitle>
 						</CardHeader>
@@ -1050,35 +1054,31 @@ function BackOfficeViewPanel({
 
 	return (
 		<PageFrame eyebrow="Operational Command" title="Today at a glance">
-			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 				{dashboardStats.map((stat) => (
-					<Card className="border border-[#d8dee8] shadow-none" key={stat.id}>
-						<CardContent className="pt-4">
-							<p className="text-[#64748b] text-xs">{stat.label}</p>
-							<p className="mt-2 font-semibold text-2xl">{stat.value}</p>
-							<p className="mt-1 text-[#64748b] text-xs">{stat.meta}</p>
-						</CardContent>
-					</Card>
+					<DashboardStatCard key={stat.id} stat={stat} />
 				))}
 			</div>
-			<div className="mt-4 grid gap-4 xl:grid-cols-[1fr_380px]">
-				<Card className="border border-[#d8dee8] shadow-none">
-					<CardHeader>
+			<div className="mt-3 grid gap-3 xl:grid-cols-[1fr_360px]">
+				<Card className={panelClass}>
+					<CardHeader className="border-[#e2e8f0] border-b pb-3">
 						<CardTitle>Live exception queue</CardTitle>
 					</CardHeader>
-					<CardContent className="space-y-3">
+					<CardContent className="flex flex-col gap-2 pt-0">
 						{liveAlerts.map((alert) => {
 							const Icon = alert.icon;
 
 							return (
 								<div
-									className="flex gap-3 rounded-sm border border-[#d8dee8] p-3"
+									className="flex gap-3 border-[#eef2f7] border-b py-3 last:border-b-0"
 									key={alert.id}
 								>
-									<Icon className="mt-0.5 size-5 text-[#0f766e]" />
+									<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-[#ecfdf5] text-[#0f766e]">
+										<Icon className="size-3.5" />
+									</div>
 									<div>
-										<p className="font-medium text-sm">{alert.title}</p>
-										<p className="mt-1 text-[#64748b] text-xs">
+										<p className="font-medium text-[13px]">{alert.title}</p>
+										<p className="mt-0.5 text-[#64748b] text-xs">
 											{alert.message}
 										</p>
 									</div>
@@ -1087,19 +1087,21 @@ function BackOfficeViewPanel({
 						})}
 					</CardContent>
 				</Card>
-				<Card className="border border-[#d8dee8] shadow-none">
-					<CardHeader>
+				<Card className={panelClass}>
+					<CardHeader className="border-[#e2e8f0] border-b pb-3">
 						<CardTitle>Release scope coverage</CardTitle>
 					</CardHeader>
-					<CardContent className="space-y-3">
+					<CardContent className="flex flex-col gap-3 pt-0">
 						{workflowCards.map((card) => {
 							const Icon = card.icon;
 
 							return (
 								<div className="flex gap-3" key={card.id}>
-									<Icon className="mt-0.5 size-5 text-[#0f766e]" />
+									<div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-[#f1f5f9] text-[#0f766e]">
+										<Icon className="size-3.5" />
+									</div>
 									<div>
-										<p className="font-medium text-sm">{card.title}</p>
+										<p className="font-medium text-[13px]">{card.title}</p>
 										<p className="text-[#64748b] text-xs leading-relaxed">
 											{card.detail}
 										</p>
@@ -1109,6 +1111,37 @@ function BackOfficeViewPanel({
 						})}
 					</CardContent>
 				</Card>
+			</div>
+			<div className="mt-3">
+				<PanelHeader title="Today jobs" />
+				<DataTable
+					columns={[
+						"Job",
+						"Hospital",
+						"Asset",
+						"Engineer",
+						"Status",
+						"Schedule",
+					]}
+					rows={jobs.slice(0, 5).map((job) => ({
+						cells: [
+							<span className="font-medium text-[#0f766e]" key={`${job.id}-id`}>
+								{job.id}
+							</span>,
+							job.hospital,
+							job.asset,
+							job.engineer,
+							<StatusPill
+								className={statusStyles[job.status]}
+								key={`${job.id}-status`}
+							>
+								{job.status}
+							</StatusPill>,
+							job.scheduledFor,
+						],
+						id: `${job.id}-dashboard`,
+					}))}
+				/>
 			</div>
 		</PageFrame>
 	);
@@ -1147,7 +1180,7 @@ function EngineerWorkspace({
 						</p>
 					</div>
 					<div className="space-y-4 p-4">
-						<Card className="border border-[#d8dee8] shadow-none">
+						<Card className={panelClass}>
 							<CardContent className="space-y-3 pt-4">
 								<div className="flex items-center justify-between">
 									<p className="font-semibold">
@@ -1169,7 +1202,7 @@ function EngineerWorkspace({
 								</div>
 								<div className="grid grid-cols-2 gap-2">
 									<Button
-										className="bg-[#0f766e] text-white"
+										className={primaryActionClass}
 										onClick={() => onJobAction("start")}
 									>
 										<PlayCircleIcon className="size-4" />
@@ -1200,7 +1233,7 @@ function EngineerWorkspace({
 							</CardContent>
 						</Card>
 
-						<Card className="border border-[#d8dee8] shadow-none">
+						<Card className={panelClass}>
 							<CardHeader>
 								<CardTitle>Log expenses and parts</CardTitle>
 							</CardHeader>
@@ -1236,7 +1269,7 @@ function EngineerWorkspace({
 						title="Push notifications"
 					/>
 				</div>
-				<Card className="border border-[#d8dee8] shadow-none">
+				<Card className={panelClass}>
 					<CardHeader>
 						<CardTitle>Natural language service manual Q&A</CardTitle>
 					</CardHeader>
@@ -1247,17 +1280,14 @@ function EngineerWorkspace({
 								placeholder="Ask the scanned device manual..."
 								value={manualQuery}
 							/>
-							<Button className="bg-[#0f766e] text-white">
+							<Button className={primaryActionClass}>
 								<SearchIcon className="size-4" />
 								Search
 							</Button>
 						</div>
 						<div className="grid gap-3">
 							{manualAnswers.map((answer) => (
-								<div
-									className="rounded-sm border border-[#d8dee8] p-3"
-									key={answer.id}
-								>
+								<div className={`${mutedPanelClass} p-3`} key={answer.id}>
 									<div className="flex items-center justify-between gap-3">
 										<p className="font-medium text-sm">{answer.title}</p>
 										<StatusPill className="border-blue-200 bg-blue-50 text-blue-700">
@@ -1320,7 +1350,7 @@ function HospitalFaultPortal({
 				</div>
 			</div>
 
-			<Card className="border border-[#d8dee8] shadow-none">
+			<Card className={panelClass}>
 				<CardHeader>
 					<CardTitle>Fault report form</CardTitle>
 				</CardHeader>
@@ -1353,13 +1383,13 @@ function HospitalFaultPortal({
 							Add photos
 						</Button>
 						<Button
-							className="bg-[#0f766e] text-white"
+							className={primaryActionClass}
 							onClick={() => setFaultStatus("Engineer Assigned")}
 						>
 							Submit report
 						</Button>
 					</div>
-					<div className="rounded-sm border border-[#d8dee8] p-3">
+					<div className={`${mutedPanelClass} p-3`}>
 						<p className="font-medium text-sm">Current status</p>
 						<div className="mt-3 grid gap-2 sm:grid-cols-4">
 							{(
@@ -1403,8 +1433,8 @@ function PageFrame({
 	title: string;
 }) {
 	return (
-		<div>
-			<div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+		<div className="mx-auto max-w-[1240px]">
+			<div className="mb-4 flex flex-col gap-3 border-[#d8dee8] border-b pb-3 sm:flex-row sm:items-end sm:justify-between">
 				<PageHeader eyebrow={eyebrow} title={title} />
 				{action}
 			</div>
@@ -1416,17 +1446,17 @@ function PageFrame({
 function PageHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
 	return (
 		<div>
-			<p className="text-[#0f766e] text-xs uppercase tracking-[0.16em]">
+			<p className="font-medium text-[#0f766e] text-[11px] uppercase tracking-[0.14em]">
 				{eyebrow}
 			</p>
-			<h2 className="mt-1 font-semibold text-2xl tracking-tight">{title}</h2>
+			<h2 className="mt-1 font-semibold text-[22px] tracking-tight">{title}</h2>
 		</div>
 	);
 }
 
 function FilterBar({ fields }: { fields: string[] }) {
 	return (
-		<div className="rounded-sm border border-[#d8dee8] bg-white p-4">
+		<div className={`${panelClass} p-3`}>
 			<div className="flex flex-col gap-3 md:flex-row md:items-center">
 				{fields.map((field, index) => (
 					<Input
@@ -1443,14 +1473,14 @@ function FilterBar({ fields }: { fields: string[] }) {
 
 function DataTable({ columns, rows }: { columns: string[]; rows: TableRow[] }) {
 	return (
-		<div className="overflow-hidden rounded-sm border border-[#d8dee8] bg-white">
+		<div className={`${panelClass} overflow-hidden`}>
 			<div className="overflow-x-auto">
-				<table className="w-full min-w-[760px] border-collapse text-sm">
+				<table className="w-full min-w-[760px] border-collapse text-[13px]">
 					<thead className="bg-[#f8fafc] text-[#64748b]">
 						<tr>
 							{columns.map((column) => (
 								<th
-									className="border-[#d8dee8] border-b px-3 py-2 text-left font-medium"
+									className="border-[#d8dee8] border-b px-3 py-2 text-left font-medium text-[11px] uppercase tracking-[0.08em]"
 									key={column}
 								>
 									{column}
@@ -1461,12 +1491,12 @@ function DataTable({ columns, rows }: { columns: string[]; rows: TableRow[] }) {
 					<tbody>
 						{rows.map((row) => (
 							<tr
-								className="border-[#eef2f7] border-b last:border-b-0"
+								className="border-[#eef2f7] border-b transition-colors last:border-b-0 hover:bg-[#f8fafc]"
 								key={row.id}
 							>
 								{row.cells.map((cell, cellIndex) => (
 									<td
-										className="px-3 py-3 align-top"
+										className="px-3 py-2.5 align-top text-[#334155]"
 										key={`${row.id}-${columns[cellIndex] ?? "cell"}`}
 									>
 										{cell}
@@ -1481,6 +1511,14 @@ function DataTable({ columns, rows }: { columns: string[]; rows: TableRow[] }) {
 	);
 }
 
+function PanelHeader({ title }: { title: string }) {
+	return (
+		<div className="border-[#d8dee8] border-x border-t bg-white px-4 py-3">
+			<p className="font-medium text-sm">{title}</p>
+		</div>
+	);
+}
+
 function StatusPill({
 	children,
 	className,
@@ -1490,7 +1528,7 @@ function StatusPill({
 }) {
 	return (
 		<span
-			className={`inline-flex items-center rounded-sm border px-2 py-1 text-xs ${className}`}
+			className={`inline-flex items-center rounded-sm border px-2 py-0.5 font-medium text-[11px] ${className}`}
 		>
 			{children}
 		</span>
@@ -1499,10 +1537,37 @@ function StatusPill({
 
 function Metric({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded-sm border border-[#d8dee8] bg-white p-3">
+		<div className={`${mutedPanelClass} p-3`}>
 			<p className="text-[#64748b] text-xs">{label}</p>
 			<p className="mt-1 font-medium text-sm">{value}</p>
 		</div>
+	);
+}
+
+function DashboardStatCard({
+	stat,
+}: {
+	stat: (typeof dashboardStats)[number];
+}) {
+	return (
+		<Card className={`${panelClass} border-t-2 border-t-[#0f766e]`}>
+			<CardContent className="pt-3">
+				<div className="flex items-start justify-between gap-3">
+					<div>
+						<p className="text-[#64748b] text-[11px] uppercase tracking-[0.08em]">
+							{stat.label}
+						</p>
+						<p className="mt-2 font-semibold text-2xl text-[#0f172a]">
+							{stat.value}
+						</p>
+					</div>
+					<span className="mt-0.5 size-2 rounded-full bg-[#0f766e]" />
+				</div>
+				<p className="mt-2 border-[#eef2f7] border-t pt-2 text-[#64748b] text-xs">
+					{stat.meta}
+				</p>
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -1556,7 +1621,7 @@ function FeatureTile({
 	title: string;
 }) {
 	return (
-		<div className="rounded-sm border border-[#d8dee8] bg-white p-4">
+		<div className={`${panelClass} p-4`}>
 			<div className="flex size-9 items-center justify-center rounded-sm bg-[#ecfdf5] text-[#0f766e]">
 				{icon}
 			</div>
