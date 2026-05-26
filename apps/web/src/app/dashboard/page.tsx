@@ -1,5 +1,5 @@
-import ServiceOpsPage from "../service-ops-page";
+import ProductivityDashboard from "./productivity/productivity-dashboard";
 
 export default function DashboardPage() {
-	return <ServiceOpsPage />;
+	return <ProductivityDashboard />;
 }

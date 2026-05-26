@@ -1,4 +1,5 @@
 "use client";
+"use no memo";
 
 import { Button } from "@luke/ui/components/button";
 import {
@@ -14,115 +15,61 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ActivityIcon,
 	AlertTriangleIcon,
-	ArrowRightIcon,
 	BellRingIcon,
-	CalendarIcon,
 	CheckCircle2Icon,
-	ChevronDownIcon,
-	ChevronLeftIcon,
-	ChevronRightIcon,
-	ChevronsLeftIcon,
-	ChevronsRightIcon,
 	ClipboardCheckIcon,
-	ClockIcon,
 	CommandIcon,
-	CreditCardIcon,
-	DownloadIcon,
 	EditIcon,
 	FileQuestionIcon,
-	HospitalIcon,
 	Loader2Icon,
-	LocateFixedIcon,
-	MessageSquareTextIcon,
+	LogOutIcon,
 	NfcIcon,
-	PauseCircleIcon,
-	PlayCircleIcon,
 	PlusIcon,
 	ReceiptTextIcon,
-	SearchIcon,
 	ShieldCheckIcon,
-	SlidersHorizontalIcon,
-	SmartphoneIcon,
 	Trash2Icon,
 	TrendingUpIcon,
-	UploadIcon,
-	UsersIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-	type Asset,
+	buildAssetPayload,
+	buildContractPayload,
+	buildEngineerPayload,
+	buildFaultPayload,
+	buildHospitalPayload,
+	buildJobPayload,
+	buildPartPayload,
+	buildProductPayload,
+	type CrudEntity,
+	type CrudState,
+	entityLabels,
+	type FieldConfig,
+	getCrudStateKey,
+	getFieldConfigs,
+	getFormDefaults,
+	getRecordId,
+} from "@/components/service-ops-crud";
+import { DataTable } from "@/components/service-ops-table";
+import { authClient } from "@/lib/auth-client";
+import {
 	type BackOfficeView,
-	type Contract,
 	type ContractStatus,
-	type Engineer,
 	type EngineerStatus,
-	type FaultReport,
 	type FaultStatus,
-	type Hospital,
 	type Job,
 	type JobStatus,
-	type ManualAnswer,
 	navigationItems,
-	type Part,
-	type ProductModel,
 	type ServiceOpsSnapshot,
 	serviceStateMachine,
 } from "@/lib/service-ops-data";
 import { trpc } from "@/utils/trpc";
 
-type AppMode = "back-office" | "engineer" | "hospital";
-
-type JobAction = "start" | "pause" | "resume" | "complete";
-
-type CrudEntity =
-	| "asset"
-	| "contract"
-	| "engineer"
-	| "fault"
-	| "hospital"
-	| "job"
-	| "part"
-	| "product";
-
-type CrudState =
-	| { entity: CrudEntity; mode: "create"; record?: never }
-	| { entity: CrudEntity; mode: "edit"; record: unknown };
-
-interface FieldOption {
-	label: string;
-	value: string;
-}
-
-interface FieldConfig {
-	label: string;
-	multiple?: boolean;
-	name: string;
-	options?: FieldOption[];
-	required?: boolean;
-	type?:
-		| "checkbox"
-		| "date"
-		| "datetime-local"
-		| "number"
-		| "select"
-		| "textarea"
-		| "text";
-}
-
-interface TableRow {
-	actions?: ReactNode;
-	cells: ReactNode[];
-	id: string;
-}
-
-interface DataTableProps {
-	columns: string[];
-	description?: string;
-	filterLabels?: string[];
-	rows: TableRow[];
-	title?: string;
+interface CurrentUser {
+	email: string;
+	name: null | string | undefined;
 }
 
 const statusStyles: Record<JobStatus, string> = {
@@ -218,221 +165,6 @@ const roleLabels = [
 	"hospital_user",
 ] as const;
 
-const entityLabels: Record<CrudEntity, string> = {
-	asset: "asset",
-	contract: "contract",
-	engineer: "engineer",
-	fault: "fault report",
-	hospital: "hospital",
-	job: "job",
-	part: "part",
-	product: "product",
-};
-
-const engineerStatusOptions: FieldOption[] = [
-	{ label: "On-site", value: "on_site" },
-	{ label: "In transit", value: "in_transit" },
-	{ label: "Idle", value: "idle" },
-	{ label: "Timer anomaly", value: "timer_anomaly" },
-	{ label: "Off duty", value: "off_duty" },
-];
-
-const coverageOptions: FieldOption[] = [
-	{ label: "In contract", value: "in_contract" },
-	{ label: "Out of contract", value: "out_of_contract" },
-	{ label: "Billable exception", value: "billable_exception" },
-	{ label: "Expired", value: "expired" },
-];
-
-const jobTypeOptions: FieldOption[] = [
-	{ label: "Installation", value: "installation" },
-	{ label: "Repair", value: "repair" },
-	{ label: "Preventive maintenance", value: "preventive_maintenance" },
-];
-
-const jobStatusOptions: FieldOption[] = [
-	{ label: "Created", value: "created" },
-	{ label: "Assigned", value: "assigned" },
-	{ label: "In progress", value: "in_progress" },
-	{ label: "Paused", value: "paused" },
-	{ label: "Resumed", value: "resumed" },
-	{ label: "Completed", value: "completed" },
-	{ label: "Timer anomaly", value: "timer_anomaly" },
-	{ label: "Cancelled", value: "cancelled" },
-];
-
-const priorityOptions: FieldOption[] = [
-	{ label: "Normal", value: "normal" },
-	{ label: "Urgent", value: "urgent" },
-];
-
-const contractTypeOptions: FieldOption[] = [
-	{ label: "Full", value: "full" },
-	{ label: "Partial", value: "partial" },
-	{ label: "Emergency only", value: "emergency_only" },
-];
-
-const contractStatusOptions: FieldOption[] = [
-	{ label: "Active", value: "active" },
-	{ label: "Expiring", value: "expiring" },
-	{ label: "Expired", value: "expired" },
-];
-
-const faultSeverityOptions: FieldOption[] = [
-	{ label: "Low", value: "low" },
-	{ label: "Medium", value: "medium" },
-	{ label: "High", value: "high" },
-	{ label: "Critical", value: "critical" },
-];
-
-const faultStatusOptions: FieldOption[] = [
-	{ label: "Received", value: "received" },
-	{ label: "Engineer assigned", value: "engineer_assigned" },
-	{ label: "In progress", value: "in_progress" },
-	{ label: "Resolved", value: "resolved" },
-];
-
-const coverageValues = [
-	"in_contract",
-	"out_of_contract",
-	"billable_exception",
-	"expired",
-] as const;
-const engineerStatusValues = [
-	"on_site",
-	"in_transit",
-	"idle",
-	"timer_anomaly",
-	"off_duty",
-] as const;
-const jobTypeValues = [
-	"installation",
-	"repair",
-	"preventive_maintenance",
-] as const;
-const jobStatusValues = [
-	"created",
-	"assigned",
-	"in_progress",
-	"paused",
-	"resumed",
-	"completed",
-	"timer_anomaly",
-	"cancelled",
-] as const;
-const priorityValues = ["normal", "urgent"] as const;
-const contractTypeValues = ["full", "partial", "emergency_only"] as const;
-const contractStatusValues = ["active", "expiring", "expired"] as const;
-const faultSeverityValues = ["low", "medium", "high", "critical"] as const;
-const faultStatusValues = [
-	"received",
-	"engineer_assigned",
-	"in_progress",
-	"resolved",
-] as const;
-
-type CoverageValue = (typeof coverageValues)[number];
-type EngineerStatusValue = (typeof engineerStatusValues)[number];
-type JobTypeValue = (typeof jobTypeValues)[number];
-type JobStatusValue = (typeof jobStatusValues)[number];
-type PriorityValue = (typeof priorityValues)[number];
-type ContractTypeValue = (typeof contractTypeValues)[number];
-type ContractStatusValue = (typeof contractStatusValues)[number];
-type FaultSeverityValue = (typeof faultSeverityValues)[number];
-type FaultStatusValue = (typeof faultStatusValues)[number];
-
-interface HospitalPayload {
-	address: null | string;
-	code: string;
-	district: string;
-	latitude: null | number;
-	longitude: null | number;
-	name: string;
-	primaryContactEmail: null | string;
-	primaryContactName: null | string;
-	primaryContactPhone: null | string;
-}
-
-interface EngineerPayload {
-	code: string;
-	email: null | string;
-	grade: string;
-	hourlyRate: number;
-	mealCap: number;
-	mileageRate: number;
-	name: string;
-	phone: null | string;
-	region: string;
-	status: EngineerStatusValue;
-}
-
-interface ProductPayload {
-	category: string;
-	code: string;
-	defaultPmCycleMonths: number;
-	isEngineerReadOnly: boolean;
-	manufacturer: string;
-	modelName: string;
-}
-
-interface PartPayload {
-	minimumStock: number;
-	name: string;
-	partNumber: string;
-	stockOnHand: number;
-	supplier: string;
-	unitCost: number;
-}
-
-interface AssetPayload {
-	assetNumber: string;
-	contractCoverageStatus: CoverageValue;
-	designatedEngineerId: null | string;
-	hospitalId: string;
-	installationDate: null | string;
-	locationLabel: string;
-	nextPmDueDate: null | string;
-	nfcUid: string;
-	productModelId: string;
-	serialNumber: string;
-	warrantyExpiryDate: null | string;
-}
-
-interface JobPayload {
-	assetId: string;
-	assignedEngineerId: null | string;
-	description: string;
-	hospitalId: string;
-	jobNumber: string;
-	priority: PriorityValue;
-	scheduledStartAt: null | string;
-	status: JobStatusValue;
-	type: JobTypeValue;
-}
-
-interface ContractPayload {
-	accountManagerName: string;
-	contractNumber: string;
-	coveredModelIds: string[];
-	endDate: string;
-	hospitalId: string;
-	responseSlaHours: number;
-	startDate: string;
-	status: ContractStatusValue;
-	type: ContractTypeValue;
-}
-
-interface FaultPayload {
-	assetId: null | string;
-	description: string;
-	hospitalId: string;
-	reportNumber: string;
-	severity: FaultSeverityValue;
-	status: FaultStatusValue;
-	submittedByContact: null | string;
-	submittedByName: string;
-}
-
 const alertIconByType = {
 	contract: ShieldCheckIcon,
 	geofence: AlertTriangleIcon,
@@ -470,10 +202,13 @@ const getHashBackOfficeView = (): BackOfficeView | null => {
 };
 
 export default function ServiceOpsPlatform({
+	currentUser,
 	initialData,
 }: {
+	currentUser: CurrentUser;
 	initialData: ServiceOpsSnapshot;
 }) {
+	const router = useRouter();
 	const snapshotQuery = useQuery(
 		trpc.serviceOps.snapshot.queryOptions(
 			{ tenantId: initialData.tenant.id },
@@ -481,49 +216,19 @@ export default function ServiceOpsPlatform({
 		)
 	);
 	const data = snapshotQuery.data ?? initialData;
-	const { assets, engineers, jobs, manualAnswers, tenant } = data;
-	const [mode, setMode] = useState<AppMode>("back-office");
+	const { jobs, tenant } = data;
 	const [activeView, setActiveView] = useState<BackOfficeView>("dashboard");
 	const [firstJob] = jobs;
-	const [firstAsset] = assets;
 	const [selectedJobId, setSelectedJobId] = useState(firstJob?.id ?? "");
-	const [jobRuntimeStatus, setJobRuntimeStatus] =
-		useState<JobStatus>("Assigned");
-	const [faultStatus, setFaultStatus] = useState<FaultStatus>("Received");
-	const [manualQuery, setManualQuery] = useState(
-		"How do I replace the sling bar assembly?"
-	);
 	const [crudState, setCrudState] = useState<CrudState | null>(null);
 
 	const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? firstJob;
-	const selectedAsset = selectedJob
-		? (assets.find((asset) => asset.id === selectedJob.asset) ?? firstAsset)
-		: firstAsset;
-	const selectedEngineer = engineers.find(
-		(engineer) => engineer.name === selectedJob?.engineer
-	);
 
 	useEffect(() => {
 		if (!selectedJobId && firstJob) {
 			setSelectedJobId(firstJob.id);
 		}
 	}, [firstJob, selectedJobId]);
-
-	const filteredManualAnswers = useMemo(() => {
-		const normalizedQuery = manualQuery.toLowerCase();
-
-		if (!normalizedQuery.trim()) {
-			return manualAnswers;
-		}
-
-		return manualAnswers.filter((answer) => {
-			const [firstTerm] = normalizedQuery.split(" ");
-
-			return `${answer.title} ${answer.excerpt}`
-				.toLowerCase()
-				.includes(firstTerm ?? "");
-		});
-	}, [manualAnswers, manualQuery]);
 
 	useEffect(() => {
 		const syncViewFromUrl = () => {
@@ -542,35 +247,31 @@ export default function ServiceOpsPlatform({
 		};
 	}, []);
 
-	const applyJobAction = (action: JobAction) => {
-		const nextStatusByAction: Record<JobAction, JobStatus> = {
-			complete: "Completed",
-			pause: "Paused",
-			resume: "In Progress",
-			start: "In Progress",
-		};
+	useEffect(() => {
+		if (!window.matchMedia("(max-width: 1023px)").matches) {
+			return;
+		}
 
-		setJobRuntimeStatus(nextStatusByAction[action]);
+		window.requestAnimationFrame(() => {
+			document
+				.getElementById(`back-office-nav-${activeView}`)
+				?.scrollIntoView({ block: "nearest", inline: "center" });
+		});
+	}, [activeView]);
+
+	const handleSignOut = () => {
+		authClient
+			.signOut({
+				fetchOptions: {
+					onSuccess: () => {
+						router.push("/login");
+					},
+				},
+			})
+			.catch(() => {
+				toast.error("Unable to sign out.");
+			});
 	};
-
-	const engineerModeContent =
-		selectedJob && selectedAsset ? (
-			<EngineerWorkspace
-				jobRuntimeStatus={jobRuntimeStatus}
-				manualAnswers={filteredManualAnswers}
-				manualQuery={manualQuery}
-				onJobAction={applyJobAction}
-				selectedAsset={selectedAsset}
-				selectedEngineer={selectedEngineer?.name ?? "Engineer"}
-				selectedJob={selectedJob}
-				setManualQuery={setManualQuery}
-			/>
-		) : (
-			<EmptyWorkspace
-				eyebrow="Engineer workflow"
-				title="No assigned jobs yet"
-			/>
-		);
 
 	const selectBackOfficeView = (view: BackOfficeView) => {
 		setActiveView(view);
@@ -593,121 +294,83 @@ export default function ServiceOpsPlatform({
 	return (
 		<main className="min-h-svh bg-background text-foreground">
 			<div className="min-h-svh">
-				{mode === "back-office" ? (
-					<div className="grid min-h-svh grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
-						<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-sidebar text-sidebar-foreground lg:min-h-svh lg:border-r lg:border-b-0">
-							<div className="flex h-14 items-center gap-3 border-b px-4">
-								<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
-									<CommandIcon className="size-4" />
-								</div>
-								<div className="min-w-0">
-									<p className="truncate font-semibold text-sm">Utiliti</p>
-									<p className="truncate text-muted-foreground text-xs">
-										{tenant.name}
-									</p>
-								</div>
+				<div className="grid min-h-svh grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
+					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-sidebar text-sidebar-foreground lg:min-h-svh lg:border-r lg:border-b-0">
+						<div className="flex h-14 items-center gap-3 border-b px-4">
+							<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
+								<CommandIcon className="size-4" />
 							</div>
-							<nav className="flex min-w-0 max-w-full gap-1 overflow-x-auto px-3 py-2 lg:flex-col lg:overflow-visible lg:py-4">
-								{navigationItems.map((item) => {
-									const Icon = item.icon;
-									const isActive = activeView === item.id;
-
-									return (
-										<button
-											aria-current={isActive ? "page" : undefined}
-											className={cn(
-												"flex h-9 min-w-max cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm transition-colors lg:w-full",
-												isActive
-													? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
-													: "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-											)}
-											key={item.id}
-											onClick={() => selectBackOfficeView(item.id)}
-											type="button"
-										>
-											<Icon className="size-4" />
-											{item.label}
-										</button>
-									);
-								})}
-							</nav>
-							<div className="mt-auto hidden border-t p-3 lg:block">
-								<div className="flex items-center gap-3 rounded-lg border bg-card/80 p-2 shadow-xs">
-									<div className="flex size-8 items-center justify-center rounded-md bg-muted font-semibold text-xs">
-										AU
-									</div>
-									<div className="min-w-0">
-										<p className="truncate font-medium text-sm">Admin User</p>
-										<p className="text-muted-foreground text-xs">admin</p>
-									</div>
-								</div>
+							<div className="min-w-0">
+								<p className="truncate font-semibold text-sm">Utiliti</p>
+								<p className="truncate text-muted-foreground text-xs">
+									{tenant.name}
+								</p>
 							</div>
-						</aside>
-						<div className="min-w-0">
-							<header className="sticky top-0 z-20 flex min-h-14 flex-col gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur lg:flex-row lg:items-center lg:justify-between lg:px-6">
-								<div className="min-w-0">
-									<p className="text-muted-foreground text-xs">
-										Service Operations
-									</p>
-									<h1 className="truncate font-semibold text-lg">
-										{getBackOfficeTitle(activeView)}
-									</h1>
-									<p className="mt-0.5 text-muted-foreground text-xs">
-										{tenant.release} · {tenant.region} service operations
-									</p>
-								</div>
-								<SurfaceSwitcher mode={mode} setMode={setMode} />
-							</header>
-							<section
-								className="@container/main min-w-0 px-4 py-4 md:py-6 lg:px-6"
-								id="back-office-content"
-							>
-								<BackOfficeViewPanel
-									activeView={activeView}
-									data={data}
-									onCreate={(entity) =>
-										setCrudState({ entity, mode: "create" })
-									}
-									onEdit={(entity, record) =>
-										setCrudState({ entity, mode: "edit", record })
-									}
-									selectedJob={selectedJob}
-									selectedJobId={selectedJobId}
-									setSelectedJobId={setSelectedJobId}
-								/>
-							</section>
 						</div>
-					</div>
-				) : (
-					<>
-						<header className="border-b bg-background">
-							<div className="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
-								<div className="flex items-center gap-3">
-									<div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-										<ActivityIcon className="size-5" />
-									</div>
-									<div className="min-w-0">
-										<p className="text-muted-foreground text-xs">
-											{tenant.release}
-										</p>
-										<h1 className="truncate font-semibold text-xl">
-											{tenant.name} Service Operations
-										</h1>
-									</div>
-								</div>
-								<SurfaceSwitcher mode={mode} setMode={setMode} />
+						<nav className="flex min-w-0 max-w-full gap-1 overflow-x-auto px-3 py-2 lg:flex-col lg:overflow-visible lg:py-4">
+							{navigationItems.map((item) => {
+								const Icon = item.icon;
+								const isActive = activeView === item.id;
+
+								return (
+									<button
+										aria-current={isActive ? "page" : undefined}
+										className={cn(
+											"flex h-9 min-w-max cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm transition-colors lg:w-full",
+											isActive
+												? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
+												: "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+										)}
+										data-back-office-nav-active={isActive ? "true" : undefined}
+										id={`back-office-nav-${item.id}`}
+										key={item.id}
+										onClick={() => selectBackOfficeView(item.id)}
+										type="button"
+									>
+										<Icon className="size-4" />
+										{item.label}
+									</button>
+								);
+							})}
+						</nav>
+						<div className="mt-auto hidden border-t p-3 lg:block">
+							<UserProfile
+								currentUser={currentUser}
+								onSignOut={handleSignOut}
+							/>
+						</div>
+					</aside>
+					<div className="min-w-0">
+						<header className="sticky top-0 z-20 flex min-h-14 flex-col gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur lg:px-6">
+							<div className="min-w-0">
+								<p className="text-muted-foreground text-xs">
+									Service Operations
+								</p>
+								<h1 className="truncate font-semibold text-lg">
+									{getBackOfficeTitle(activeView)}
+								</h1>
+								<p className="mt-0.5 text-muted-foreground text-xs">
+									{tenant.release} · {tenant.region} service operations
+								</p>
 							</div>
 						</header>
-						{mode === "engineer" ? engineerModeContent : null}
-
-						{mode === "hospital" ? (
-							<HospitalFaultPortal
-								faultStatus={faultStatus}
-								setFaultStatus={setFaultStatus}
+						<section
+							className="@container/main min-w-0 px-4 py-4 md:py-6 lg:px-6"
+							id="back-office-content"
+						>
+							<BackOfficeViewPanel
+								activeView={activeView}
+								data={data}
+								onCreate={(entity) => setCrudState({ entity, mode: "create" })}
+								onEdit={(entity, record) =>
+									setCrudState({ entity, mode: "edit", record })
+								}
+								selectedJob={selectedJob}
+								setSelectedJobId={setSelectedJobId}
 							/>
-						) : null}
-					</>
-				)}
+						</section>
+					</div>
+				</div>
 			</div>
 			<CrudDialog
 				data={data}
@@ -718,62 +381,49 @@ export default function ServiceOpsPlatform({
 	);
 }
 
-function SurfaceSwitcher({
-	mode,
-	setMode,
+function UserProfile({
+	currentUser,
+	onSignOut,
 }: {
-	mode: AppMode;
-	setMode: (mode: AppMode) => void;
+	currentUser: CurrentUser;
+	onSignOut: () => void;
 }) {
+	const displayName = currentUser.name?.trim() || "Signed-in user";
+	const initials = getInitials(displayName, currentUser.email);
+
 	return (
-		<div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
-			<ModeButton
-				active={mode === "back-office"}
-				onClick={() => setMode("back-office")}
+		<div className="flex items-center gap-3 rounded-lg border bg-card/80 p-2 shadow-xs">
+			<div className="flex size-8 items-center justify-center rounded-md bg-muted font-semibold text-xs uppercase">
+				{initials}
+			</div>
+			<div className="min-w-0 flex-1">
+				<p className="truncate font-medium text-sm">{displayName}</p>
+				<p className="truncate text-muted-foreground text-xs">
+					{currentUser.email}
+				</p>
+			</div>
+			<Button
+				aria-label="Sign out"
+				className={compactButtonClass}
+				onClick={onSignOut}
+				size="icon-sm"
+				variant="ghost"
 			>
-				<UsersIcon className="size-4" />
-				Back Office
-			</ModeButton>
-			<ModeButton
-				active={mode === "engineer"}
-				onClick={() => setMode("engineer")}
-			>
-				<SmartphoneIcon className="size-4" />
-				Engineer App
-			</ModeButton>
-			<ModeButton
-				active={mode === "hospital"}
-				onClick={() => setMode("hospital")}
-			>
-				<HospitalIcon className="size-4" />
-				Hospital Web
-			</ModeButton>
+				<LogOutIcon className="size-4" />
+			</Button>
 		</div>
 	);
 }
 
-function ModeButton({
-	active,
-	children,
-	onClick,
-}: {
-	active: boolean;
-	children: ReactNode;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs transition-colors ${
-				active
-					? "bg-background text-foreground shadow-xs"
-					: "text-muted-foreground hover:bg-background/70 hover:text-foreground"
-			}`}
-			onClick={onClick}
-			type="button"
-		>
-			{children}
-		</button>
-	);
+function getInitials(name: string, email: string) {
+	const nameInitials = name
+		.split(" ")
+		.map((part) => part.at(0))
+		.filter(Boolean)
+		.join("")
+		.slice(0, 2);
+
+	return (nameInitials || email.at(0) || "U").toUpperCase();
 }
 
 function BackOfficeViewPanel({
@@ -782,7 +432,6 @@ function BackOfficeViewPanel({
 	onCreate,
 	onEdit,
 	selectedJob,
-	selectedJobId,
 	setSelectedJobId,
 }: {
 	activeView: BackOfficeView;
@@ -790,7 +439,6 @@ function BackOfficeViewPanel({
 	onCreate: (entity: CrudEntity) => void;
 	onEdit: (entity: CrudEntity, record: unknown) => void;
 	selectedJob?: Job;
-	selectedJobId: string;
 	setSelectedJobId: (jobId: string) => void;
 }) {
 	const {
@@ -873,27 +521,33 @@ function BackOfficeViewPanel({
 						/>
 					</div>
 					<Card className={panelClass}>
-						<CardHeader>
-							<CardTitle>
-								{selectedJob?.id ?? selectedJobId} audit trail
-							</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<StateMachine currentStatus={selectedJob?.status ?? "Created"} />
-							<div className={`${mutedPanelClass} p-3 text-sm`}>
-								<p className="font-medium">Latest event</p>
-								<p className="mt-1 text-muted-foreground">
-									{selectedJob?.audit ?? "No audit events yet."}
-								</p>
-							</div>
-							<div className="grid grid-cols-2 gap-3 text-sm">
-								<Metric
-									label="Timer"
-									value={`${selectedJob?.timerMinutes ?? 0} min`}
-								/>
-								<Metric label="Cost" value={`HK$${selectedJob?.cost ?? 0}`} />
-							</div>
-						</CardContent>
+						{selectedJob ? (
+							<>
+								<CardHeader>
+									<CardTitle>{selectedJob.id} audit trail</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<StateMachine currentStatus={selectedJob.status} />
+									<div className={`${mutedPanelClass} p-3 text-sm`}>
+										<p className="font-medium">Latest event</p>
+										<p className="mt-1 text-muted-foreground">
+											{selectedJob.audit}
+										</p>
+									</div>
+									<div className="grid grid-cols-2 gap-3 text-sm">
+										<Metric
+											label="Timer"
+											value={`${selectedJob.timerMinutes} min`}
+										/>
+										<Metric label="Cost" value={`HK$${selectedJob.cost}`} />
+									</div>
+								</CardContent>
+							</>
+						) : (
+							<CardContent className="pt-4">
+								<EmptyInline message="Select or create a job to view the audit trail." />
+							</CardContent>
+						)}
 					</Card>
 				</div>
 			</PageFrame>
@@ -1338,12 +992,17 @@ function MapView({
 						</div>
 					))}
 					<div className="absolute right-4 bottom-4 rounded-lg border bg-card/95 p-3 text-xs shadow-xs backdrop-blur">
-						<p className="font-medium">Google Maps layer placeholder</p>
+						<p className="font-medium">Tenant location layer</p>
 						<p className="mt-1 text-muted-foreground">
-							Hospital pins and live engineer GPS dots share the same location
-							stack.
+							Hospital pins and live engineer GPS dots are shown from the
+							current tenant records.
 						</p>
 					</div>
+					{hospitals.length === 0 && engineers.length === 0 ? (
+						<div className="absolute inset-x-4 top-1/2 -translate-y-1/2">
+							<EmptyInline message="Create hospitals or engineers to populate the map." />
+						</div>
+					) : null}
 				</div>
 				<div className="space-y-3">
 					{hasLiveAlerts ? (
@@ -1694,323 +1353,6 @@ function DashboardView({
 	);
 }
 
-function EngineerWorkspace({
-	jobRuntimeStatus,
-	manualAnswers,
-	manualQuery,
-	onJobAction,
-	selectedAsset,
-	selectedEngineer,
-	selectedJob,
-	setManualQuery,
-}: {
-	jobRuntimeStatus: JobStatus;
-	manualAnswers: ManualAnswer[];
-	manualQuery: string;
-	onJobAction: (action: JobAction) => void;
-	selectedAsset: ServiceOpsSnapshot["assets"][number];
-	selectedEngineer: string;
-	selectedJob?: Job;
-	setManualQuery: (query: string) => void;
-}) {
-	return (
-		<section className="mx-auto grid w-full max-w-[1320px] flex-1 gap-4 p-4 lg:grid-cols-[390px_1fr] lg:p-6">
-			<div className="rounded-2xl border bg-foreground p-2 shadow-lg">
-				<div className="overflow-hidden rounded-xl bg-card">
-					<div className="bg-primary px-4 py-5 text-primary-foreground">
-						<p className="text-primary-foreground/70 text-xs">Engineer App</p>
-						<h2 className="mt-1 font-semibold text-xl">{selectedEngineer}</h2>
-						<p className="text-primary-foreground/80 text-sm">
-							Clocked in · GPS active · Weak WiFi queue ready
-						</p>
-					</div>
-					<div className="space-y-4 p-4">
-						<Card className={panelClass}>
-							<CardContent className="space-y-3 pt-4">
-								<div className="flex items-center justify-between">
-									<p className="font-semibold">
-										{selectedJob?.id} · {selectedJob?.type}
-									</p>
-									<StatusPill className={statusStyles[jobRuntimeStatus]}>
-										{jobRuntimeStatus}
-									</StatusPill>
-								</div>
-								<p className="text-muted-foreground text-sm">
-									{selectedJob?.hospital}
-								</p>
-								<div className={`${mutedPanelClass} p-3 text-sm`}>
-									<p className="font-medium">{selectedAsset.model}</p>
-									<p className="text-muted-foreground">
-										{selectedAsset.location}
-									</p>
-									<p className="mt-2 text-primary text-xs">
-										NFC UID: {selectedAsset.nfcUid}
-									</p>
-								</div>
-								<div className="grid grid-cols-2 gap-2">
-									<Button
-										className={primaryActionClass}
-										onClick={() => onJobAction("start")}
-									>
-										<PlayCircleIcon className="size-4" />
-										NFC start
-									</Button>
-									<Button
-										className={compactButtonClass}
-										onClick={() => onJobAction("pause")}
-										variant="outline"
-									>
-										<PauseCircleIcon className="size-4" />
-										Parts pause
-									</Button>
-									<Button
-										className={compactButtonClass}
-										onClick={() => onJobAction("resume")}
-										variant="outline"
-									>
-										<ClockIcon className="size-4" />
-										Resume
-									</Button>
-									<Button
-										className={compactButtonClass}
-										onClick={() => onJobAction("complete")}
-										variant="outline"
-									>
-										<CheckCircle2Icon className="size-4" />
-										NFC end
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-
-						<Card className={panelClass}>
-							<CardHeader>
-								<CardTitle>Log expenses and parts</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-3">
-								<Metric label="Mileage" value="15 km · HK$72" />
-								<Metric label="Meal receipt" value="Required photo" />
-								<Metric label="Parts billing" value="Auto contract check" />
-							</CardContent>
-						</Card>
-					</div>
-				</div>
-			</div>
-
-			<div className="space-y-4">
-				<PageHeader
-					eyebrow="Engineer workflow"
-					title="NFC, geofence, manual Q&A and offline sync"
-				/>
-				<div className="grid gap-4 xl:grid-cols-3">
-					<FeatureTile
-						icon={<NfcIcon className="size-5" />}
-						text="Start requires matching asset uid. End validates the hospital geofence before submission."
-						title="NFC scan to start/end"
-					/>
-					<FeatureTile
-						icon={<LocateFixedIcon className="size-5" />}
-						text="Tracking activates during work hours and is retained for 30 days."
-						title="GPS clock-in/out"
-					/>
-					<FeatureTile
-						icon={<BellRingIcon className="size-5" />}
-						text="Assignments, resumed jobs, geofence alerts and status changes reach the engineer app."
-						title="Push notifications"
-					/>
-				</div>
-				<div className={panelClass}>
-					<div className="flex flex-col gap-4 px-5 pt-5 pb-4">
-						<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-							<div>
-								<p className="font-semibold text-lg">
-									Natural language service manual Q&A
-								</p>
-								<p className="mt-1 text-muted-foreground text-sm">
-									Search the scanned device manual and return page-backed
-									answers.
-								</p>
-							</div>
-							<Button className={primaryActionClass} size="sm">
-								<SearchIcon className="size-4" />
-								Search
-							</Button>
-						</div>
-						<div className="relative">
-							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								className="h-8 rounded-md bg-background pl-9 text-sm"
-								onChange={(event) => setManualQuery(event.target.value)}
-								placeholder="Ask the scanned device manual..."
-								value={manualQuery}
-							/>
-						</div>
-					</div>
-					<div className="mx-5 mb-5 overflow-hidden rounded-lg border">
-						{manualAnswers.length > 0 ? (
-							manualAnswers.map((answer) => (
-								<div
-									className="border-b p-4 last:border-b-0 hover:bg-muted/25"
-									key={answer.id}
-								>
-									<div className="flex items-center justify-between gap-3">
-										<p className="font-medium text-sm">{answer.title}</p>
-										<StatusPill className="border-blue-200 bg-blue-50 text-blue-700">
-											Page {answer.page}
-										</StatusPill>
-									</div>
-									<p className="mt-2 text-muted-foreground text-sm">
-										{answer.excerpt}
-									</p>
-								</div>
-							))
-						) : (
-							<EmptyInline message="No matching manual answers." />
-						)}
-					</div>
-				</div>
-			</div>
-		</section>
-	);
-}
-
-function HospitalFaultPortal({
-	faultStatus,
-	setFaultStatus,
-}: {
-	faultStatus: FaultStatus;
-	setFaultStatus: (status: FaultStatus) => void;
-}) {
-	return (
-		<section className="mx-auto grid w-full max-w-6xl flex-1 gap-6 p-4 lg:grid-cols-[0.9fr_1.1fr] lg:p-6">
-			<div>
-				<PageHeader
-					eyebrow="Hospital mobile web"
-					title="Report a fault without installing an app"
-				/>
-				<p className="mt-3 max-w-xl text-muted-foreground text-sm leading-relaxed">
-					Hospital staff open a Utiliti link, scan an NFC sticker on Android or
-					search by asset, add fault details and photos, then track status from
-					received to resolved.
-				</p>
-				<div className="mt-5 grid gap-3 sm:grid-cols-2">
-					<FeatureTile
-						icon={<NfcIcon className="size-5" />}
-						text="Device data is pre-filled from the commissioned asset record."
-						title="NFC or manual lookup"
-					/>
-					<FeatureTile
-						icon={<UploadIcon className="size-5" />}
-						text="Staff attach fault photos before the report reaches Back Office."
-						title="Photo evidence"
-					/>
-					<FeatureTile
-						icon={<MessageSquareTextIcon className="size-5" />}
-						text="Hospitals can check status without calling service coordinators."
-						title="Status tracking"
-					/>
-					<FeatureTile
-						icon={<ArrowRightIcon className="size-5" />}
-						text="Coordinators can generate a repair job from the same screen."
-						title="Repair job handoff"
-					/>
-				</div>
-			</div>
-
-			<Card className={panelClass}>
-				<CardHeader>
-					<CardTitle>Fault report form</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4">
-					<div className={`${mutedPanelClass} p-3`}>
-						<div className="flex items-center gap-2 text-primary text-sm">
-							<NfcIcon className="size-4" />
-							NFC scan matched asset AST-10031
-						</div>
-						<p className="mt-2 font-medium">Sara Flex Standing Aid</p>
-						<p className="text-muted-foreground text-sm">
-							Prince of Wales Hospital · Ward 10B / Bay 3
-						</p>
-					</div>
-					<div className="grid gap-3 md:grid-cols-2">
-						<Field label="Severity" value="High" />
-						<Field label="Contact" value="Ward 10B nurse station" />
-					</div>
-					<div>
-						<Label htmlFor="fault-description">Fault description</Label>
-						<textarea
-							className="mt-2 min-h-28 w-full rounded-md border bg-background p-3 text-sm outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring/50"
-							defaultValue="Standing aid battery does not hold charge and shows warning after short use."
-							id="fault-description"
-						/>
-					</div>
-					<div className="flex flex-wrap gap-2">
-						<Button className={compactButtonClass} variant="outline">
-							<UploadIcon className="size-4" />
-							Add photos
-						</Button>
-						<Button
-							className={primaryActionClass}
-							onClick={() => setFaultStatus("Engineer Assigned")}
-						>
-							Submit report
-						</Button>
-					</div>
-					<div className={`${mutedPanelClass} p-3`}>
-						<p className="font-medium text-sm">Current status</p>
-						<div className="mt-3 grid gap-2 sm:grid-cols-4">
-							{(
-								[
-									"Received",
-									"Engineer Assigned",
-									"In Progress",
-									"Resolved",
-								] as const
-							).map((status) => (
-								<button
-									className={cn(
-										"rounded-md border px-2 py-2 text-xs transition-colors",
-										faultStatus === status
-											? faultStatusStyles[status]
-											: "bg-background text-muted-foreground hover:bg-muted"
-									)}
-									key={status}
-									onClick={() => setFaultStatus(status)}
-									type="button"
-								>
-									{status}
-								</button>
-							))}
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-		</section>
-	);
-}
-
-function EmptyWorkspace({
-	eyebrow,
-	title,
-}: {
-	eyebrow: string;
-	title: string;
-}) {
-	return (
-		<section className="mx-auto w-full max-w-4xl p-4 lg:p-6">
-			<PageFrame eyebrow={eyebrow} title={title}>
-				<Card className={panelClass}>
-					<CardContent className="pt-4">
-						<p className="text-muted-foreground text-sm">
-							Create records from Back Office to start using this workflow.
-						</p>
-					</CardContent>
-				</Card>
-			</PageFrame>
-		</section>
-	);
-}
-
 function EmptyInline({ message }: { message: string }) {
 	return (
 		<div
@@ -2030,6 +1372,24 @@ function CrudDialog({
 	onClose: () => void;
 	state: CrudState | null;
 }) {
+	useEffect(() => {
+		if (!state) {
+			return;
+		}
+
+		const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				onClose();
+			}
+		};
+
+		window.addEventListener("keydown", handleDialogKeyDown);
+
+		return () => {
+			window.removeEventListener("keydown", handleDialogKeyDown);
+		};
+	}, [onClose, state]);
+
 	if (!state) {
 		return null;
 	}
@@ -2038,18 +1398,32 @@ function CrudDialog({
 		state.mode === "create"
 			? `New ${entityLabels[state.entity]}`
 			: `Edit ${entityLabels[state.entity]}`;
+	const descriptionId = "crud-dialog-description";
+	const titleId = "crud-dialog-title";
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 px-4 py-8 backdrop-blur-sm">
+		<div
+			aria-describedby={descriptionId}
+			aria-labelledby={titleId}
+			aria-modal="true"
+			className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 px-4 py-8 backdrop-blur-sm"
+			role="dialog"
+		>
 			<div className="w-full max-w-2xl rounded-lg border bg-card shadow-lg">
 				<div className="flex items-start justify-between gap-4 border-b px-5 py-4">
 					<div>
-						<p className="font-semibold text-lg">{title}</p>
-						<p className="mt-1 text-muted-foreground text-sm">
+						<p className="font-semibold text-lg" id={titleId}>
+							{title}
+						</p>
+						<p
+							className="mt-1 text-muted-foreground text-sm"
+							id={descriptionId}
+						>
 							Changes are saved to the current tenant only.
 						</p>
 					</div>
 					<Button
+						aria-label="Close dialog"
 						className={compactButtonClass}
 						onClick={onClose}
 						size="sm"
@@ -2125,7 +1499,7 @@ function CrudForm({
 					type="submit"
 				>
 					{isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-					Save
+					{isSaving ? "Saving" : "Save"}
 				</Button>
 			</div>
 		</form>
@@ -2225,769 +1599,6 @@ function FormField({
 			/>
 		</div>
 	);
-}
-
-function optionFromRecord(
-	record: { id: string; name?: string },
-	fallback?: string
-) {
-	return {
-		label: record.name ?? fallback ?? record.id,
-		value: record.id,
-	};
-}
-
-function getFieldConfigs(
-	entity: CrudEntity,
-	data: ServiceOpsSnapshot
-): FieldConfig[] {
-	const hospitalOptions = data.hospitals.map((hospital) =>
-		optionFromRecord(hospital)
-	);
-	const engineerOptions = data.engineers.map((engineer) =>
-		optionFromRecord(engineer)
-	);
-	const productOptions = data.products.map((product) => ({
-		label: product.modelName,
-		value: product.id,
-	}));
-	const assetOptions = data.assets.map((asset) => ({
-		label: `${asset.id} · ${asset.model}`,
-		value: asset.recordId,
-	}));
-
-	const configs: Record<CrudEntity, FieldConfig[]> = {
-		asset: [
-			{ label: "Asset number", name: "assetNumber", required: true },
-			{ label: "Serial number", name: "serialNumber", required: true },
-			{
-				label: "Model",
-				name: "productModelId",
-				options: productOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Hospital",
-				name: "hospitalId",
-				options: hospitalOptions,
-				required: true,
-				type: "select",
-			},
-			{ label: "Location", name: "locationLabel", required: true },
-			{ label: "NFC UID", name: "nfcUid", required: true },
-			{
-				label: "Coverage",
-				name: "contractCoverageStatus",
-				options: coverageOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Designated engineer",
-				name: "designatedEngineerId",
-				options: engineerOptions,
-				type: "select",
-			},
-			{ label: "Installation date", name: "installationDate", type: "date" },
-			{ label: "Warranty expiry", name: "warrantyExpiryDate", type: "date" },
-			{ label: "Next PM due", name: "nextPmDueDate", type: "date" },
-		],
-		contract: [
-			{ label: "Contract number", name: "contractNumber", required: true },
-			{
-				label: "Hospital",
-				name: "hospitalId",
-				options: hospitalOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Type",
-				name: "type",
-				options: contractTypeOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Status",
-				name: "status",
-				options: contractStatusOptions,
-				required: true,
-				type: "select",
-			},
-			{ label: "Start date", name: "startDate", required: true, type: "date" },
-			{ label: "End date", name: "endDate", required: true, type: "date" },
-			{
-				label: "Response SLA hours",
-				name: "responseSlaHours",
-				required: true,
-				type: "number",
-			},
-			{ label: "Account manager", name: "accountManagerName", required: true },
-			{
-				label: "Covered models",
-				multiple: true,
-				name: "coveredModelIds",
-				options: productOptions,
-				type: "select",
-			},
-		],
-		engineer: [
-			{ label: "Code", name: "code", required: true },
-			{ label: "Name", name: "name", required: true },
-			{ label: "Email", name: "email" },
-			{ label: "Phone", name: "phone" },
-			{ label: "Grade", name: "grade", required: true },
-			{ label: "Region", name: "region", required: true },
-			{
-				label: "Status",
-				name: "status",
-				options: engineerStatusOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Hourly rate",
-				name: "hourlyRate",
-				required: true,
-				type: "number",
-			},
-			{
-				label: "Mileage rate",
-				name: "mileageRate",
-				required: true,
-				type: "number",
-			},
-			{ label: "Meal cap", name: "mealCap", required: true, type: "number" },
-		],
-		fault: [
-			{ label: "Report number", name: "reportNumber", required: true },
-			{
-				label: "Hospital",
-				name: "hospitalId",
-				options: hospitalOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Asset",
-				name: "assetId",
-				options: assetOptions,
-				type: "select",
-			},
-			{
-				label: "Severity",
-				name: "severity",
-				options: faultSeverityOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Status",
-				name: "status",
-				options: faultStatusOptions,
-				required: true,
-				type: "select",
-			},
-			{ label: "Submitted by", name: "submittedByName", required: true },
-			{ label: "Contact", name: "submittedByContact" },
-			{
-				label: "Description",
-				name: "description",
-				required: true,
-				type: "textarea",
-			},
-		],
-		hospital: [
-			{ label: "Code", name: "code", required: true },
-			{ label: "Name", name: "name", required: true },
-			{ label: "District", name: "district", required: true },
-			{ label: "Address", name: "address" },
-			{ label: "Latitude", name: "latitude", type: "number" },
-			{ label: "Longitude", name: "longitude", type: "number" },
-			{ label: "Contact name", name: "primaryContactName" },
-			{ label: "Contact email", name: "primaryContactEmail" },
-			{ label: "Contact phone", name: "primaryContactPhone" },
-		],
-		job: [
-			{ label: "Job number", name: "jobNumber", required: true },
-			{
-				label: "Type",
-				name: "type",
-				options: jobTypeOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Status",
-				name: "status",
-				options: jobStatusOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Priority",
-				name: "priority",
-				options: priorityOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Asset",
-				name: "assetId",
-				options: assetOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Hospital",
-				name: "hospitalId",
-				options: hospitalOptions,
-				required: true,
-				type: "select",
-			},
-			{
-				label: "Engineer",
-				name: "assignedEngineerId",
-				options: engineerOptions,
-				type: "select",
-			},
-			{
-				label: "Scheduled start",
-				name: "scheduledStartAt",
-				type: "datetime-local",
-			},
-			{
-				label: "Description",
-				name: "description",
-				required: true,
-				type: "textarea",
-			},
-		],
-		part: [
-			{ label: "Part number", name: "partNumber", required: true },
-			{ label: "Name", name: "name", required: true },
-			{ label: "Supplier", name: "supplier", required: true },
-			{
-				label: "Stock on hand",
-				name: "stockOnHand",
-				required: true,
-				type: "number",
-			},
-			{
-				label: "Minimum stock",
-				name: "minimumStock",
-				required: true,
-				type: "number",
-			},
-			{ label: "Unit cost", name: "unitCost", required: true, type: "number" },
-		],
-		product: [
-			{ label: "Code", name: "code", required: true },
-			{ label: "Model name", name: "modelName", required: true },
-			{ label: "Manufacturer", name: "manufacturer", required: true },
-			{ label: "Category", name: "category", required: true },
-			{
-				label: "Default PM cycle months",
-				name: "defaultPmCycleMonths",
-				required: true,
-				type: "number",
-			},
-			{
-				label: "Engineer read only",
-				name: "isEngineerReadOnly",
-				type: "checkbox",
-			},
-		],
-	};
-
-	return configs[entity];
-}
-
-function valueFromForm(formData: FormData, name: string) {
-	return String(formData.get(name) ?? "").trim();
-}
-
-function nullableValueFromForm(formData: FormData, name: string) {
-	const value = valueFromForm(formData, name);
-
-	return value || null;
-}
-
-function numberFromForm(formData: FormData, name: string) {
-	const value = valueFromForm(formData, name);
-
-	return value ? Number(value) : 0;
-}
-
-function optionalNumberFromForm(formData: FormData, name: string) {
-	const value = valueFromForm(formData, name);
-
-	return value ? Number(value) : null;
-}
-
-function boolFromForm(formData: FormData, name: string) {
-	return formData.get(name) === "on";
-}
-
-function datetimeLocalValue(value: null | string | undefined) {
-	if (!value) {
-		return "";
-	}
-
-	const date = new Date(value);
-
-	if (Number.isNaN(date.getTime())) {
-		return "";
-	}
-
-	const timezoneOffsetMs = date.getTimezoneOffset() * 60_000;
-
-	return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 16);
-}
-
-function valuesFromForm(formData: FormData, name: string) {
-	return formData
-		.getAll(name)
-		.map((value) => String(value).trim())
-		.filter(Boolean);
-}
-
-function enumFromForm<T extends readonly string[]>(
-	formData: FormData,
-	name: string,
-	values: T
-): T[number] {
-	const value = valueFromForm(formData, name);
-
-	if (values.includes(value)) {
-		return value;
-	}
-
-	return values[0];
-}
-
-function getRecordId(entity: CrudEntity, record: unknown) {
-	const typedRecord = record as Record<string, unknown>;
-	const id =
-		entity === "product" || entity === "hospital" || entity === "engineer"
-			? typedRecord.id
-			: typedRecord.recordId;
-
-	return String(id ?? "");
-}
-
-function getCrudStateKey(state: CrudState) {
-	if (state.mode === "create") {
-		return `${state.entity}-create`;
-	}
-
-	return `${state.entity}-${getRecordId(state.entity, state.record)}`;
-}
-
-function isHospitalRecord(record: unknown): record is Hospital {
-	return typeof record === "object" && record !== null && "district" in record;
-}
-
-function isEngineerRecord(record: unknown): record is Engineer {
-	return typeof record === "object" && record !== null && "grade" in record;
-}
-
-function isProductRecord(record: unknown): record is ProductModel {
-	return typeof record === "object" && record !== null && "modelName" in record;
-}
-
-function isPartRecord(record: unknown): record is Part {
-	return typeof record === "object" && record !== null && "minimum" in record;
-}
-
-function isAssetRecord(record: unknown): record is Asset {
-	return typeof record === "object" && record !== null && "nfcUid" in record;
-}
-
-function isJobRecord(record: unknown): record is Job {
-	return typeof record === "object" && record !== null && "typeValue" in record;
-}
-
-function isContractRecord(record: unknown): record is Contract {
-	return (
-		typeof record === "object" && record !== null && "coveredModelIds" in record
-	);
-}
-
-function isFaultRecord(record: unknown): record is FaultReport {
-	return (
-		typeof record === "object" && record !== null && "severityValue" in record
-	);
-}
-
-function getFormDefaults(entity: CrudEntity, record: unknown) {
-	if (!record) {
-		return getCreateDefaults(entity);
-	}
-
-	const defaults = getEditDefaults(entity, record);
-
-	return defaults ?? getCreateDefaults(entity);
-}
-
-function getEditDefaults(entity: CrudEntity, record: unknown) {
-	const defaultsByEntity: Record<
-		CrudEntity,
-		(
-			record: unknown
-		) => Record<string, boolean | number | string | string[]> | null
-	> = {
-		asset: getAssetDefaults,
-		contract: getContractDefaults,
-		engineer: getEngineerDefaults,
-		fault: getFaultDefaults,
-		hospital: getHospitalDefaults,
-		job: getJobDefaults,
-		part: getPartDefaults,
-		product: getProductDefaults,
-	};
-
-	return defaultsByEntity[entity](record);
-}
-
-function getAssetDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isAssetRecord(record)) {
-		return {
-			assetNumber: record.id,
-			contractCoverageStatus: record.contractCoverageValue,
-			designatedEngineerId: record.designatedEngineerId ?? "",
-			hospitalId: record.hospitalId,
-			installationDate:
-				record.installationDate === "Not set" ? "" : record.installationDate,
-			locationLabel: record.location,
-			nextPmDueDate: record.nextPmDue === "Not set" ? "" : record.nextPmDue,
-			nfcUid: record.nfcUid,
-			productModelId: record.productModelId,
-			serialNumber: record.serial,
-			warrantyExpiryDate:
-				record.warrantyExpiry === "Not set" ? "" : record.warrantyExpiry,
-		};
-	}
-
-	return null;
-}
-
-function getContractDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isContractRecord(record)) {
-		return {
-			accountManagerName: record.accountManager,
-			contractNumber: record.id,
-			coveredModelIds: record.coveredModelIds,
-			endDate: record.expiry,
-			hospitalId: record.hospitalId,
-			responseSlaHours: record.slaHours,
-			startDate: record.startDate,
-			status: record.statusValue,
-			type: record.typeValue,
-		};
-	}
-
-	return null;
-}
-
-function getEngineerDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isEngineerRecord(record)) {
-		return {
-			code: record.code,
-			email: record.email ?? "",
-			grade: record.grade,
-			hourlyRate: record.hourlyRate,
-			mealCap: record.mealCap,
-			mileageRate: record.mileageRate,
-			name: record.name,
-			phone: record.phone ?? "",
-			region: record.region,
-			status: record.statusValue,
-		};
-	}
-
-	return null;
-}
-
-function getFaultDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isFaultRecord(record)) {
-		return {
-			assetId: record.assetId ?? "",
-			description: record.description,
-			hospitalId: record.hospitalId,
-			reportNumber: record.id,
-			severity: record.severityValue,
-			status: record.statusValue,
-			submittedByContact: record.submittedByContact ?? "",
-			submittedByName: record.submittedByName,
-		};
-	}
-
-	return null;
-}
-
-function getHospitalDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isHospitalRecord(record)) {
-		return {
-			address: record.address ?? "",
-			code: record.code,
-			district: record.district,
-			latitude: record.lat,
-			longitude: record.lng,
-			name: record.name,
-			primaryContactEmail: record.primaryContactEmail ?? "",
-			primaryContactName: record.primaryContactName ?? "",
-			primaryContactPhone: record.primaryContactPhone ?? "",
-		};
-	}
-
-	return null;
-}
-
-function getJobDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isJobRecord(record)) {
-		return {
-			assetId: record.assetId,
-			assignedEngineerId: record.engineerId ?? "",
-			description: record.description,
-			hospitalId: record.hospitalId,
-			jobNumber: record.id,
-			priority: record.priorityValue,
-			scheduledStartAt: datetimeLocalValue(record.scheduledStartAt),
-			status: record.statusValue,
-			type: record.typeValue,
-		};
-	}
-
-	return null;
-}
-
-function getPartDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isPartRecord(record)) {
-		return {
-			minimumStock: record.minimum,
-			name: record.name,
-			partNumber: record.id,
-			stockOnHand: record.stock,
-			supplier: record.supplier,
-			unitCost: record.unitCost,
-		};
-	}
-
-	return null;
-}
-
-function getProductDefaults(
-	record: unknown
-): Record<string, boolean | number | string | string[]> | null {
-	if (isProductRecord(record)) {
-		return {
-			category: record.category,
-			code: record.code,
-			defaultPmCycleMonths: record.defaultPmCycleMonths,
-			isEngineerReadOnly: record.isEngineerReadOnly,
-			manufacturer: record.manufacturer,
-			modelName: record.modelName,
-		};
-	}
-
-	return null;
-}
-
-function getCreateDefaults(entity: CrudEntity) {
-	const suffix = Date.now().toString().slice(-5);
-	const today = new Date().toISOString().slice(0, 10);
-	const defaults: Record<string, boolean | number | string | string[]> = {
-		status: "",
-	};
-
-	if (entity === "engineer") {
-		defaults.code = `ENG-${suffix}`;
-		defaults.status = "idle";
-		defaults.hourlyRate = 0;
-		defaults.mileageRate = 0;
-		defaults.mealCap = 0;
-	}
-
-	if (entity === "product") {
-		defaults.code = `MODEL-${suffix}`;
-		defaults.defaultPmCycleMonths = 6;
-		defaults.isEngineerReadOnly = true;
-	}
-
-	if (entity === "part") {
-		defaults.partNumber = `P-${suffix}`;
-		defaults.minimumStock = 0;
-		defaults.stockOnHand = 0;
-		defaults.unitCost = 0;
-	}
-
-	if (entity === "asset") {
-		defaults.assetNumber = `AST-${suffix}`;
-		defaults.contractCoverageStatus = "in_contract";
-		defaults.installationDate = today;
-		defaults.nfcUid = `nfc-${suffix}`;
-	}
-
-	if (entity === "job") {
-		defaults.jobNumber = `JOB-${suffix}`;
-		defaults.type = "repair";
-		defaults.status = "created";
-		defaults.priority = "normal";
-	}
-
-	if (entity === "contract") {
-		defaults.contractNumber = `CTR-${suffix}`;
-		defaults.coveredModelIds = [];
-		defaults.endDate = today;
-		defaults.startDate = today;
-		defaults.type = "full";
-		defaults.status = "active";
-		defaults.responseSlaHours = 4;
-	}
-
-	if (entity === "fault") {
-		defaults.reportNumber = `FLT-${suffix}`;
-		defaults.severity = "medium";
-		defaults.status = "received";
-	}
-
-	if (entity === "hospital") {
-		defaults.code = `HSP-${suffix}`;
-	}
-
-	return defaults;
-}
-
-function buildAssetPayload(formData: FormData): AssetPayload {
-	return {
-		assetNumber: valueFromForm(formData, "assetNumber"),
-		contractCoverageStatus: enumFromForm(
-			formData,
-			"contractCoverageStatus",
-			coverageValues
-		),
-		designatedEngineerId: nullableValueFromForm(
-			formData,
-			"designatedEngineerId"
-		),
-		hospitalId: valueFromForm(formData, "hospitalId"),
-		installationDate: nullableValueFromForm(formData, "installationDate"),
-		locationLabel: valueFromForm(formData, "locationLabel"),
-		nextPmDueDate: nullableValueFromForm(formData, "nextPmDueDate"),
-		nfcUid: valueFromForm(formData, "nfcUid"),
-		productModelId: valueFromForm(formData, "productModelId"),
-		serialNumber: valueFromForm(formData, "serialNumber"),
-		warrantyExpiryDate: nullableValueFromForm(formData, "warrantyExpiryDate"),
-	};
-}
-
-function buildContractPayload(formData: FormData): ContractPayload {
-	return {
-		accountManagerName: valueFromForm(formData, "accountManagerName"),
-		contractNumber: valueFromForm(formData, "contractNumber"),
-		coveredModelIds: valuesFromForm(formData, "coveredModelIds"),
-		endDate: valueFromForm(formData, "endDate"),
-		hospitalId: valueFromForm(formData, "hospitalId"),
-		responseSlaHours: numberFromForm(formData, "responseSlaHours"),
-		startDate: valueFromForm(formData, "startDate"),
-		status: enumFromForm(formData, "status", contractStatusValues),
-		type: enumFromForm(formData, "type", contractTypeValues),
-	};
-}
-
-function buildEngineerPayload(formData: FormData): EngineerPayload {
-	return {
-		code: valueFromForm(formData, "code"),
-		email: nullableValueFromForm(formData, "email"),
-		grade: valueFromForm(formData, "grade"),
-		hourlyRate: numberFromForm(formData, "hourlyRate"),
-		mealCap: numberFromForm(formData, "mealCap"),
-		mileageRate: numberFromForm(formData, "mileageRate"),
-		name: valueFromForm(formData, "name"),
-		phone: nullableValueFromForm(formData, "phone"),
-		region: valueFromForm(formData, "region"),
-		status: enumFromForm(formData, "status", engineerStatusValues),
-	};
-}
-
-function buildFaultPayload(formData: FormData): FaultPayload {
-	return {
-		assetId: nullableValueFromForm(formData, "assetId"),
-		description: valueFromForm(formData, "description"),
-		hospitalId: valueFromForm(formData, "hospitalId"),
-		reportNumber: valueFromForm(formData, "reportNumber"),
-		severity: enumFromForm(formData, "severity", faultSeverityValues),
-		status: enumFromForm(formData, "status", faultStatusValues),
-		submittedByContact: nullableValueFromForm(formData, "submittedByContact"),
-		submittedByName: valueFromForm(formData, "submittedByName"),
-	};
-}
-
-function buildHospitalPayload(formData: FormData): HospitalPayload {
-	return {
-		address: nullableValueFromForm(formData, "address"),
-		code: valueFromForm(formData, "code"),
-		district: valueFromForm(formData, "district"),
-		latitude: optionalNumberFromForm(formData, "latitude"),
-		longitude: optionalNumberFromForm(formData, "longitude"),
-		name: valueFromForm(formData, "name"),
-		primaryContactEmail: nullableValueFromForm(formData, "primaryContactEmail"),
-		primaryContactName: nullableValueFromForm(formData, "primaryContactName"),
-		primaryContactPhone: nullableValueFromForm(formData, "primaryContactPhone"),
-	};
-}
-
-function buildJobPayload(formData: FormData): JobPayload {
-	return {
-		assetId: valueFromForm(formData, "assetId"),
-		assignedEngineerId: nullableValueFromForm(formData, "assignedEngineerId"),
-		description: valueFromForm(formData, "description"),
-		hospitalId: valueFromForm(formData, "hospitalId"),
-		jobNumber: valueFromForm(formData, "jobNumber"),
-		priority: enumFromForm(formData, "priority", priorityValues),
-		scheduledStartAt: nullableValueFromForm(formData, "scheduledStartAt"),
-		status: enumFromForm(formData, "status", jobStatusValues),
-		type: enumFromForm(formData, "type", jobTypeValues),
-	};
-}
-
-function buildPartPayload(formData: FormData): PartPayload {
-	return {
-		minimumStock: numberFromForm(formData, "minimumStock"),
-		name: valueFromForm(formData, "name"),
-		partNumber: valueFromForm(formData, "partNumber"),
-		stockOnHand: numberFromForm(formData, "stockOnHand"),
-		supplier: valueFromForm(formData, "supplier"),
-		unitCost: numberFromForm(formData, "unitCost"),
-	};
-}
-
-function buildProductPayload(formData: FormData): ProductPayload {
-	return {
-		category: valueFromForm(formData, "category"),
-		code: valueFromForm(formData, "code"),
-		defaultPmCycleMonths: numberFromForm(formData, "defaultPmCycleMonths"),
-		isEngineerReadOnly: boolFromForm(formData, "isEngineerReadOnly"),
-		manufacturer: valueFromForm(formData, "manufacturer"),
-		modelName: valueFromForm(formData, "modelName"),
-	};
 }
 
 function useEntityMutations(tenantId: string, onDone: () => void) {
@@ -3411,191 +2022,6 @@ function PageHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
 	);
 }
 
-function DataTable({
-	columns,
-	description,
-	filterLabels = ["Status", "Date"],
-	rows,
-	title,
-}: DataTableProps) {
-	return (
-		<div className={`${panelClass} overflow-hidden`}>
-			<div className="flex flex-col gap-4 px-5 pt-5 pb-4">
-				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-					<div>
-						<p className="font-semibold text-lg">
-							{title ?? `${rows.length} Records`}
-						</p>
-						<p className="mt-1 text-muted-foreground text-sm">
-							{description ??
-								"Recent service records with status, ownership, and schedule activity."}
-						</p>
-					</div>
-					<Button className={compactButtonClass} size="sm" variant="outline">
-						<DownloadIcon className="size-4" />
-						Export
-					</Button>
-				</div>
-				<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-						<div className="relative sm:w-[340px]">
-							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								className="h-8 rounded-md bg-background pl-9 text-sm"
-								placeholder="Search records..."
-								readOnly
-							/>
-						</div>
-						{filterLabels.map((label) => (
-							<TableToolbarButton key={label} label={label} />
-						))}
-					</div>
-					<div className="flex flex-wrap gap-2">
-						<TableToolbarButton icon={<CreditCardIcon />} label="Billing" />
-						<TableToolbarButton icon={<SlidersHorizontalIcon />} label="Sort" />
-					</div>
-				</div>
-			</div>
-			<div className="mx-5 overflow-hidden rounded-lg border">
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[820px] border-collapse text-sm">
-						<thead className="bg-muted/20">
-							<tr className="border-b">
-								<th className="h-11 w-14 px-4 text-left align-middle">
-									<RowCheckbox label="Select all rows" />
-								</th>
-								{columns.map((column) => (
-									<th
-										className="h-11 px-4 text-left align-middle font-medium"
-										key={column}
-									>
-										{column}
-									</th>
-								))}
-								<th className="h-11 w-16 px-4 text-right align-middle font-medium">
-									Actions
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							{rows.length > 0 ? (
-								rows.map((row) => (
-									<tr
-										className="border-b transition-colors last:border-b-0 hover:bg-muted/25"
-										key={row.id}
-									>
-										<td className="px-4 py-3 align-middle">
-											<RowCheckbox label={`Select ${row.id}`} />
-										</td>
-										{row.cells.map((cell, cellIndex) => (
-											<td
-												className="px-4 py-3 align-middle"
-												key={`${row.id}-${columns[cellIndex] ?? "cell"}`}
-											>
-												{cell}
-											</td>
-										))}
-										<td className="px-4 py-3 text-right align-middle">
-											{row.actions}
-										</td>
-									</tr>
-								))
-							) : (
-								<tr>
-									<td
-										className="h-24 px-4 text-center text-muted-foreground"
-										colSpan={columns.length + 2}
-									>
-										No records yet.
-									</td>
-								</tr>
-							)}
-						</tbody>
-					</table>
-				</div>
-			</div>
-			<div className="flex flex-col gap-3 px-5 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
-				<p>0 of {rows.length} row(s) selected.</p>
-				<div className="flex flex-wrap items-center gap-3">
-					<div className="flex items-center gap-2">
-						<span className="font-medium text-foreground">Rows per page</span>
-						<button
-							className="inline-flex h-8 min-w-16 items-center justify-between rounded-md border bg-background px-3 font-medium text-foreground transition-colors hover:bg-muted"
-							type="button"
-						>
-							10
-							<ChevronDownIcon className="size-4 text-muted-foreground" />
-						</button>
-					</div>
-					<span className="font-medium text-foreground">Page 1 of 1</span>
-					<div className="flex gap-2">
-						<PaginationButton label="First page">
-							<ChevronsLeftIcon className="size-4" />
-						</PaginationButton>
-						<PaginationButton label="Previous page">
-							<ChevronLeftIcon className="size-4" />
-						</PaginationButton>
-						<PaginationButton label="Next page">
-							<ChevronRightIcon className="size-4" />
-						</PaginationButton>
-						<PaginationButton label="Last page">
-							<ChevronsRightIcon className="size-4" />
-						</PaginationButton>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-function TableToolbarButton({
-	icon,
-	label,
-}: {
-	icon?: ReactNode;
-	label: string;
-}) {
-	return (
-		<Button
-			className="h-8 rounded-md bg-background text-sm"
-			size="sm"
-			variant="outline"
-		>
-			{icon ?? <CalendarIcon className="size-4" />}
-			{label}
-		</Button>
-	);
-}
-
-function RowCheckbox({ label }: { label: string }) {
-	return (
-		<input
-			aria-label={label}
-			className="size-4 rounded border bg-background accent-primary"
-			readOnly
-			type="checkbox"
-		/>
-	);
-}
-
-function PaginationButton({
-	children,
-	label,
-}: {
-	children: ReactNode;
-	label: string;
-}) {
-	return (
-		<button
-			aria-label={label}
-			className="inline-flex size-8 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-			type="button"
-		>
-			{children}
-		</button>
-	);
-}
-
 function StatusPill({
 	children,
 	className,
@@ -3646,15 +2072,6 @@ function DashboardStatCard({
 	);
 }
 
-function Field({ label, value }: { label: string; value: string }) {
-	return (
-		<div>
-			<Label>{label}</Label>
-			<Input className="mt-2 rounded-md" defaultValue={value} />
-		</div>
-	);
-}
-
 function StateMachine({ currentStatus }: { currentStatus: JobStatus }) {
 	const activeIndex = serviceStateMachine.indexOf(
 		currentStatus as (typeof serviceStateMachine)[number]
@@ -3684,26 +2101,6 @@ function StateMachine({ currentStatus }: { currentStatus: JobStatus }) {
 					</div>
 				);
 			})}
-		</div>
-	);
-}
-
-function FeatureTile({
-	icon,
-	text,
-	title,
-}: {
-	icon: ReactNode;
-	text: string;
-	title: string;
-}) {
-	return (
-		<div className={`${panelClass} p-4`}>
-			<div className={iconTileClass}>{icon}</div>
-			<p className="mt-3 font-medium text-sm">{title}</p>
-			<p className="mt-1 text-muted-foreground text-xs leading-relaxed">
-				{text}
-			</p>
 		</div>
 	);
 }

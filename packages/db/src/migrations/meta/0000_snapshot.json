@@ -110,12 +110,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -202,12 +198,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -217,9 +209,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -283,9 +273,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -585,12 +573,8 @@
           "name": "assets_tenant_id_tenants_id_fk",
           "tableFrom": "assets",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -598,12 +582,8 @@
           "name": "assets_product_model_id_product_models_id_fk",
           "tableFrom": "assets",
           "tableTo": "product_models",
-          "columnsFrom": [
-            "product_model_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_model_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -611,12 +591,8 @@
           "name": "assets_hospital_id_hospitals_id_fk",
           "tableFrom": "assets",
           "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hospital_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -624,12 +600,8 @@
           "name": "assets_designated_engineer_id_engineers_id_fk",
           "tableFrom": "assets",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "designated_engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["designated_engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -726,12 +698,8 @@
           "name": "contract_model_coverage_tenant_id_tenants_id_fk",
           "tableFrom": "contract_model_coverage",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -739,12 +707,8 @@
           "name": "contract_model_coverage_contract_id_contracts_id_fk",
           "tableFrom": "contract_model_coverage",
           "tableTo": "contracts",
-          "columnsFrom": [
-            "contract_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["contract_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -752,12 +716,8 @@
           "name": "contract_model_coverage_product_model_id_product_models_id_fk",
           "tableFrom": "contract_model_coverage",
           "tableTo": "product_models",
-          "columnsFrom": [
-            "product_model_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_model_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -854,12 +814,8 @@
           "name": "contract_part_coverage_tenant_id_tenants_id_fk",
           "tableFrom": "contract_part_coverage",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -867,12 +823,8 @@
           "name": "contract_part_coverage_contract_id_contracts_id_fk",
           "tableFrom": "contract_part_coverage",
           "tableTo": "contracts",
-          "columnsFrom": [
-            "contract_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["contract_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -880,12 +832,8 @@
           "name": "contract_part_coverage_part_id_parts_id_fk",
           "tableFrom": "contract_part_coverage",
           "tableTo": "parts",
-          "columnsFrom": [
-            "part_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["part_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1068,12 +1016,8 @@
           "name": "contracts_tenant_id_tenants_id_fk",
           "tableFrom": "contracts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1081,12 +1025,8 @@
           "name": "contracts_hospital_id_hospitals_id_fk",
           "tableFrom": "contracts",
           "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hospital_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1181,12 +1121,8 @@
           "name": "engineer_clock_events_tenant_id_tenants_id_fk",
           "tableFrom": "engineer_clock_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1194,12 +1130,8 @@
           "name": "engineer_clock_events_engineer_id_engineers_id_fk",
           "tableFrom": "engineer_clock_events",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1314,12 +1246,8 @@
           "name": "engineer_locations_tenant_id_tenants_id_fk",
           "tableFrom": "engineer_locations",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1327,12 +1255,8 @@
           "name": "engineer_locations_engineer_id_engineers_id_fk",
           "tableFrom": "engineer_locations",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1340,12 +1264,8 @@
           "name": "engineer_locations_job_id_jobs_id_fk",
           "tableFrom": "engineer_locations",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1533,12 +1453,8 @@
           "name": "engineers_tenant_id_tenants_id_fk",
           "tableFrom": "engineers",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1546,12 +1462,8 @@
           "name": "engineers_user_id_user_id_fk",
           "tableFrom": "engineers",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1728,12 +1640,8 @@
           "name": "fault_reports_tenant_id_tenants_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1741,12 +1649,8 @@
           "name": "fault_reports_hospital_id_hospitals_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hospital_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1754,12 +1658,8 @@
           "name": "fault_reports_asset_id_assets_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1767,12 +1667,8 @@
           "name": "fault_reports_converted_job_id_jobs_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "converted_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["converted_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1900,12 +1796,8 @@
           "name": "file_attachments_tenant_id_tenants_id_fk",
           "tableFrom": "file_attachments",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1913,12 +1805,8 @@
           "name": "file_attachments_uploaded_by_user_id_user_id_fk",
           "tableFrom": "file_attachments",
           "tableTo": "user",
-          "columnsFrom": [
-            "uploaded_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["uploaded_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2053,12 +1941,8 @@
           "name": "geofence_events_tenant_id_tenants_id_fk",
           "tableFrom": "geofence_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2066,12 +1950,8 @@
           "name": "geofence_events_job_id_jobs_id_fk",
           "tableFrom": "geofence_events",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2079,12 +1959,8 @@
           "name": "geofence_events_engineer_id_engineers_id_fk",
           "tableFrom": "geofence_events",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2092,12 +1968,8 @@
           "name": "geofence_events_hospital_id_hospitals_id_fk",
           "tableFrom": "geofence_events",
           "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hospital_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2250,12 +2122,8 @@
           "name": "hospitals_tenant_id_tenants_id_fk",
           "tableFrom": "hospitals",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2399,12 +2267,8 @@
           "name": "job_costs_tenant_id_tenants_id_fk",
           "tableFrom": "job_costs",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2412,12 +2276,8 @@
           "name": "job_costs_job_id_jobs_id_fk",
           "tableFrom": "job_costs",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2539,12 +2399,8 @@
           "name": "job_expenses_tenant_id_tenants_id_fk",
           "tableFrom": "job_expenses",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2552,12 +2408,8 @@
           "name": "job_expenses_job_id_jobs_id_fk",
           "tableFrom": "job_expenses",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2565,12 +2417,8 @@
           "name": "job_expenses_engineer_id_engineers_id_fk",
           "tableFrom": "job_expenses",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2688,12 +2536,8 @@
           "name": "job_parts_usage_tenant_id_tenants_id_fk",
           "tableFrom": "job_parts_usage",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2701,12 +2545,8 @@
           "name": "job_parts_usage_job_id_jobs_id_fk",
           "tableFrom": "job_parts_usage",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2714,12 +2554,8 @@
           "name": "job_parts_usage_part_id_parts_id_fk",
           "tableFrom": "job_parts_usage",
           "tableTo": "parts",
-          "columnsFrom": [
-            "part_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["part_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2855,12 +2691,8 @@
           "name": "job_state_events_tenant_id_tenants_id_fk",
           "tableFrom": "job_state_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2868,12 +2700,8 @@
           "name": "job_state_events_job_id_jobs_id_fk",
           "tableFrom": "job_state_events",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2881,12 +2709,8 @@
           "name": "job_state_events_actor_user_id_user_id_fk",
           "tableFrom": "job_state_events",
           "tableTo": "user",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2894,12 +2718,8 @@
           "name": "job_state_events_actor_engineer_id_engineers_id_fk",
           "tableFrom": "job_state_events",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "actor_engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3021,12 +2841,8 @@
           "name": "job_timers_tenant_id_tenants_id_fk",
           "tableFrom": "job_timers",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3034,12 +2850,8 @@
           "name": "job_timers_job_id_jobs_id_fk",
           "tableFrom": "job_timers",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3047,12 +2859,8 @@
           "name": "job_timers_engineer_id_engineers_id_fk",
           "tableFrom": "job_timers",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3060,12 +2868,8 @@
           "name": "job_timers_start_nfc_event_id_nfc_events_id_fk",
           "tableFrom": "job_timers",
           "tableTo": "nfc_events",
-          "columnsFrom": [
-            "start_nfc_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["start_nfc_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3073,12 +2877,8 @@
           "name": "job_timers_end_nfc_event_id_nfc_events_id_fk",
           "tableFrom": "job_timers",
           "tableTo": "nfc_events",
-          "columnsFrom": [
-            "end_nfc_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["end_nfc_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3310,12 +3110,8 @@
           "name": "jobs_tenant_id_tenants_id_fk",
           "tableFrom": "jobs",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3323,12 +3119,8 @@
           "name": "jobs_asset_id_assets_id_fk",
           "tableFrom": "jobs",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3336,12 +3128,8 @@
           "name": "jobs_hospital_id_hospitals_id_fk",
           "tableFrom": "jobs",
           "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["hospital_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -3349,12 +3137,8 @@
           "name": "jobs_assigned_engineer_id_engineers_id_fk",
           "tableFrom": "jobs",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "assigned_engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["assigned_engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3362,12 +3146,8 @@
           "name": "jobs_created_by_user_id_user_id_fk",
           "tableFrom": "jobs",
           "tableTo": "user",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3489,12 +3269,8 @@
           "name": "manual_qa_queries_tenant_id_tenants_id_fk",
           "tableFrom": "manual_qa_queries",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3502,12 +3278,8 @@
           "name": "manual_qa_queries_engineer_id_engineers_id_fk",
           "tableFrom": "manual_qa_queries",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3515,12 +3287,8 @@
           "name": "manual_qa_queries_asset_id_assets_id_fk",
           "tableFrom": "manual_qa_queries",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3528,12 +3296,8 @@
           "name": "manual_qa_queries_job_id_jobs_id_fk",
           "tableFrom": "manual_qa_queries",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3541,12 +3305,8 @@
           "name": "manual_qa_queries_manual_id_service_manuals_id_fk",
           "tableFrom": "manual_qa_queries",
           "tableTo": "service_manuals",
-          "columnsFrom": [
-            "manual_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["manual_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3702,12 +3462,8 @@
           "name": "nfc_events_tenant_id_tenants_id_fk",
           "tableFrom": "nfc_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3715,12 +3471,8 @@
           "name": "nfc_events_asset_id_assets_id_fk",
           "tableFrom": "nfc_events",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3728,12 +3480,8 @@
           "name": "nfc_events_tag_id_nfc_tags_id_fk",
           "tableFrom": "nfc_events",
           "tableTo": "nfc_tags",
-          "columnsFrom": [
-            "tag_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tag_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3741,12 +3489,8 @@
           "name": "nfc_events_job_id_jobs_id_fk",
           "tableFrom": "nfc_events",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -3754,12 +3498,8 @@
           "name": "nfc_events_engineer_id_engineers_id_fk",
           "tableFrom": "nfc_events",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -3889,12 +3629,8 @@
           "name": "nfc_tags_tenant_id_tenants_id_fk",
           "tableFrom": "nfc_tags",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3902,12 +3638,8 @@
           "name": "nfc_tags_asset_id_assets_id_fk",
           "tableFrom": "nfc_tags",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3915,12 +3647,8 @@
           "name": "nfc_tags_commissioned_by_engineer_id_engineers_id_fk",
           "tableFrom": "nfc_tags",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "commissioned_by_engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["commissioned_by_engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4048,12 +3776,8 @@
           "name": "opportunistic_pm_alerts_tenant_id_tenants_id_fk",
           "tableFrom": "opportunistic_pm_alerts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4061,12 +3785,8 @@
           "name": "opportunistic_pm_alerts_engineer_id_engineers_id_fk",
           "tableFrom": "opportunistic_pm_alerts",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4074,12 +3794,8 @@
           "name": "opportunistic_pm_alerts_asset_id_assets_id_fk",
           "tableFrom": "opportunistic_pm_alerts",
           "tableTo": "assets",
-          "columnsFrom": [
-            "asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4087,12 +3803,8 @@
           "name": "opportunistic_pm_alerts_source_job_id_jobs_id_fk",
           "tableFrom": "opportunistic_pm_alerts",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "source_job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4198,12 +3910,8 @@
           "name": "part_inventory_tenant_id_tenants_id_fk",
           "tableFrom": "part_inventory",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4211,12 +3919,8 @@
           "name": "part_inventory_part_id_parts_id_fk",
           "tableFrom": "part_inventory",
           "tableTo": "parts",
-          "columnsFrom": [
-            "part_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["part_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4339,12 +4043,8 @@
           "name": "parts_tenant_id_tenants_id_fk",
           "tableFrom": "parts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4501,12 +4201,8 @@
           "name": "parts_shortages_tenant_id_tenants_id_fk",
           "tableFrom": "parts_shortages",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4514,12 +4210,8 @@
           "name": "parts_shortages_job_id_jobs_id_fk",
           "tableFrom": "parts_shortages",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4527,12 +4219,8 @@
           "name": "parts_shortages_part_id_parts_id_fk",
           "tableFrom": "parts_shortages",
           "tableTo": "parts",
-          "columnsFrom": [
-            "part_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["part_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4540,12 +4228,8 @@
           "name": "parts_shortages_engineer_id_engineers_id_fk",
           "tableFrom": "parts_shortages",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4553,12 +4237,8 @@
           "name": "parts_shortages_confirmed_by_user_id_user_id_fk",
           "tableFrom": "parts_shortages",
           "tableTo": "user",
-          "columnsFrom": [
-            "confirmed_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["confirmed_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -4655,12 +4335,8 @@
           "name": "product_model_parts_tenant_id_tenants_id_fk",
           "tableFrom": "product_model_parts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4668,12 +4344,8 @@
           "name": "product_model_parts_product_model_id_product_models_id_fk",
           "tableFrom": "product_model_parts",
           "tableTo": "product_models",
-          "columnsFrom": [
-            "product_model_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_model_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4681,12 +4353,8 @@
           "name": "product_model_parts_part_id_parts_id_fk",
           "tableFrom": "product_model_parts",
           "tableTo": "parts",
-          "columnsFrom": [
-            "part_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["part_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4815,12 +4483,8 @@
           "name": "product_models_tenant_id_tenants_id_fk",
           "tableFrom": "product_models",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4969,12 +4633,8 @@
           "name": "push_notifications_tenant_id_tenants_id_fk",
           "tableFrom": "push_notifications",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4982,12 +4642,8 @@
           "name": "push_notifications_recipient_user_id_user_id_fk",
           "tableFrom": "push_notifications",
           "tableTo": "user",
-          "columnsFrom": [
-            "recipient_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["recipient_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4995,12 +4651,8 @@
           "name": "push_notifications_engineer_id_engineers_id_fk",
           "tableFrom": "push_notifications",
           "tableTo": "engineers",
-          "columnsFrom": [
-            "engineer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["engineer_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -5008,12 +4660,8 @@
           "name": "push_notifications_job_id_jobs_id_fk",
           "tableFrom": "push_notifications",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5114,12 +4762,8 @@
           "name": "report_snapshots_tenant_id_tenants_id_fk",
           "tableFrom": "report_snapshots",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5229,12 +4873,8 @@
           "name": "service_manual_sections_tenant_id_tenants_id_fk",
           "tableFrom": "service_manual_sections",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5242,12 +4882,8 @@
           "name": "service_manual_sections_manual_id_service_manuals_id_fk",
           "tableFrom": "service_manual_sections",
           "tableTo": "service_manuals",
-          "columnsFrom": [
-            "manual_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["manual_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5390,12 +5026,8 @@
           "name": "service_manuals_tenant_id_tenants_id_fk",
           "tableFrom": "service_manuals",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5403,12 +5035,8 @@
           "name": "service_manuals_product_model_id_product_models_id_fk",
           "tableFrom": "service_manuals",
           "tableTo": "product_models",
-          "columnsFrom": [
-            "product_model_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["product_model_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5416,12 +5044,8 @@
           "name": "service_manuals_uploaded_by_user_id_user_id_fk",
           "tableFrom": "service_manuals",
           "tableTo": "user",
-          "columnsFrom": [
-            "uploaded_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["uploaded_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5516,12 +5140,8 @@
           "name": "system_parameters_tenant_id_tenants_id_fk",
           "tableFrom": "system_parameters",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5529,12 +5149,8 @@
           "name": "system_parameters_updated_by_user_id_user_id_fk",
           "tableFrom": "system_parameters",
           "tableTo": "user",
-          "columnsFrom": [
-            "updated_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["updated_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -5654,12 +5270,8 @@
           "name": "tenant_memberships_tenant_id_tenants_id_fk",
           "tableFrom": "tenant_memberships",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5667,12 +5279,8 @@
           "name": "tenant_memberships_user_id_user_id_fk",
           "tableFrom": "tenant_memberships",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5840,12 +5448,8 @@
           "name": "websocket_events_tenant_id_tenants_id_fk",
           "tableFrom": "websocket_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5861,38 +5465,22 @@
     "public.attachment_owner_type": {
       "name": "attachment_owner_type",
       "schema": "public",
-      "values": [
-        "fault_report",
-        "job_expense",
-        "service_manual",
-        "job"
-      ]
+      "values": ["fault_report", "job_expense", "service_manual", "job"]
     },
     "public.clock_event_type": {
       "name": "clock_event_type",
       "schema": "public",
-      "values": [
-        "clock_in",
-        "clock_out"
-      ]
+      "values": ["clock_in", "clock_out"]
     },
     "public.contract_status": {
       "name": "contract_status",
       "schema": "public",
-      "values": [
-        "active",
-        "expiring",
-        "expired"
-      ]
+      "values": ["active", "expiring", "expired"]
     },
     "public.contract_type": {
       "name": "contract_type",
       "schema": "public",
-      "values": [
-        "full",
-        "partial",
-        "emergency_only"
-      ]
+      "values": ["full", "partial", "emergency_only"]
     },
     "public.coverage_status": {
       "name": "coverage_status",
@@ -5907,70 +5495,37 @@
     "public.engineer_status": {
       "name": "engineer_status",
       "schema": "public",
-      "values": [
-        "on_site",
-        "in_transit",
-        "idle",
-        "timer_anomaly",
-        "off_duty"
-      ]
+      "values": ["on_site", "in_transit", "idle", "timer_anomaly", "off_duty"]
     },
     "public.expense_type": {
       "name": "expense_type",
       "schema": "public",
-      "values": [
-        "mileage",
-        "meal",
-        "parking",
-        "other"
-      ]
+      "values": ["mileage", "meal", "parking", "other"]
     },
     "public.fault_severity": {
       "name": "fault_severity",
       "schema": "public",
-      "values": [
-        "low",
-        "medium",
-        "high",
-        "critical"
-      ]
+      "values": ["low", "medium", "high", "critical"]
     },
     "public.fault_source": {
       "name": "fault_source",
       "schema": "public",
-      "values": [
-        "hospital_web",
-        "back_office"
-      ]
+      "values": ["hospital_web", "back_office"]
     },
     "public.fault_status": {
       "name": "fault_status",
       "schema": "public",
-      "values": [
-        "received",
-        "engineer_assigned",
-        "in_progress",
-        "resolved"
-      ]
+      "values": ["received", "engineer_assigned", "in_progress", "resolved"]
     },
     "public.geofence_event_type": {
       "name": "geofence_event_type",
       "schema": "public",
-      "values": [
-        "activated",
-        "entered",
-        "exited",
-        "timer_anomaly",
-        "resolved"
-      ]
+      "values": ["activated", "entered", "exited", "timer_anomaly", "resolved"]
     },
     "public.job_priority": {
       "name": "job_priority",
       "schema": "public",
-      "values": [
-        "normal",
-        "urgent"
-      ]
+      "values": ["normal", "urgent"]
     },
     "public.job_status": {
       "name": "job_status",
@@ -5989,30 +5544,17 @@
     "public.job_type": {
       "name": "job_type",
       "schema": "public",
-      "values": [
-        "installation",
-        "repair",
-        "preventive_maintenance"
-      ]
+      "values": ["installation", "repair", "preventive_maintenance"]
     },
     "public.manual_status": {
       "name": "manual_status",
       "schema": "public",
-      "values": [
-        "uploaded",
-        "indexed",
-        "failed",
-        "retired"
-      ]
+      "values": ["uploaded", "indexed", "failed", "retired"]
     },
     "public.membership_status": {
       "name": "membership_status",
       "schema": "public",
-      "values": [
-        "active",
-        "invited",
-        "suspended"
-      ]
+      "values": ["active", "invited", "suspended"]
     },
     "public.nfc_event_type": {
       "name": "nfc_event_type",
@@ -6042,12 +5584,7 @@
     "public.notification_status": {
       "name": "notification_status",
       "schema": "public",
-      "values": [
-        "queued",
-        "sent",
-        "read",
-        "failed"
-      ]
+      "values": ["queued", "sent", "read", "failed"]
     },
     "public.notification_type": {
       "name": "notification_type",
@@ -6064,41 +5601,22 @@
     "public.report_period": {
       "name": "report_period",
       "schema": "public",
-      "values": [
-        "day",
-        "week",
-        "month"
-      ]
+      "values": ["day", "week", "month"]
     },
     "public.shortage_status": {
       "name": "shortage_status",
       "schema": "public",
-      "values": [
-        "waiting_for_parts",
-        "arrived",
-        "reschedule_ready",
-        "closed"
-      ]
+      "values": ["waiting_for_parts", "arrived", "reschedule_ready", "closed"]
     },
     "public.system_parameter_value_type": {
       "name": "system_parameter_value_type",
       "schema": "public",
-      "values": [
-        "number",
-        "string",
-        "secret",
-        "boolean"
-      ]
+      "values": ["number", "string", "secret", "boolean"]
     },
     "public.tenant_role": {
       "name": "tenant_role",
       "schema": "public",
-      "values": [
-        "admin",
-        "coordinator",
-        "engineer",
-        "hospital_user"
-      ]
+      "values": ["admin", "coordinator", "engineer", "hospital_user"]
     }
   },
   "schemas": {},

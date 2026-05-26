@@ -24,5 +24,13 @@ export default async function ServiceOpsPage() {
 
 	const initialData = await getServiceOpsSnapshot(tenantId);
 
-	return <ServiceOpsPlatform initialData={initialData} />;
+	return (
+		<ServiceOpsPlatform
+			currentUser={{
+				email: session.user.email,
+				name: session.user.name,
+			}}
+			initialData={initialData}
+		/>
+	);
 }

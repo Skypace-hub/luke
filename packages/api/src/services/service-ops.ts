@@ -1161,31 +1161,34 @@ const getReportMetrics = async (tenantId: string): Promise<ReportMetric[]> => {
 				jobsCompleted?: number;
 		  }
 		| undefined;
+	const hasSnapshot = Boolean(metrics);
 
 	return [
 		{
 			id: "jobs",
 			label: "Jobs completed",
 			value: String(metrics?.jobsCompleted ?? 0),
-			trend: "+18% vs last month",
+			trend: hasSnapshot ? "Latest report snapshot" : "No completed jobs yet",
 		},
 		{
 			id: "resolution",
 			label: "Avg resolution",
 			value: `${metrics?.averageResolutionHours ?? 0}h`,
-			trend: "-1.1h vs last month",
+			trend: hasSnapshot
+				? "Latest report snapshot"
+				: "No resolution history yet",
 		},
 		{
 			id: "firstFix",
 			label: "First-fix rate",
 			value: `${Math.round((metrics?.firstFixRate ?? 0) * 100)}%`,
-			trend: "+6% vs last month",
+			trend: hasSnapshot ? "Latest report snapshot" : "No first-fix sample yet",
 		},
 		{
 			id: "cost",
 			label: "Billable parts",
 			value: formatMoney(String(metrics?.billablePartsHkd ?? 0)),
-			trend: "32% out of contract",
+			trend: hasSnapshot ? "Latest report snapshot" : "No billable parts yet",
 		},
 	];
 };
