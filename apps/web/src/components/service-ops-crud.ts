@@ -120,6 +120,7 @@ interface ContractPayload {
 	accountManagerName: string;
 	contractNumber: string;
 	coveredModelIds: string[];
+	coveredPartIds: string[];
 	endDate: string;
 	hospitalId: string;
 	responseSlaHours: number;
@@ -322,6 +323,10 @@ export function getFieldConfigs(
 		label: product.modelName,
 		value: product.id,
 	}));
+	const partOptions = data.parts.map((part) => ({
+		label: `${part.id} · ${part.name}`,
+		value: part.recordId,
+	}));
 	const assetOptions = data.assets.map((asset) => ({
 		label: `${asset.id} · ${asset.model}`,
 		value: asset.recordId,
@@ -401,6 +406,13 @@ export function getFieldConfigs(
 				multiple: true,
 				name: "coveredModelIds",
 				options: productOptions,
+				type: "select",
+			},
+			{
+				label: "Covered parts",
+				multiple: true,
+				name: "coveredPartIds",
+				options: partOptions,
 				type: "select",
 			},
 		],
@@ -813,6 +825,7 @@ function getContractDefaults(
 			accountManagerName: record.accountManager,
 			contractNumber: record.id,
 			coveredModelIds: record.coveredModelIds,
+			coveredPartIds: record.coveredPartIds,
 			endDate: record.expiry,
 			hospitalId: record.hospitalId,
 			responseSlaHours: record.slaHours,
@@ -1016,6 +1029,7 @@ function getCreateDefaults(entity: CrudEntity) {
 	if (entity === "contract") {
 		defaults.contractNumber = `CTR-${suffix}`;
 		defaults.coveredModelIds = [];
+		defaults.coveredPartIds = [];
 		defaults.endDate = today;
 		defaults.startDate = today;
 		defaults.type = "full";
@@ -1076,6 +1090,7 @@ export function buildContractPayload(formData: FormData): ContractPayload {
 		accountManagerName: valueFromForm(formData, "accountManagerName"),
 		contractNumber: valueFromForm(formData, "contractNumber"),
 		coveredModelIds: valuesFromForm(formData, "coveredModelIds"),
+		coveredPartIds: valuesFromForm(formData, "coveredPartIds"),
 		endDate: valueFromForm(formData, "endDate"),
 		hospitalId: valueFromForm(formData, "hospitalId"),
 		responseSlaHours: numberFromForm(formData, "responseSlaHours"),

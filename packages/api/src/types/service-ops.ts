@@ -3,6 +3,7 @@ export type JobStatus =
 	| "Assigned"
 	| "In Progress"
 	| "Paused"
+	| "Resumed"
 	| "Completed"
 	| "Timer Anomaly"
 	| "Cancelled";
@@ -100,6 +101,9 @@ export interface Engineer {
 	grade: string;
 	hourlyRate: number;
 	id: string;
+	lat: null | number;
+	lng: null | number;
+	locationRecordedAt: null | string;
 	mealCap: number;
 	mileageRate: number;
 	name: string;
@@ -111,7 +115,11 @@ export interface Engineer {
 
 export interface Asset {
 	contractCoverage: "In contract" | "Billable exception" | "Expired";
-	contractCoverageValue: string;
+	contractCoverageValue:
+		| "billable_exception"
+		| "expired"
+		| "in_contract"
+		| "out_of_contract";
 	designatedEngineer: string;
 	designatedEngineerId: null | string;
 	hospital: string;
@@ -139,6 +147,7 @@ export interface Job {
 	hospital: string;
 	hospitalId: string;
 	id: string;
+	nfcUid: string;
 	priority: Priority;
 	priorityValue: string;
 	recordId: string;
@@ -159,8 +168,10 @@ export interface ProductModel {
 	id: string;
 	isEngineerReadOnly: boolean;
 	manualFileName: string;
+	manualFileUrl: null | string;
 	manufacturer: string;
 	modelName: string;
+	partIds: string[];
 	partsList: string[];
 }
 
@@ -168,6 +179,8 @@ export interface Contract {
 	accountManager: string;
 	coveredModelIds: string[];
 	coveredModels: string[];
+	coveredPartIds: string[];
+	coveredParts: string[];
 	expiry: string;
 	hospital: string;
 	hospitalId: string;
@@ -212,7 +225,10 @@ export interface Shortage {
 	engineer: string;
 	id: string;
 	job: string;
+	jobId: string;
 	part: string;
+	partId: string;
+	recordId: string;
 	status: "Waiting for parts" | "Arrived" | "Reschedule ready";
 }
 
@@ -223,10 +239,27 @@ export interface ManualAnswer {
 	title: string;
 }
 
+export interface ManualQuestionResult {
+	answers: ManualAnswer[];
+	queryId: string;
+	summary: string;
+}
+
+export interface NfcDeviceInfo {
+	asset: Asset;
+	contractCoverageStatus: Asset["contractCoverage"];
+	currentOpenJob: Job | null;
+	lastServiceRecords: Job[];
+	manualFileUrl: null | string;
+	productModel: ProductModel | null;
+}
+
 export interface SystemParameter {
 	id: string;
 	label: string;
 	value: string;
+	valueRaw?: unknown;
+	valueType: "boolean" | "number" | "secret" | "string";
 }
 
 export interface ReportMetric {
@@ -247,6 +280,7 @@ export interface CostRecord {
 }
 
 export interface LiveAlert {
+	actionId?: string;
 	id: string;
 	message: string;
 	title: string;

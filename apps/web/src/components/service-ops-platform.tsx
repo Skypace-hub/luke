@@ -41,9 +41,11 @@ import {
 	NfcIcon,
 	PlusIcon,
 	ReceiptTextIcon,
+	RefreshCwIcon,
 	ShieldCheckIcon,
 	Trash2Icon,
 	TrendingUpIcon,
+	WrenchIcon,
 	XIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -83,7 +85,10 @@ import {
 	type Job,
 	type JobStatus,
 	navigationItems,
+	type Part,
+	type ProductModel,
 	type ServiceOpsSnapshot,
+	type SystemParameter,
 	serviceStateMachine,
 } from "@/lib/service-ops-data";
 import { trpc } from "@/utils/trpc";
@@ -100,6 +105,7 @@ const statusStyles: Record<JobStatus, string> = {
 	Created: "border-zinc-200 bg-zinc-50 text-zinc-700",
 	"In Progress": "border-blue-200 bg-blue-50 text-blue-700",
 	Paused: "border-amber-200 bg-amber-50 text-amber-700",
+	Resumed: "border-violet-200 bg-violet-50 text-violet-700",
 	"Timer Anomaly": "border-rose-200 bg-rose-50 text-rose-700",
 };
 
@@ -174,18 +180,30 @@ const formLabelClass = "font-medium text-foreground text-xs";
 const formControlClass =
 	"h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50";
 
-const hospitalMapPositions = [
-	{ left: "18%", top: "2rem" },
-	{ right: "20%", top: "34%" },
-	{ bottom: "22%", right: "34%" },
-	{ bottom: "14%", left: "24%" },
-] as const;
+const actionButtonClass = "rounded-lg";
 
-const engineerMapPositions = [
-	{ left: "32%", top: "22%" },
-	{ right: "28%", top: "48%" },
-	{ bottom: "30%", left: "42%" },
-] as const;
+const hongKongBounds = {
+	maxLat: 22.56,
+	maxLng: 114.35,
+	minLat: 22.15,
+	minLng: 113.82,
+} as const;
+
+const coordinateStyle = (lat: number, lng: number) => {
+	const left =
+		((lng - hongKongBounds.minLng) /
+			(hongKongBounds.maxLng - hongKongBounds.minLng)) *
+		100;
+	const top =
+		((hongKongBounds.maxLat - lat) /
+			(hongKongBounds.maxLat - hongKongBounds.minLat)) *
+		100;
+
+	return {
+		left: `${Math.min(Math.max(left, 6), 88)}%`,
+		top: `${Math.min(Math.max(top, 6), 88)}%`,
+	};
+};
 
 const roleLabels = [
 	"super_admin",
@@ -314,11 +332,11 @@ export default function ServiceOpsPlatform({
 		selectedTenantId === initialData.tenant.id
 			? trpc.serviceOps.snapshot.queryOptions(
 					{ tenantId: selectedTenantId },
-					{ initialData, staleTime: 30_000 }
+					{ initialData, refetchInterval: 15_000, staleTime: 10_000 }
 				)
 			: trpc.serviceOps.snapshot.queryOptions(
 					{ tenantId: selectedTenantId },
-					{ staleTime: 30_000 }
+					{ refetchInterval: 15_000, staleTime: 10_000 }
 				)
 	);
 	const loadedData = snapshotQuery.data;
@@ -743,6 +761,7 @@ function BackOfficeViewPanel({
 	const canManageTenants = data.access.canManageTenants;
 	const canManageTenantUsers = data.access.canManageTenantUsers;
 	const actionFor = (action: ReactNode) => (canWrite ? action : null);
+	const actionMutations = useServiceOpsActionMutations(data.tenant.id);
 
 	if (activeView === "jobs") {
 		return (
@@ -829,6 +848,13 @@ function BackOfficeViewPanel({
 										/>
 										<Metric label="Cost" value={`HK$${selectedJob.cost}`} />
 									</div>
+									<JobActionPanel
+										canWrite={canWrite}
+										job={selectedJob}
+										mutations={actionMutations}
+										parts={parts}
+										tenantId={data.tenant.id}
+									/>
 								</CardContent>
 							</>
 						) : (
@@ -883,13 +909,22 @@ function BackOfficeViewPanel({
 							asset.nextPmDue,
 						],
 						actions: (
-							<RowActions
-								canWrite={canWrite}
-								entity="asset"
-								id={asset.recordId}
-								onEdit={() => onEdit("asset", asset)}
-								tenantId={data.tenant.id}
-							/>
+							<div className="flex items-center justify-end gap-1">
+								<AssetNfcInlineActions
+									asset={asset}
+									canWrite={canWrite}
+									engineers={engineers}
+									mutations={actionMutations}
+									tenantId={data.tenant.id}
+								/>
+								<RowActions
+									canWrite={canWrite}
+									entity="asset"
+									id={asset.recordId}
+									onEdit={() => onEdit("asset", asset)}
+									tenantId={data.tenant.id}
+								/>
+							</div>
 						),
 						id: asset.id,
 					}))}
@@ -930,17 +965,38 @@ function BackOfficeViewPanel({
 							product.modelName,
 							`${product.defaultPmCycleMonths} months`,
 							product.partsList.join(", ") || "No parts linked",
-							product.manualFileName,
+							product.manualFileUrl ? (
+								<a
+									className="font-medium text-primary hover:underline"
+									href={product.manualFileUrl}
+									key={`${product.id}-manual`}
+									rel="noopener"
+									target="_blank"
+								>
+									{product.manualFileName}
+								</a>
+							) : (
+								product.manualFileName
+							),
 							product.engineerAccess,
 						],
 						actions: (
-							<RowActions
-								canWrite={canWrite}
-								entity="product"
-								id={product.id}
-								onEdit={() => onEdit("product", product)}
-								tenantId={data.tenant.id}
-							/>
+							<div className="flex items-center justify-end gap-1">
+								<ProductInlineActions
+									canWrite={canWrite}
+									mutations={actionMutations}
+									parts={parts}
+									product={product}
+									tenantId={data.tenant.id}
+								/>
+								<RowActions
+									canWrite={canWrite}
+									entity="product"
+									id={product.id}
+									onEdit={() => onEdit("product", product)}
+									tenantId={data.tenant.id}
+								/>
+							</div>
 						),
 						id: product.id,
 					}))}
@@ -1076,8 +1132,14 @@ function BackOfficeViewPanel({
 			<ContractsView
 				canWrite={canWrite}
 				contracts={contracts}
+				isRefreshing={actionMutations.refreshContractStatuses.isPending}
 				onCreate={() => onCreate("contract")}
 				onEdit={(contract) => onEdit("contract", contract)}
+				onRefreshStatuses={() =>
+					actionMutations.refreshContractStatuses.mutate({
+						tenantId: data.tenant.id,
+					})
+				}
 				tenantId={data.tenant.id}
 			/>
 		);
@@ -1086,9 +1148,13 @@ function BackOfficeViewPanel({
 	if (activeView === "map") {
 		return (
 			<MapView
+				canWrite={canWrite}
 				engineers={engineers}
 				hospitals={hospitals}
 				liveAlerts={liveAlerts}
+				mutations={actionMutations}
+				systemParameters={systemParameters}
+				tenantId={data.tenant.id}
 			/>
 		);
 	}
@@ -1137,13 +1203,30 @@ function BackOfficeViewPanel({
 							fault.description,
 						],
 						actions: (
-							<RowActions
-								canWrite={canWrite}
-								entity="fault"
-								id={fault.recordId}
-								onEdit={() => onEdit("fault", fault)}
-								tenantId={data.tenant.id}
-							/>
+							<div className="flex items-center justify-end gap-1">
+								<Button
+									aria-label="Convert fault to repair job"
+									className={compactButtonClass}
+									disabled={!(canWrite && fault.assetId)}
+									onClick={() =>
+										actionMutations.convertFaultToRepairJob.mutate({
+											id: fault.recordId,
+											tenantId: data.tenant.id,
+										})
+									}
+									size="icon-sm"
+									variant="ghost"
+								>
+									<WrenchIcon className="size-4" />
+								</Button>
+								<RowActions
+									canWrite={canWrite}
+									entity="fault"
+									id={fault.recordId}
+									onEdit={() => onEdit("fault", fault)}
+									tenantId={data.tenant.id}
+								/>
+							</div>
 						),
 						id: fault.id,
 					}))}
@@ -1157,6 +1240,7 @@ function BackOfficeViewPanel({
 		return (
 			<PartsView
 				canWrite={canWrite}
+				mutations={actionMutations}
 				onCreate={() => onCreate("part")}
 				onEdit={(part) => onEdit("part", part)}
 				parts={parts}
@@ -1168,12 +1252,32 @@ function BackOfficeViewPanel({
 
 	if (activeView === "reports") {
 		return (
-			<ReportsView costRecords={costRecords} reportMetrics={reportMetrics} />
+			<ReportsView
+				costRecords={costRecords}
+				onGenerateReport={(period) =>
+					actionMutations.generateOperationalReport.mutate({
+						period,
+						tenantId: data.tenant.id,
+					})
+				}
+				reportMetrics={reportMetrics}
+			/>
 		);
 	}
 
 	if (activeView === "config") {
-		return <ConfigView systemParameters={systemParameters} />;
+		return (
+			<ConfigView
+				canWrite={canWrite}
+				onUpdateParameter={(parameter) =>
+					actionMutations.updateSystemParameter.mutate({
+						data: parameter,
+						tenantId: data.tenant.id,
+					})
+				}
+				systemParameters={systemParameters}
+			/>
+		);
 	}
 
 	if (activeView === "tenants") {
@@ -1210,24 +1314,41 @@ function BackOfficeViewPanel({
 function ContractsView({
 	canWrite,
 	contracts,
+	isRefreshing,
 	onCreate,
 	onEdit,
+	onRefreshStatuses,
 	tenantId,
 }: {
 	canWrite: boolean;
 	contracts: ServiceOpsSnapshot["contracts"];
+	isRefreshing: boolean;
 	onCreate: () => void;
 	onEdit: (contract: ServiceOpsSnapshot["contracts"][number]) => void;
+	onRefreshStatuses: () => void;
 	tenantId: string;
 }) {
 	return (
 		<PageFrame
 			action={
 				canWrite ? (
-					<Button className={primaryActionClass} onClick={onCreate}>
-						<PlusIcon className="size-4" />
-						New contract
-					</Button>
+					<div className="flex gap-2">
+						<Button
+							className={actionButtonClass}
+							disabled={isRefreshing}
+							onClick={onRefreshStatuses}
+							variant="outline"
+						>
+							{isRefreshing ? (
+								<Loader2Icon className="size-4 animate-spin" />
+							) : null}
+							Refresh status
+						</Button>
+						<Button className={primaryActionClass} onClick={onCreate}>
+							<PlusIcon className="size-4" />
+							New contract
+						</Button>
+					</div>
 				) : null
 			}
 			description="Track coverage terms, expiry risk, SLA targets, and model entitlement per hospital."
@@ -1268,6 +1389,12 @@ function ContractsView({
 									</p>
 									<p className="mt-1">{contract.coveredModels.join(", ")}</p>
 								</div>
+								<div>
+									<p className="text-muted-foreground text-xs">Covered parts</p>
+									<p className="mt-1">
+										{contract.coveredParts.join(", ") || "No parts configured"}
+									</p>
+								</div>
 							</CardContent>
 						</Card>
 					))
@@ -1282,15 +1409,33 @@ function ContractsView({
 }
 
 function MapView({
+	canWrite,
 	engineers,
 	hospitals,
 	liveAlerts,
+	mutations,
+	systemParameters,
+	tenantId,
 }: {
+	canWrite: boolean;
 	engineers: ServiceOpsSnapshot["engineers"];
 	hospitals: ServiceOpsSnapshot["hospitals"];
 	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
+	mutations: ActionMutations;
+	systemParameters: ServiceOpsSnapshot["systemParameters"];
+	tenantId: string;
 }) {
 	const hasLiveAlerts = liveAlerts.length > 0;
+	const mapsKey = systemParameters.find(
+		(parameter) => parameter.id === "google_maps_api_key"
+	);
+	const hasGoogleMapsKey = Boolean(String(mapsKey?.valueRaw ?? "").trim());
+	const positionedHospitals = hospitals.filter(
+		(hospital) => hospital.lat !== 0 || hospital.lng !== 0
+	);
+	const positionedEngineers = engineers.filter(
+		(engineer) => engineer.lat !== null && engineer.lng !== null
+	);
 
 	return (
 		<PageFrame
@@ -1302,29 +1447,31 @@ function MapView({
 				<div className="relative min-h-[560px] overflow-hidden rounded-xl border border-border/60 bg-muted/30">
 					<div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(148,163,184,.22)_1px,transparent_1px),linear-gradient(rgba(148,163,184,.22)_1px,transparent_1px)] bg-[size:44px_44px]" />
 					<div className="absolute inset-0 bg-gradient-to-br from-background/75 via-transparent to-muted/30" />
-					{hospitals.slice(0, 4).map((hospital, index) => (
+					{positionedHospitals.slice(0, 8).map((hospital) => (
 						<div
 							className="absolute"
 							key={hospital.id}
-							style={hospitalMapPositions[index] ?? hospitalMapPositions[0]}
+							style={coordinateStyle(hospital.lat, hospital.lng)}
 						>
 							<MapPin label={hospital.name} status={hospital.contractStatus} />
 						</div>
 					))}
-					{engineers.slice(0, 3).map((engineer, index) => (
+					{positionedEngineers.slice(0, 8).map((engineer) => (
 						<div
 							className="absolute"
 							key={engineer.id}
-							style={engineerMapPositions[index] ?? engineerMapPositions[0]}
+							style={coordinateStyle(engineer.lat ?? 0, engineer.lng ?? 0)}
 						>
 							<EngineerDot engineer={engineer.name} status={engineer.status} />
 						</div>
 					))}
 					<div className="absolute right-4 bottom-4 rounded-lg bg-card/95 p-3 text-xs shadow-xs ring-1 ring-foreground/10 backdrop-blur">
-						<p className="font-medium">Tenant location layer</p>
+						<p className="font-medium">
+							{hasGoogleMapsKey ? "Google Maps configured" : "Map key missing"}
+						</p>
 						<p className="mt-1 text-muted-foreground">
-							Hospital pins and live engineer GPS dots are shown from the
-							current tenant records.
+							Coordinates are plotted from tenant hospital records and latest
+							engineer GPS pings.
 						</p>
 					</div>
 					{hospitals.length === 0 && engineers.length === 0 ? (
@@ -1344,11 +1491,35 @@ function MapView({
 										<span className={iconTileClass}>
 											<Icon className="size-4" />
 										</span>
-										<div>
+										<div className="flex-1">
 											<p className="font-medium text-sm">{alert.title}</p>
 											<p className="mt-1 text-muted-foreground text-xs leading-relaxed">
 												{alert.message}
 											</p>
+											{alert.type === "pm" && alert.actionId ? (
+												<Button
+													className="mt-3 rounded-lg"
+													disabled={
+														!(
+															canWrite &&
+															!mutations.approvePmOpportunity.isPending
+														)
+													}
+													onClick={() =>
+														mutations.approvePmOpportunity.mutate({
+															data: {},
+															id: alert.actionId ?? "",
+															tenantId,
+														})
+													}
+													size="sm"
+													type="button"
+													variant="outline"
+												>
+													<CheckCircle2Icon className="size-4" />
+													Allocate now
+												</Button>
+											) : null}
 										</div>
 									</CardContent>
 								</Card>
@@ -1367,11 +1538,13 @@ function PartsView({
 	canWrite,
 	onCreate,
 	onEdit,
+	mutations,
 	parts,
 	shortages,
 	tenantId,
 }: {
 	canWrite: boolean;
+	mutations: ActionMutations;
 	onCreate: () => void;
 	onEdit: (part: ServiceOpsSnapshot["parts"][number]) => void;
 	parts: ServiceOpsSnapshot["parts"];
@@ -1453,6 +1626,41 @@ function PartsView({
 									<p className="mt-1 text-muted-foreground">
 										{shortage.part} requested by {shortage.engineer}
 									</p>
+									{canWrite ? (
+										<div className="mt-3 flex flex-wrap gap-2">
+											<Button
+												className={actionButtonClass}
+												disabled={mutations.confirmPartsArrived.isPending}
+												onClick={() =>
+													mutations.confirmPartsArrived.mutate({
+														id: shortage.recordId,
+														tenantId,
+													})
+												}
+												size="sm"
+												type="button"
+												variant="outline"
+											>
+												Mark arrived
+											</Button>
+											<Button
+												className={actionButtonClass}
+												disabled={mutations.resumeShortageJob.isPending}
+												onClick={() =>
+													mutations.resumeShortageJob.mutate({
+														data: { scheduledStartAt: null },
+														id: shortage.recordId,
+														tenantId,
+													})
+												}
+												size="sm"
+												type="button"
+												variant="outline"
+											>
+												Resume job
+											</Button>
+										</div>
+									) : null}
 								</div>
 							))
 						) : (
@@ -1467,13 +1675,43 @@ function PartsView({
 
 function ReportsView({
 	costRecords,
+	onGenerateReport,
 	reportMetrics,
 }: {
 	costRecords: ServiceOpsSnapshot["costRecords"];
+	onGenerateReport: (period: "day" | "month" | "week") => void;
 	reportMetrics: ServiceOpsSnapshot["reportMetrics"];
 }) {
 	return (
 		<PageFrame
+			action={
+				<div className="flex gap-2">
+					<Button
+						className={actionButtonClass}
+						onClick={() => onGenerateReport("day")}
+						type="button"
+						variant="outline"
+					>
+						Day
+					</Button>
+					<Button
+						className={actionButtonClass}
+						onClick={() => onGenerateReport("week")}
+						type="button"
+						variant="outline"
+					>
+						Week
+					</Button>
+					<Button
+						className={actionButtonClass}
+						onClick={() => onGenerateReport("month")}
+						type="button"
+						variant="outline"
+					>
+						Month
+					</Button>
+				</div>
+			}
 			description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
 			eyebrow="I. Reports"
 			title="Operational report and job-level cost view"
@@ -1528,8 +1766,16 @@ function ReportsView({
 }
 
 function ConfigView({
+	canWrite,
+	onUpdateParameter,
 	systemParameters,
 }: {
+	canWrite: boolean;
+	onUpdateParameter: (parameter: {
+		key: string;
+		value: boolean | number | string;
+		valueType: "boolean" | "number" | "secret" | "string";
+	}) => void;
 	systemParameters: ServiceOpsSnapshot["systemParameters"];
 }) {
 	return (
@@ -1546,10 +1792,11 @@ function ConfigView({
 					<CardContent className="grid gap-3 md:grid-cols-2">
 						{systemParameters.length > 0 ? (
 							systemParameters.map((parameter) => (
-								<Metric
+								<SystemParameterEditor
+									canWrite={canWrite}
 									key={parameter.id}
-									label={parameter.label}
-									value={parameter.value}
+									onUpdate={onUpdateParameter}
+									parameter={parameter}
 								/>
 							))
 						) : (
@@ -1577,6 +1824,73 @@ function ConfigView({
 				</Card>
 			</div>
 		</PageFrame>
+	);
+}
+
+function SystemParameterEditor({
+	canWrite,
+	onUpdate,
+	parameter,
+}: {
+	canWrite: boolean;
+	onUpdate: (parameter: {
+		key: string;
+		value: boolean | number | string;
+		valueType: "boolean" | "number" | "secret" | "string";
+	}) => void;
+	parameter: SystemParameter;
+}) {
+	const [value, setValue] = useState(String(parameter.valueRaw ?? ""));
+
+	useEffect(() => {
+		setValue(String(parameter.valueRaw ?? ""));
+	}, [parameter.valueRaw]);
+
+	const submitValue = () => {
+		let parsedValue: boolean | number | string = value;
+
+		if (parameter.valueType === "number") {
+			parsedValue = Number(value);
+		}
+
+		if (parameter.valueType === "boolean") {
+			parsedValue = value === "true";
+		}
+
+		onUpdate({
+			key: parameter.id,
+			value: parsedValue,
+			valueType: parameter.valueType,
+		});
+	};
+
+	return (
+		<div className={`${mutedPanelClass} flex flex-col gap-2 p-3`}>
+			<div>
+				<p className="text-muted-foreground text-xs">{parameter.label}</p>
+				<p className="font-medium text-sm">{parameter.value}</p>
+			</div>
+			{canWrite ? (
+				<div className="flex gap-2">
+					<Input
+						aria-label={`Edit ${parameter.label}`}
+						className={formControlClass}
+						onChange={(event) => setValue(event.target.value)}
+						type={parameter.valueType === "number" ? "number" : "text"}
+						value={value}
+					/>
+					<Button
+						className={actionButtonClass}
+						onClick={submitValue}
+						size="sm"
+						type="button"
+						variant="outline"
+					>
+						Save
+					</Button>
+				</div>
+			) : null}
+		</div>
 	);
 }
 
@@ -2302,6 +2616,577 @@ function EmptyInline({ message }: { message: string }) {
 	);
 }
 
+function JobActionPanel({
+	canWrite,
+	job,
+	mutations,
+	parts,
+	tenantId,
+}: {
+	canWrite: boolean;
+	job: Job;
+	mutations: ActionMutations;
+	parts: Part[];
+	tenantId: string;
+}) {
+	if (!canWrite) {
+		return null;
+	}
+
+	return (
+		<div className="flex flex-col gap-4 rounded-lg border border-border/60 p-3">
+			<div>
+				<p className="font-medium text-sm">Operational actions</p>
+				<p className="text-muted-foreground text-xs">
+					NFC, shortage, cost, and close-out commands are recorded as service
+					events.
+				</p>
+			</div>
+			<div className="grid gap-2 sm:grid-cols-2">
+				<Button
+					className={actionButtonClass}
+					disabled={mutations.startJobWithNfc.isPending}
+					onClick={() =>
+						mutations.startJobWithNfc.mutate({
+							data: { nfcUid: job.nfcUid },
+							id: job.recordId,
+							tenantId,
+						})
+					}
+					type="button"
+					variant="outline"
+				>
+					Start by NFC
+				</Button>
+				<Button
+					className={actionButtonClass}
+					disabled={mutations.endJobWithNfc.isPending}
+					onClick={() =>
+						mutations.endJobWithNfc.mutate({
+							data: { nfcUid: job.nfcUid },
+							id: job.recordId,
+							tenantId,
+						})
+					}
+					type="button"
+					variant="outline"
+				>
+					End by NFC
+				</Button>
+				<Button
+					className={actionButtonClass}
+					disabled={mutations.reportTimerAnomaly.isPending}
+					onClick={() =>
+						mutations.reportTimerAnomaly.mutate({
+							data: {
+								nfcUid: job.nfcUid,
+								notes: "Back Office marked timer anomaly",
+							},
+							id: job.recordId,
+							tenantId,
+						})
+					}
+					type="button"
+					variant="outline"
+				>
+					Timer anomaly
+				</Button>
+				<Button
+					className={actionButtonClass}
+					disabled={mutations.recalculateJobCost.isPending}
+					onClick={() =>
+						mutations.recalculateJobCost.mutate({
+							id: job.recordId,
+							tenantId,
+						})
+					}
+					type="button"
+					variant="outline"
+				>
+					Recalculate cost
+				</Button>
+			</div>
+			<JobPartUsageForm
+				job={job}
+				mutations={mutations}
+				parts={parts}
+				tenantId={tenantId}
+			/>
+			<JobExpenseForm job={job} mutations={mutations} tenantId={tenantId} />
+			<JobShortageForm
+				job={job}
+				mutations={mutations}
+				parts={parts}
+				tenantId={tenantId}
+			/>
+		</div>
+	);
+}
+
+function JobPartUsageForm({
+	job,
+	mutations,
+	parts,
+	tenantId,
+}: {
+	job: Job;
+	mutations: ActionMutations;
+	parts: Part[];
+	tenantId: string;
+}) {
+	const [partId, setPartId] = useState(parts[0]?.recordId ?? "");
+	const [quantity, setQuantity] = useState(1);
+
+	useEffect(() => {
+		setPartId(parts[0]?.recordId ?? "");
+	}, [parts]);
+
+	return (
+		<div className="grid gap-2 sm:grid-cols-[1fr_88px_auto]">
+			<select
+				aria-label="Part used"
+				className={formControlClass}
+				onChange={(event) => setPartId(event.target.value)}
+				value={partId}
+			>
+				{parts.map((part) => (
+					<option key={part.recordId} value={part.recordId}>
+						{part.id} · {part.name}
+					</option>
+				))}
+			</select>
+			<Input
+				aria-label="Part quantity"
+				className={formControlClass}
+				min={1}
+				onChange={(event) => setQuantity(Number(event.target.value))}
+				type="number"
+				value={quantity}
+			/>
+			<Button
+				className={actionButtonClass}
+				disabled={!partId || mutations.addJobPartUsage.isPending}
+				onClick={() =>
+					mutations.addJobPartUsage.mutate({
+						data: { partId, quantity },
+						id: job.recordId,
+						tenantId,
+					})
+				}
+				type="button"
+				variant="outline"
+			>
+				Add part
+			</Button>
+		</div>
+	);
+}
+
+function JobExpenseForm({
+	job,
+	mutations,
+	tenantId,
+}: {
+	job: Job;
+	mutations: ActionMutations;
+	tenantId: string;
+}) {
+	const [type, setType] = useState<"meal" | "mileage" | "other" | "parking">(
+		"mileage"
+	);
+	const [quantity, setQuantity] = useState(0);
+	const [amount, setAmount] = useState(0);
+
+	return (
+		<div className="grid gap-2 sm:grid-cols-[130px_1fr_1fr_auto]">
+			<select
+				aria-label="Expense type"
+				className={formControlClass}
+				onChange={(event) =>
+					setType(
+						event.target.value as "meal" | "mileage" | "other" | "parking"
+					)
+				}
+				value={type}
+			>
+				<option value="mileage">Mileage</option>
+				<option value="meal">Meal</option>
+				<option value="parking">Parking</option>
+				<option value="other">Other</option>
+			</select>
+			<Input
+				aria-label="Expense quantity"
+				className={formControlClass}
+				onChange={(event) => setQuantity(Number(event.target.value))}
+				placeholder="km"
+				type="number"
+				value={quantity}
+			/>
+			<Input
+				aria-label="Expense amount"
+				className={formControlClass}
+				onChange={(event) => setAmount(Number(event.target.value))}
+				placeholder="HKD"
+				type="number"
+				value={amount}
+			/>
+			<Button
+				className={actionButtonClass}
+				disabled={mutations.logJobExpense.isPending}
+				onClick={() =>
+					mutations.logJobExpense.mutate({
+						data: { amount, quantity, type },
+						id: job.recordId,
+						tenantId,
+					})
+				}
+				type="button"
+				variant="outline"
+			>
+				Log expense
+			</Button>
+		</div>
+	);
+}
+
+function JobShortageForm({
+	job,
+	mutations,
+	parts,
+	tenantId,
+}: {
+	job: Job;
+	mutations: ActionMutations;
+	parts: Part[];
+	tenantId: string;
+}) {
+	const [partId, setPartId] = useState(parts[0]?.recordId ?? "");
+	const [quantityRequested, setQuantityRequested] = useState(1);
+
+	useEffect(() => {
+		setPartId(parts[0]?.recordId ?? "");
+	}, [parts]);
+
+	return (
+		<div className="grid gap-2 sm:grid-cols-[1fr_88px_auto]">
+			<select
+				aria-label="Shortage part"
+				className={formControlClass}
+				onChange={(event) => setPartId(event.target.value)}
+				value={partId}
+			>
+				{parts.map((part) => (
+					<option key={part.recordId} value={part.recordId}>
+						{part.id} · {part.name}
+					</option>
+				))}
+			</select>
+			<Input
+				aria-label="Shortage quantity"
+				className={formControlClass}
+				min={1}
+				onChange={(event) => setQuantityRequested(Number(event.target.value))}
+				type="number"
+				value={quantityRequested}
+			/>
+			<Button
+				className={actionButtonClass}
+				disabled={!partId || mutations.reportPartsShortage.isPending}
+				onClick={() =>
+					mutations.reportPartsShortage.mutate({
+						data: { partId, quantityRequested },
+						id: job.recordId,
+						tenantId,
+					})
+				}
+				type="button"
+				variant="outline"
+			>
+				Report shortage
+			</Button>
+		</div>
+	);
+}
+
+function AssetNfcInlineActions({
+	asset,
+	canWrite,
+	engineers,
+	mutations,
+	tenantId,
+}: {
+	asset: ServiceOpsSnapshot["assets"][number];
+	canWrite: boolean;
+	engineers: ServiceOpsSnapshot["engineers"];
+	mutations: ActionMutations;
+	tenantId: string;
+}) {
+	const [isOpen, setIsOpen] = useState(false);
+	const [nfcUid, setNfcUid] = useState(asset.nfcUid);
+	const [engineerId, setEngineerId] = useState("");
+
+	useEffect(() => {
+		setNfcUid(asset.nfcUid);
+	}, [asset.nfcUid]);
+
+	if (!canWrite) {
+		return null;
+	}
+
+	const data = {
+		engineerId: engineerId || null,
+		nfcUid,
+	};
+
+	return (
+		<div className="relative">
+			<Button
+				aria-label="Manage NFC tag"
+				className={compactButtonClass}
+				onClick={() => setIsOpen((current) => !current)}
+				size="icon-sm"
+				type="button"
+				variant="ghost"
+			>
+				<NfcIcon className="size-4" />
+			</Button>
+			{isOpen ? (
+				<div className="absolute right-0 z-10 mt-2 flex w-80 flex-col gap-3 rounded-xl border bg-card p-3 text-left shadow-lg">
+					<div className="flex flex-col gap-1">
+						<Label className={formLabelClass}>NFC UID</Label>
+						<Input
+							className={formControlClass}
+							onChange={(event) => setNfcUid(event.target.value)}
+							value={nfcUid}
+						/>
+					</div>
+					<div className="flex flex-col gap-1">
+						<Label className={formLabelClass}>Engineer</Label>
+						<select
+							className={formControlClass}
+							onChange={(event) => setEngineerId(event.target.value)}
+							value={engineerId}
+						>
+							<option value="">Back Office</option>
+							{engineers.map((engineer) => (
+								<option key={engineer.id} value={engineer.id}>
+									{engineer.name}
+								</option>
+							))}
+						</select>
+					</div>
+					<div className="flex justify-end gap-2">
+						<Button
+							className={actionButtonClass}
+							disabled={!nfcUid || mutations.commissionAssetNfcTag.isPending}
+							onClick={() => {
+								mutations.commissionAssetNfcTag.mutate({
+									data,
+									id: asset.recordId,
+									tenantId,
+								});
+								setIsOpen(false);
+							}}
+							size="sm"
+							type="button"
+							variant="outline"
+						>
+							<NfcIcon className="size-4" />
+							Commission
+						</Button>
+						<Button
+							className={actionButtonClass}
+							disabled={!nfcUid || mutations.replaceAssetNfcTag.isPending}
+							onClick={() => {
+								mutations.replaceAssetNfcTag.mutate({
+									data,
+									id: asset.recordId,
+									tenantId,
+								});
+								setIsOpen(false);
+							}}
+							size="sm"
+							type="button"
+							variant="outline"
+						>
+							<RefreshCwIcon className="size-4" />
+							Replace
+						</Button>
+					</div>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function ProductInlineActions({
+	canWrite,
+	mutations,
+	parts,
+	product,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	parts: Part[];
+	product: ProductModel;
+	tenantId: string;
+}) {
+	const [isOpen, setIsOpen] = useState(false);
+
+	if (!canWrite) {
+		return null;
+	}
+
+	return (
+		<div className="relative">
+			<Button
+				aria-label="Configure product"
+				className={compactButtonClass}
+				onClick={() => setIsOpen((current) => !current)}
+				size="icon-sm"
+				type="button"
+				variant="ghost"
+			>
+				<FileQuestionIcon className="size-4" />
+			</Button>
+			{isOpen ? (
+				<div className="absolute right-0 z-10 mt-2 flex w-80 flex-col gap-3 rounded-xl border bg-card p-3 text-left shadow-lg">
+					<ProductPartsForm
+						mutations={mutations}
+						onDone={() => setIsOpen(false)}
+						parts={parts}
+						product={product}
+						tenantId={tenantId}
+					/>
+					<ProductManualForm
+						mutations={mutations}
+						onDone={() => setIsOpen(false)}
+						product={product}
+						tenantId={tenantId}
+					/>
+				</div>
+			) : null}
+		</div>
+	);
+}
+
+function ProductPartsForm({
+	mutations,
+	onDone,
+	parts,
+	product,
+	tenantId,
+}: {
+	mutations: ActionMutations;
+	onDone: () => void;
+	parts: Part[];
+	product: ProductModel;
+	tenantId: string;
+}) {
+	const [selectedPartIds, setSelectedPartIds] = useState(product.partIds);
+
+	const togglePart = (partId: string) => {
+		setSelectedPartIds((currentIds) =>
+			currentIds.includes(partId)
+				? currentIds.filter((currentId) => currentId !== partId)
+				: [...currentIds, partId]
+		);
+	};
+
+	return (
+		<div className="flex flex-col gap-2">
+			<p className="font-medium text-sm">Standard parts</p>
+			<div className="grid max-h-36 gap-1 overflow-y-auto">
+				{parts.map((part) => (
+					<label
+						className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-muted"
+						key={part.recordId}
+					>
+						<input
+							checked={selectedPartIds.includes(part.recordId)}
+							onChange={() => togglePart(part.recordId)}
+							type="checkbox"
+						/>
+						<span>{part.name}</span>
+					</label>
+				))}
+			</div>
+			<Button
+				className={actionButtonClass}
+				disabled={mutations.updateProductParts.isPending}
+				onClick={() => {
+					mutations.updateProductParts.mutate({
+						data: { partIds: selectedPartIds },
+						id: product.id,
+						tenantId,
+					});
+					onDone();
+				}}
+				size="sm"
+				type="button"
+			>
+				Save parts
+			</Button>
+		</div>
+	);
+}
+
+function ProductManualForm({
+	mutations,
+	onDone,
+	product,
+	tenantId,
+}: {
+	mutations: ActionMutations;
+	onDone: () => void;
+	product: ProductModel;
+	tenantId: string;
+}) {
+	const [fileName, setFileName] = useState(
+		product.manualFileName === "Not uploaded" ? "" : product.manualFileName
+	);
+	const [fileUrl, setFileUrl] = useState(product.manualFileUrl ?? "");
+
+	return (
+		<div className="flex flex-col gap-2">
+			<p className="font-medium text-sm">Service manual</p>
+			<Input
+				aria-label="Manual file name"
+				className={formControlClass}
+				onChange={(event) => setFileName(event.target.value)}
+				placeholder="manual.pdf"
+				value={fileName}
+			/>
+			<Input
+				aria-label="Manual URL"
+				className={formControlClass}
+				onChange={(event) => setFileUrl(event.target.value)}
+				placeholder="https://..."
+				value={fileUrl}
+			/>
+			<Button
+				className={actionButtonClass}
+				disabled={
+					!(fileName && fileUrl) || mutations.uploadServiceManual.isPending
+				}
+				onClick={() => {
+					mutations.uploadServiceManual.mutate({
+						data: { fileName, fileUrl },
+						id: product.id,
+						tenantId,
+					});
+					onDone();
+				}}
+				size="sm"
+				type="button"
+			>
+				Save manual
+			</Button>
+		</div>
+	);
+}
+
 function CrudDialog({
 	data,
 	onClose,
@@ -2465,6 +3350,74 @@ function isEntityMutationPending(mutations: EntityMutations) {
 }
 
 type EntityMutations = ReturnType<typeof useEntityMutations>;
+
+type ActionMutations = ReturnType<typeof useServiceOpsActionMutations>;
+
+function useServiceOpsActionMutations(tenantId: string) {
+	const actionResult = useMutationResult(
+		tenantId,
+		"Operation completed.",
+		"operation",
+		"save"
+	);
+
+	return {
+		addJobPartUsage: useMutation(
+			trpc.serviceOps.addJobPartUsage.mutationOptions(actionResult)
+		),
+		approvePmOpportunity: useMutation(
+			trpc.serviceOps.approvePmOpportunity.mutationOptions(actionResult)
+		),
+		commissionAssetNfcTag: useMutation(
+			trpc.serviceOps.commissionAssetNfcTag.mutationOptions(actionResult)
+		),
+		confirmPartsArrived: useMutation(
+			trpc.serviceOps.confirmPartsArrived.mutationOptions(actionResult)
+		),
+		convertFaultToRepairJob: useMutation(
+			trpc.serviceOps.convertFaultToRepairJob.mutationOptions(actionResult)
+		),
+		endJobWithNfc: useMutation(
+			trpc.serviceOps.endJobWithNfc.mutationOptions(actionResult)
+		),
+		generateOperationalReport: useMutation(
+			trpc.serviceOps.generateOperationalReport.mutationOptions(actionResult)
+		),
+		logJobExpense: useMutation(
+			trpc.serviceOps.logJobExpense.mutationOptions(actionResult)
+		),
+		recalculateJobCost: useMutation(
+			trpc.serviceOps.recalculateJobCost.mutationOptions(actionResult)
+		),
+		refreshContractStatuses: useMutation(
+			trpc.serviceOps.refreshContractStatuses.mutationOptions(actionResult)
+		),
+		reportPartsShortage: useMutation(
+			trpc.serviceOps.reportPartsShortage.mutationOptions(actionResult)
+		),
+		reportTimerAnomaly: useMutation(
+			trpc.serviceOps.reportTimerAnomaly.mutationOptions(actionResult)
+		),
+		resumeShortageJob: useMutation(
+			trpc.serviceOps.resumeShortageJob.mutationOptions(actionResult)
+		),
+		replaceAssetNfcTag: useMutation(
+			trpc.serviceOps.replaceAssetNfcTag.mutationOptions(actionResult)
+		),
+		startJobWithNfc: useMutation(
+			trpc.serviceOps.startJobWithNfc.mutationOptions(actionResult)
+		),
+		updateProductParts: useMutation(
+			trpc.serviceOps.updateProductParts.mutationOptions(actionResult)
+		),
+		updateSystemParameter: useMutation(
+			trpc.serviceOps.updateSystemParameter.mutationOptions(actionResult)
+		),
+		uploadServiceManual: useMutation(
+			trpc.serviceOps.uploadServiceManual.mutationOptions(actionResult)
+		),
+	};
+}
 
 function FormField({
 	defaultValue,

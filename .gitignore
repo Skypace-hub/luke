@@ -9,10 +9,6 @@ build
 output/
 *.tsbuildinfo
 
-# Environment variables
-.env
-.env*.local
-
 # IDEs and editors
 .vscode/*
 !.vscode/settings.json

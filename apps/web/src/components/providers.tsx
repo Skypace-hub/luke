@@ -23,7 +23,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 				{children}
 				{shouldShowQueryDevtools ? <ReactQueryDevtools /> : null}
 			</QueryClientProvider>
-			<Toaster richColors />
+			<Toaster position="top-right" richColors />
 		</ThemeProvider>
 	);
 }

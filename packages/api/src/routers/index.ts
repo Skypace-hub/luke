@@ -3,6 +3,13 @@ import { z } from "zod";
 
 import { protectedProcedure, publicProcedure, router } from "../index";
 import {
+	addJobPartUsage,
+	approvePmOpportunity,
+	askServiceManualQuestion,
+	clockEngineer,
+	commissionAssetNfcTag,
+	confirmPartsArrived,
+	convertFaultToRepairJob,
 	createAsset,
 	createContract,
 	createEngineer,
@@ -23,10 +30,23 @@ import {
 	deleteProduct,
 	deleteTenant,
 	deleteTenantUser,
+	endJobWithNfc,
 	ensureDefaultTenantForUser,
+	generateOperationalReportSnapshot,
 	getDefaultTenantIdForUser,
+	getNfcDeviceInfo,
 	getServiceOpsSnapshot,
 	getTenantAccessPolicy,
+	logJobExpense,
+	recalculateJobCost,
+	recordEngineerLocation,
+	refreshContractStatuses,
+	replaceAssetNfcTag,
+	reportPartsShortage,
+	reportTimerAnomaly,
+	resumeShortageJob,
+	startJobWithNfc,
+	transitionJob,
 	updateAsset,
 	updateContract,
 	updateEngineer,
@@ -35,8 +55,11 @@ import {
 	updateJob,
 	updatePart,
 	updateProduct,
+	updateProductParts,
+	updateSystemParameter,
 	updateTenant,
 	updateTenantUser,
+	uploadServiceManualMetadata,
 } from "../services/service-ops";
 
 const optionalTextSchema = z
@@ -164,12 +187,82 @@ const contractSchema = z.object({
 	accountManagerName: z.string().trim().min(1),
 	contractNumber: z.string().trim().min(1),
 	coveredModelIds: z.array(z.string().min(1)),
+	coveredPartIds: z.array(z.string().min(1)),
 	endDate: z.string().trim().min(1),
 	hospitalId: z.string().min(1),
 	responseSlaHours: z.number().int().min(1),
 	startDate: z.string().trim().min(1),
 	status: z.enum(["active", "expiring", "expired"]),
 	type: z.enum(["full", "partial", "emergency_only"]),
+});
+
+const jobStatusSchema = z.enum([
+	"created",
+	"assigned",
+	"in_progress",
+	"paused",
+	"resumed",
+	"completed",
+	"timer_anomaly",
+	"cancelled",
+]);
+
+const nfcJobSchema = z.object({
+	accuracyMeters: z.number().min(0).nullable().optional(),
+	latitude: z.number().min(-90).max(90).nullable().optional(),
+	longitude: z.number().min(-180).max(180).nullable().optional(),
+	nfcUid: z.string().trim().min(1),
+	notes: optionalTextSchema,
+});
+
+const nfcCommissioningSchema = z.object({
+	engineerId: optionalTextSchema,
+	nfcUid: z.string().trim().min(1),
+});
+
+const manualQuestionSchema = z.object({
+	assetId: optionalTextSchema,
+	engineerId: optionalTextSchema,
+	jobId: optionalTextSchema,
+	question: z.string().trim().min(3),
+});
+
+const pmOpportunityApprovalSchema = z.object({
+	description: optionalTextSchema,
+	scheduledStartAt: optionalTextSchema,
+});
+
+const expenseSchema = z.object({
+	amount: z.number().min(0).nullable().optional(),
+	notes: optionalTextSchema,
+	quantity: z.number().min(0).nullable().optional(),
+	receiptFileName: optionalTextSchema,
+	type: z.enum(["mileage", "meal", "parking", "other"]),
+});
+
+const partUsageSchema = z.object({
+	partId: z.string().min(1),
+	quantity: z.number().int().min(1),
+});
+
+const shortageSchema = z.object({
+	notes: optionalTextSchema,
+	partId: z.string().min(1),
+	quantityRequested: z.number().int().min(1),
+});
+
+const systemParameterSchema = z.object({
+	key: z.string().trim().min(1),
+	value: z.union([z.string(), z.number(), z.boolean()]),
+	valueType: z.enum(["number", "string", "secret", "boolean"]),
+});
+
+const serviceManualSchema = z.object({
+	fileName: z.string().trim().min(1),
+	fileUrl: z.url(),
+	pageCount: z.number().int().min(1).nullable().optional(),
+	storageKey: optionalTextSchema,
+	version: optionalTextSchema,
 });
 
 const faultSchema = z.object({
@@ -254,6 +347,16 @@ export const appRouter = router({
 				);
 
 				return getServiceOpsSnapshot(requestedTenantId, ctx.session.user.id);
+			}),
+		nfcDeviceInfo: protectedProcedure
+			.input(
+				tenantInputSchema.extend({
+					nfcUid: z.string().trim().min(1),
+				})
+			)
+			.query(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "read");
+				return getNfcDeviceInfo(input.tenantId, input.nfcUid);
 			}),
 		createTenant: protectedProcedure
 			.input(z.object({ data: tenantSchema }))
@@ -387,6 +490,35 @@ export const appRouter = router({
 				await deleteProduct(input.tenantId, input.id);
 				return mutationResponse;
 			}),
+		updateProductParts: protectedProcedure
+			.input(
+				idSchema.extend({
+					data: z.object({ partIds: z.array(z.string().min(1)) }),
+				})
+			)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await updateProductParts(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		uploadServiceManual: protectedProcedure
+			.input(idSchema.extend({ data: serviceManualSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await uploadServiceManualMetadata(
+					input.tenantId,
+					ctx.session.user.id,
+					input.id,
+					input.data
+				);
+				return mutationResponse;
+			}),
+		askServiceManualQuestion: protectedProcedure
+			.input(tenantInputSchema.extend({ data: manualQuestionSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "read");
+				return askServiceManualQuestion(input.tenantId, input.data);
+			}),
 		createPart: protectedProcedure
 			.input(tenantInputSchema.extend({ data: partSchema }))
 			.mutation(async ({ ctx, input }) => {
@@ -429,6 +561,20 @@ export const appRouter = router({
 				await deleteAsset(input.tenantId, input.id);
 				return mutationResponse;
 			}),
+		commissionAssetNfcTag: protectedProcedure
+			.input(idSchema.extend({ data: nfcCommissioningSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await commissionAssetNfcTag(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		replaceAssetNfcTag: protectedProcedure
+			.input(idSchema.extend({ data: nfcCommissioningSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await replaceAssetNfcTag(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
 		createJob: protectedProcedure
 			.input(tenantInputSchema.extend({ data: jobSchema }))
 			.mutation(async ({ ctx, input }) => {
@@ -455,6 +601,74 @@ export const appRouter = router({
 				await deleteJob(input.tenantId, input.id);
 				return mutationResponse;
 			}),
+		transitionJob: protectedProcedure
+			.input(
+				idSchema.extend({
+					data: z.object({
+						notes: optionalTextSchema,
+						status: jobStatusSchema,
+					}),
+				})
+			)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await transitionJob(
+					input.tenantId,
+					ctx.session.user.id,
+					input.id,
+					input.data
+				);
+				return mutationResponse;
+			}),
+		startJobWithNfc: protectedProcedure
+			.input(idSchema.extend({ data: nfcJobSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await startJobWithNfc(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		endJobWithNfc: protectedProcedure
+			.input(idSchema.extend({ data: nfcJobSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await endJobWithNfc(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		reportTimerAnomaly: protectedProcedure
+			.input(idSchema.extend({ data: nfcJobSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await reportTimerAnomaly(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		logJobExpense: protectedProcedure
+			.input(idSchema.extend({ data: expenseSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await logJobExpense(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		addJobPartUsage: protectedProcedure
+			.input(idSchema.extend({ data: partUsageSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await addJobPartUsage(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		reportPartsShortage: protectedProcedure
+			.input(idSchema.extend({ data: shortageSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await reportPartsShortage(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		recalculateJobCost: protectedProcedure
+			.input(idSchema)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await recalculateJobCost(input.tenantId, input.id);
+				return mutationResponse;
+			}),
 		createContract: protectedProcedure
 			.input(tenantInputSchema.extend({ data: contractSchema }))
 			.mutation(async ({ ctx, input }) => {
@@ -476,6 +690,13 @@ export const appRouter = router({
 				await deleteContract(input.tenantId, input.id);
 				return mutationResponse;
 			}),
+		refreshContractStatuses: protectedProcedure
+			.input(tenantInputSchema)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await refreshContractStatuses(input.tenantId);
+				return mutationResponse;
+			}),
 		createFault: protectedProcedure
 			.input(tenantInputSchema.extend({ data: faultSchema }))
 			.mutation(async ({ ctx, input }) => {
@@ -495,6 +716,115 @@ export const appRouter = router({
 			.mutation(async ({ ctx, input }) => {
 				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteFault(input.tenantId, input.id);
+				return mutationResponse;
+			}),
+		convertFaultToRepairJob: protectedProcedure
+			.input(idSchema)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await convertFaultToRepairJob(
+					input.tenantId,
+					ctx.session.user.id,
+					input.id
+				);
+				return mutationResponse;
+			}),
+		confirmPartsArrived: protectedProcedure
+			.input(idSchema)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await confirmPartsArrived(
+					input.tenantId,
+					ctx.session.user.id,
+					input.id
+				);
+				return mutationResponse;
+			}),
+		resumeShortageJob: protectedProcedure
+			.input(
+				idSchema.extend({
+					data: z.object({ scheduledStartAt: optionalTextSchema }),
+				})
+			)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await resumeShortageJob(
+					input.tenantId,
+					ctx.session.user.id,
+					input.id,
+					input.data
+				);
+				return mutationResponse;
+			}),
+		updateSystemParameter: protectedProcedure
+			.input(tenantInputSchema.extend({ data: systemParameterSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await updateSystemParameter(
+					input.tenantId,
+					ctx.session.user.id,
+					input.data
+				);
+				return mutationResponse;
+			}),
+		generateOperationalReport: protectedProcedure
+			.input(
+				tenantInputSchema.extend({
+					period: z.enum(["day", "week", "month"]),
+				})
+			)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await generateOperationalReportSnapshot(input.tenantId, input.period);
+				return mutationResponse;
+			}),
+		approvePmOpportunity: protectedProcedure
+			.input(idSchema.extend({ data: pmOpportunityApprovalSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await approvePmOpportunity(
+					input.tenantId,
+					ctx.session.user.id,
+					input.id,
+					input.data
+				);
+				return mutationResponse;
+			}),
+		clockEngineer: protectedProcedure
+			.input(
+				idSchema.extend({
+					data: z.object({
+						accuracyMeters: z.number().min(0).nullable().optional(),
+						eventType: z.enum(["clock_in", "clock_out"]),
+						latitude: z.number().min(-90).max(90).nullable().optional(),
+						longitude: z.number().min(-180).max(180).nullable().optional(),
+					}),
+				})
+			)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await clockEngineer(
+					input.tenantId,
+					input.id,
+					input.data.eventType,
+					input.data
+				);
+				return mutationResponse;
+			}),
+		recordEngineerLocation: protectedProcedure
+			.input(
+				idSchema.extend({
+					data: z.object({
+						accuracyMeters: z.number().min(0).nullable().optional(),
+						jobId: optionalTextSchema,
+						latitude: z.number().min(-90).max(90),
+						longitude: z.number().min(-180).max(180),
+					}),
+				})
+			)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
+				await recordEngineerLocation(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 	}),
