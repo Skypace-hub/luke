@@ -22,7 +22,7 @@ export default async function ServiceOpsPage() {
 		(await getDefaultTenantIdForUser(session.user.id)) ??
 		(await ensureDefaultTenantForUser(session.user));
 
-	const initialData = await getServiceOpsSnapshot(tenantId);
+	const initialData = await getServiceOpsSnapshot(tenantId, session.user.id);
 
 	return (
 		<ServiceOpsPlatform

@@ -1,8 +1,24 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 
 import type { Context } from "./context";
+import { isTechnicalErrorMessage } from "./error-format";
 
-export const t = initTRPC.context<Context>().create();
+export const t = initTRPC.context<Context>().create({
+	errorFormatter({ error, shape }) {
+		const shouldHideMessage =
+			error.code === "INTERNAL_SERVER_ERROR" &&
+			isTechnicalErrorMessage(error.message);
+
+		if (!shouldHideMessage) {
+			return shape;
+		}
+
+		return {
+			...shape,
+			message: "Request failed.",
+		};
+	},
+});
 
 export const router = t.router;
 

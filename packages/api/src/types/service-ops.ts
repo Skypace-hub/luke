@@ -35,6 +35,41 @@ export interface TenantSummary {
 	release: string;
 }
 
+export type TenantRole =
+	| "operator"
+	| "observer"
+	| "super_admin"
+	| "tenant_admin";
+
+export type MembershipStatus = "active" | "invited" | "suspended";
+
+export interface TenantAccessPolicy {
+	canManageTenants: boolean;
+	canManageTenantUsers: boolean;
+	canRead: boolean;
+	canWrite: boolean;
+	role: TenantRole;
+}
+
+export interface TenantManagementRecord extends TenantSummary {
+	createdAt: string;
+	isActive: boolean;
+	memberCount: number;
+	recordId: string;
+	role: TenantRole;
+	status: MembershipStatus;
+}
+
+export interface TenantUserRecord {
+	createdAt: string;
+	email: string;
+	id: string;
+	membershipId: string;
+	name: string;
+	role: TenantRole;
+	status: MembershipStatus;
+}
+
 export interface DashboardStat {
 	id: string;
 	label: string;
@@ -219,6 +254,7 @@ export interface LiveAlert {
 }
 
 export interface ServiceOpsSnapshot {
+	access: TenantAccessPolicy;
 	assets: Asset[];
 	contracts: Contract[];
 	costRecords: CostRecord[];
@@ -235,4 +271,6 @@ export interface ServiceOpsSnapshot {
 	shortages: Shortage[];
 	systemParameters: SystemParameter[];
 	tenant: TenantSummary;
+	tenants: TenantManagementRecord[];
+	users: TenantUserRecord[];
 }

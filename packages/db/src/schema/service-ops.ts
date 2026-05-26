@@ -18,10 +18,10 @@ import {
 import { user } from "./auth";
 
 export const tenantRoleEnum = pgEnum("tenant_role", [
-	"admin",
-	"coordinator",
-	"engineer",
-	"hospital_user",
+	"super_admin",
+	"tenant_admin",
+	"operator",
+	"observer",
 ]);
 
 export const membershipStatusEnum = pgEnum("membership_status", [
@@ -219,11 +219,11 @@ export const tenantMemberships = pgTable(
 			.notNull(),
 	},
 	(table) => [
-		uniqueIndex("tenant_memberships_tenant_user_role_uidx").on(
+		uniqueIndex("tenant_memberships_tenant_user_uidx").on(
 			table.tenantId,
-			table.userId,
-			table.role
+			table.userId
 		),
+		index("tenant_memberships_tenant_idx").on(table.tenantId),
 		index("tenant_memberships_user_idx").on(table.userId),
 	]
 );

@@ -8,6 +8,8 @@ import type {
 	Part,
 	ProductModel,
 	ServiceOpsSnapshot,
+	TenantManagementRecord,
+	TenantUserRecord,
 } from "@/lib/service-ops-data";
 
 export type CrudEntity =
@@ -18,7 +20,9 @@ export type CrudEntity =
 	| "hospital"
 	| "job"
 	| "part"
-	| "product";
+	| "product"
+	| "tenant"
+	| "tenantUser";
 
 export type CrudState =
 	| { entity: CrudEntity; mode: "create"; record?: never }
@@ -33,6 +37,8 @@ export interface FieldOption {
 
 export interface FieldConfig {
 	label: string;
+	max?: number;
+	min?: number;
 	multiple?: boolean;
 	name: string;
 	options?: FieldOption[];
@@ -188,6 +194,22 @@ interface ProductPayload {
 	modelName: string;
 }
 
+export interface TenantPayload {
+	id: null | string;
+	isActive: boolean;
+	name: string;
+	region: string;
+	releaseLabel: string;
+}
+
+export interface TenantUserPayload {
+	email: string;
+	name: string;
+	password: null | string;
+	role: "operator" | "observer" | "tenant_admin";
+	status: "active" | "invited" | "suspended";
+}
+
 export const entityLabels: Record<CrudEntity, string> = {
 	asset: "asset",
 	contract: "contract",
@@ -197,6 +219,8 @@ export const entityLabels: Record<CrudEntity, string> = {
 	job: "job",
 	part: "part",
 	product: "product",
+	tenant: "tenant",
+	tenantUser: "user",
 };
 
 const coverageOptions: FieldOption[] = [
@@ -260,6 +284,18 @@ const faultStatusOptions: FieldOption[] = [
 	{ label: "Engineer assigned", value: "engineer_assigned" },
 	{ label: "In progress", value: "in_progress" },
 	{ label: "Resolved", value: "resolved" },
+];
+
+const tenantUserRoleOptions: FieldOption[] = [
+	{ label: "Tenant administrator", value: "tenant_admin" },
+	{ label: "Operator", value: "operator" },
+	{ label: "Observer", value: "observer" },
+];
+
+const membershipStatusOptions: FieldOption[] = [
+	{ label: "Active", value: "active" },
+	{ label: "Invited", value: "invited" },
+	{ label: "Suspended", value: "suspended" },
 ];
 
 function optionFromRecord(
@@ -439,8 +475,20 @@ export function getFieldConfigs(
 			{ label: "Name", name: "name", required: true },
 			{ label: "District", name: "district", required: true },
 			{ label: "Address", name: "address" },
-			{ label: "Latitude", name: "latitude", type: "number" },
-			{ label: "Longitude", name: "longitude", type: "number" },
+			{
+				label: "Latitude",
+				max: 90,
+				min: -90,
+				name: "latitude",
+				type: "number",
+			},
+			{
+				label: "Longitude",
+				max: 180,
+				min: -180,
+				name: "longitude",
+				type: "number",
+			},
 			{ label: "Contact name", name: "primaryContactName" },
 			{ label: "Contact email", name: "primaryContactEmail" },
 			{ label: "Contact phone", name: "primaryContactPhone" },
@@ -535,6 +583,39 @@ export function getFieldConfigs(
 				type: "checkbox",
 			},
 		],
+		tenant: [
+			{
+				label: "Tenant ID",
+				name: "id",
+			},
+			{ label: "Tenant name", name: "name", required: true },
+			{ label: "Region", name: "region", required: true },
+			{ label: "Release label", name: "releaseLabel", required: true },
+			{ label: "Active", name: "isActive", type: "checkbox" },
+		],
+		tenantUser: [
+			{ label: "Name", name: "name", required: true },
+			{ label: "Email", name: "email", required: true },
+			{
+				label: "Role",
+				name: "role",
+				options: tenantUserRoleOptions,
+				required: true,
+				type: "select",
+			},
+			{
+				label: "Status",
+				name: "status",
+				options: membershipStatusOptions,
+				required: true,
+				type: "select",
+			},
+			{
+				label: "Password",
+				name: "password",
+				type: "text",
+			},
+		],
 	};
 
 	return configs[entity];
@@ -606,7 +687,10 @@ function enumFromForm<T extends readonly string[]>(
 export function getRecordId(entity: CrudEntity, record: unknown) {
 	const typedRecord = record as Record<string, unknown>;
 	const id =
-		entity === "product" || entity === "hospital" || entity === "engineer"
+		entity === "product" ||
+		entity === "hospital" ||
+		entity === "engineer" ||
+		entity === "tenant"
 			? typedRecord.id
 			: typedRecord.recordId;
 
@@ -657,6 +741,16 @@ function isFaultRecord(record: unknown): record is FaultReport {
 	);
 }
 
+function isTenantRecord(record: unknown): record is TenantManagementRecord {
+	return typeof record === "object" && record !== null && "release" in record;
+}
+
+function isTenantUserRecord(record: unknown): record is TenantUserRecord {
+	return (
+		typeof record === "object" && record !== null && "membershipId" in record
+	);
+}
+
 export function getFormDefaults(entity: CrudEntity, record: unknown) {
 	if (!record) {
 		return getCreateDefaults(entity);
@@ -680,6 +774,8 @@ function getEditDefaults(entity: CrudEntity, record: unknown) {
 		job: getJobDefaults,
 		part: getPartDefaults,
 		product: getProductDefaults,
+		tenant: getTenantDefaults,
+		tenantUser: getTenantUserDefaults,
 	};
 
 	return defaultsByEntity[entity](record);
@@ -843,6 +939,38 @@ function getProductDefaults(
 	return null;
 }
 
+function getTenantDefaults(
+	record: unknown
+): Record<string, FormDefaultValue> | null {
+	if (isTenantRecord(record)) {
+		return {
+			id: record.id,
+			isActive: record.isActive,
+			name: record.name,
+			region: record.region,
+			releaseLabel: record.release,
+		};
+	}
+
+	return null;
+}
+
+function getTenantUserDefaults(
+	record: unknown
+): Record<string, FormDefaultValue> | null {
+	if (isTenantUserRecord(record)) {
+		return {
+			email: record.email,
+			name: record.name,
+			password: "",
+			role: record.role,
+			status: record.status,
+		};
+	}
+
+	return null;
+}
+
 function getCreateDefaults(entity: CrudEntity) {
 	const suffix = Date.now().toString().slice(-5);
 	const today = new Date().toISOString().slice(0, 10);
@@ -903,6 +1031,18 @@ function getCreateDefaults(entity: CrudEntity) {
 
 	if (entity === "hospital") {
 		defaults.code = `HSP-${suffix}`;
+	}
+
+	if (entity === "tenant") {
+		defaults.id = "";
+		defaults.isActive = true;
+		defaults.region = "Hong Kong";
+		defaults.releaseLabel = "Early Release v1";
+	}
+
+	if (entity === "tenantUser") {
+		defaults.role = "observer";
+		defaults.status = "active";
 	}
 
 	return defaults;
@@ -1020,5 +1160,33 @@ export function buildProductPayload(formData: FormData): ProductPayload {
 		isEngineerReadOnly: boolFromForm(formData, "isEngineerReadOnly"),
 		manufacturer: valueFromForm(formData, "manufacturer"),
 		modelName: valueFromForm(formData, "modelName"),
+	};
+}
+
+export function buildTenantPayload(formData: FormData): TenantPayload {
+	return {
+		id: nullableValueFromForm(formData, "id"),
+		isActive: boolFromForm(formData, "isActive"),
+		name: valueFromForm(formData, "name"),
+		region: valueFromForm(formData, "region"),
+		releaseLabel: valueFromForm(formData, "releaseLabel"),
+	};
+}
+
+export function buildTenantUserPayload(formData: FormData): TenantUserPayload {
+	return {
+		email: valueFromForm(formData, "email"),
+		name: valueFromForm(formData, "name"),
+		password: nullableValueFromForm(formData, "password"),
+		role: enumFromForm(formData, "role", [
+			"tenant_admin",
+			"operator",
+			"observer",
+		] as const),
+		status: enumFromForm(formData, "status", [
+			"active",
+			"invited",
+			"suspended",
+		] as const),
 	};
 }

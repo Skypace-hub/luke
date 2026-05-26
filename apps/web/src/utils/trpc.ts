@@ -4,14 +4,19 @@ import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import { toast } from "sonner";
 
+import { getServiceOpsQueryError } from "@/lib/business-errors";
+
 export const queryClient = new QueryClient({
 	queryCache: new QueryCache({
 		onError: (error, query) => {
-			toast.error(error.message, {
+			const businessError = getServiceOpsQueryError(error.message);
+
+			toast.error(businessError.title, {
 				action: {
 					label: "retry",
 					onClick: query.invalidate,
 				},
+				description: businessError.description,
 			});
 		},
 	}),

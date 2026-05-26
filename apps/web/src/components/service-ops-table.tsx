@@ -80,8 +80,9 @@ interface DataTableProps {
 	title?: string;
 }
 
-const compactButtonClass = "rounded-md";
-const panelClass = "rounded-lg border bg-card text-card-foreground shadow-xs";
+const compactButtonClass = "rounded-lg";
+const panelClass =
+	"rounded-xl bg-card text-card-foreground shadow-none ring-1 ring-foreground/10";
 
 const nonFileNameCharactersPattern = /[^a-z0-9]+/gi;
 const edgeDashPattern = /^-|-$/g;
@@ -183,10 +184,10 @@ export function DataTable({
 
 	return (
 		<div className={`${panelClass} overflow-hidden`}>
-			<div className="flex flex-col gap-4 p-5">
+			<div className="flex flex-col gap-4 p-4">
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
 					<div>
-						<p className="font-semibold text-lg">
+						<p className="font-medium text-base leading-none">
 							{title ?? `${rows.length} Records`}
 						</p>
 						<p className="mt-1 text-muted-foreground text-sm">
@@ -201,7 +202,7 @@ export function DataTable({
 						size="sm"
 						variant="outline"
 					>
-						<DownloadIcon className="size-4" />
+						<DownloadIcon data-icon="inline-start" />
 						Export
 					</Button>
 				</div>
@@ -211,7 +212,7 @@ export function DataTable({
 							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 							<Input
 								aria-label="Search records"
-								className="h-8 rounded-md bg-background pr-8 pl-9 text-sm"
+								className="h-8 rounded-lg bg-background pr-8 pl-9"
 								onChange={(event) => {
 									table.setGlobalFilter(event.target.value);
 									table.setPageIndex(0);
@@ -222,7 +223,7 @@ export function DataTable({
 							{globalFilter ? (
 								<button
 									aria-label="Clear search"
-									className="absolute top-1/2 right-2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+									className="absolute top-1/2 right-2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 									onClick={() => {
 										table.setGlobalFilter("");
 										table.setPageIndex(0);
@@ -268,9 +269,9 @@ export function DataTable({
 					</div>
 				</div>
 			</div>
-			<div className="mx-5 overflow-hidden rounded-lg border">
-				<Table className="min-w-[820px]">
-					<TableHeader className="bg-muted/20">
+			<div className="overflow-hidden border-t">
+				<Table className="min-w-[820px] **:data-[slot=table-cell]:px-4 **:data-[slot=table-head]:px-4 **:data-[slot=table-cell]:py-4">
+					<TableHeader className="**:data-[slot=table-head]:h-11 **:data-[slot=table-head]:font-medium **:data-[slot=table-head]:text-foreground **:data-[slot=table-head]:text-sm">
 						{table.getHeaderGroups().map((headerGroup) => (
 							<UiTableRow key={headerGroup.id}>
 								{headerGroup.headers.map((header) => (
@@ -293,7 +294,7 @@ export function DataTable({
 							</UiTableRow>
 						))}
 					</TableHeader>
-					<TableBody>
+					<TableBody className="**:data-[slot=table-row]:border-border/50 **:data-[slot=table-row]:hover:bg-transparent">
 						{table.getRowModel().rows.length ? (
 							table.getRowModel().rows.map((row) => (
 								<UiTableRow
@@ -303,7 +304,7 @@ export function DataTable({
 									{row.getVisibleCells().map((cell) => (
 										<TableCell
 											className={cn(
-												"px-4 py-3",
+												"px-4 py-4",
 												cell.column.id === "actions" ? "text-right" : ""
 											)}
 											key={cell.id}
@@ -329,7 +330,7 @@ export function DataTable({
 					</TableBody>
 				</Table>
 			</div>
-			<div className="flex flex-col gap-3 px-5 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
+			<div className="flex flex-col gap-3 px-4 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
 				<div className="flex flex-col gap-1">
 					<p>
 						{selectedRowCount} of {filteredRowCount} row(s) selected.
@@ -341,7 +342,7 @@ export function DataTable({
 						<span>Rows per page</span>
 						<select
 							aria-label="Rows per page"
-							className="h-8 rounded-md border bg-background px-2 text-foreground text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+							className="h-8 rounded-lg border bg-background px-2 text-foreground text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 							onChange={(event) => {
 								table.setPageSize(Number(event.target.value));
 							}}
@@ -407,7 +408,7 @@ function FilterMenu({
 				render={
 					<Button
 						className={cn(
-							"h-8 rounded-md bg-background text-sm",
+							"h-8 rounded-lg bg-background text-sm",
 							value === "all" ? "" : "border-primary text-foreground"
 						)}
 						size="sm"
@@ -475,7 +476,7 @@ function SortMenu({
 				render={
 					<Button
 						className={cn(
-							"h-8 rounded-md bg-background text-sm",
+							"h-8 rounded-lg bg-background text-sm",
 							value === "default" ? "" : "border-primary text-foreground"
 						)}
 						size="sm"
@@ -483,7 +484,7 @@ function SortMenu({
 					/>
 				}
 			>
-				<SlidersHorizontalIcon className="size-4" />
+				<SlidersHorizontalIcon data-icon="inline-start" />
 				Sort
 				<span className="ml-1 text-muted-foreground">· {sortLabel}</span>
 			</DropdownMenuTrigger>

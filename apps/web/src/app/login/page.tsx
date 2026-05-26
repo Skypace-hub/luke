@@ -1,16 +1,11 @@
-"use client";
+import { ensureDefaultSuperAdmin } from "@luke/auth";
 
-import { useState } from "react";
+import { LoginChooser } from "./login-chooser";
 
-import SignInForm from "@/components/sign-in-form";
-import SignUpForm from "@/components/sign-up-form";
+export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
-	const [showSignIn, setShowSignIn] = useState(true);
+export default async function LoginPage() {
+	await ensureDefaultSuperAdmin();
 
-	return showSignIn ? (
-		<SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
-	) : (
-		<SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
-	);
+	return <LoginChooser />;
 }

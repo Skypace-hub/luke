@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { db } from "@luke/db";
+import { account, user } from "@luke/db/schema/auth";
 import {
 	assets,
 	contractModelCoverage,
@@ -29,6 +31,7 @@ import {
 	tenantMemberships,
 	tenants,
 } from "@luke/db/schema/service-ops";
+import { hashPassword } from "better-auth/crypto";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type {
 	Asset,
@@ -52,9 +55,17 @@ import type {
 	ReportMetric,
 	ServiceOpsSnapshot,
 	SystemParameter,
+	TenantManagementRecord,
+	TenantRole,
+	TenantUserRecord,
 } from "../types/service-ops";
 
+const platformTenantId = "platform";
+
 type TenantRow = typeof tenants.$inferSelect;
+type TenantInsert = typeof tenants.$inferInsert;
+type TenantMembershipRow = typeof tenantMemberships.$inferSelect;
+type UserInsert = typeof user.$inferInsert;
 type JobRow = typeof jobs.$inferSelect;
 type AssetRow = typeof assets.$inferSelect;
 type ContractRow = typeof contracts.$inferSelect;
@@ -68,6 +79,22 @@ type AssetInsert = typeof assets.$inferInsert;
 type JobInsert = typeof jobs.$inferInsert;
 type ContractInsert = typeof contracts.$inferInsert;
 type FaultReportInsert = typeof faultReports.$inferInsert;
+
+export interface TenantMutationInput {
+	id?: null | string;
+	isActive: boolean;
+	name: string;
+	region: string;
+	releaseLabel: string;
+}
+
+export interface TenantUserMutationInput {
+	email: string;
+	name: string;
+	password?: null | string;
+	role: Exclude<TenantRole, "super_admin">;
+	status: TenantMembershipRow["status"];
+}
 
 export interface HospitalMutationInput {
 	address?: null | string;
@@ -382,14 +409,58 @@ const parameterLabel = (key: string): string => {
 	return labels[key] ?? titleCase(key);
 };
 
+const formatDateTime = (value: Date): string =>
+	new Intl.DateTimeFormat("en-HK", {
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		month: "short",
+		timeZone: "Asia/Hong_Kong",
+		year: "numeric",
+	}).format(value);
+
+const getAccessPolicyForRole = (
+	role: TenantRole
+): ServiceOpsSnapshot["access"] => {
+	const canManageTenants = role === "super_admin";
+	const canManageTenantUsers = canManageTenants || role === "tenant_admin";
+	const canWrite = canManageTenantUsers || role === "operator";
+
+	return {
+		canManageTenantUsers,
+		canManageTenants,
+		canRead: true,
+		canWrite,
+		role,
+	};
+};
+
+const userIsSuperAdmin = async (userId: string): Promise<boolean> => {
+	const [superAdminMembership] = await db
+		.select({ id: tenantMemberships.id })
+		.from(tenantMemberships)
+		.where(
+			and(
+				eq(tenantMemberships.userId, userId),
+				eq(tenantMemberships.role, "super_admin"),
+				eq(tenantMemberships.status, "active")
+			)
+		)
+		.limit(1);
+
+	return Boolean(superAdminMembership);
+};
+
 export async function getDefaultTenantIdForUser(
 	userId: string
 ): Promise<string | null> {
 	const [membership] = await db
 		.select({ tenantId: tenantMemberships.tenantId })
 		.from(tenantMemberships)
+		.innerJoin(tenants, eq(tenants.id, tenantMemberships.tenantId))
 		.where(
 			and(
+				eq(tenants.isActive, true),
 				eq(tenantMemberships.userId, userId),
 				eq(tenantMemberships.status, "active")
 			)
@@ -428,7 +499,7 @@ export async function ensureDefaultTenantForUser(user: {
 			.insert(tenantMemberships)
 			.values({
 				permissions: ["*"],
-				role: "admin",
+				role: "tenant_admin",
 				status: "active",
 				tenantId: tenantSeed.id,
 				userId: user.id,
@@ -458,12 +529,20 @@ export async function ensureDefaultTenantForUser(user: {
 	return tenantId;
 }
 
-export async function userCanAccessTenant(
+export async function getTenantAccessPolicy(
 	userId: string,
 	tenantId: string
-): Promise<boolean> {
+): Promise<ServiceOpsSnapshot["access"] | null> {
+	if (await userIsSuperAdmin(userId)) {
+		return getAccessPolicyForRole("super_admin");
+	}
+
 	const [membership] = await db
-		.select({ id: tenantMemberships.id })
+		.select({
+			id: tenantMemberships.id,
+			role: tenantMemberships.role,
+			status: tenantMemberships.status,
+		})
 		.from(tenantMemberships)
 		.where(
 			and(
@@ -474,7 +553,148 @@ export async function userCanAccessTenant(
 		)
 		.limit(1);
 
-	return Boolean(membership);
+	if (!membership) {
+		return null;
+	}
+
+	return getAccessPolicyForRole(membership.role);
+}
+
+export async function userCanAccessTenant(
+	userId: string,
+	tenantId: string
+): Promise<boolean> {
+	return Boolean(await getTenantAccessPolicy(userId, tenantId));
+}
+
+export async function getTenantsForUser(
+	userId: string
+): Promise<TenantManagementRecord[]> {
+	const accessRows = await db
+		.select({
+			role: tenantMemberships.role,
+			tenantId: tenantMemberships.tenantId,
+		})
+		.from(tenantMemberships)
+		.where(
+			and(
+				eq(tenantMemberships.userId, userId),
+				eq(tenantMemberships.status, "active")
+			)
+		);
+	const isSuperAdmin = accessRows.some((row) => row.role === "super_admin");
+
+	if (isSuperAdmin) {
+		const rows = await db
+			.select({
+				createdAt: tenants.createdAt,
+				id: tenants.id,
+				isActive: tenants.isActive,
+				memberCount:
+					sql<number>`count(distinct ${tenantMemberships.userId})`.mapWith(
+						Number
+					),
+				name: tenants.name,
+				region: tenants.region,
+				releaseLabel: tenants.releaseLabel,
+			})
+			.from(tenants)
+			.leftJoin(tenantMemberships, eq(tenantMemberships.tenantId, tenants.id))
+			.groupBy(
+				tenants.id,
+				tenants.name,
+				tenants.region,
+				tenants.releaseLabel,
+				tenants.isActive,
+				tenants.createdAt
+			)
+			.orderBy(desc(tenants.createdAt));
+
+		return rows.map((row) => ({
+			createdAt: formatDateTime(row.createdAt),
+			id: row.id,
+			isActive: row.isActive,
+			memberCount: row.memberCount,
+			name: row.name,
+			recordId: row.id,
+			region: row.region,
+			release: row.releaseLabel,
+			role: "super_admin",
+			status: "active",
+		}));
+	}
+
+	const rows = await db
+		.select({
+			createdAt: tenants.createdAt,
+			id: tenants.id,
+			isActive: tenants.isActive,
+			memberCount:
+				sql<number>`count(distinct ${tenantMemberships.userId})`.mapWith(
+					Number
+				),
+			name: tenants.name,
+			region: tenants.region,
+			releaseLabel: tenants.releaseLabel,
+			role: tenantMemberships.role,
+			status: tenantMemberships.status,
+		})
+		.from(tenantMemberships)
+		.innerJoin(tenants, eq(tenants.id, tenantMemberships.tenantId))
+		.where(eq(tenantMemberships.userId, userId))
+		.groupBy(
+			tenants.id,
+			tenants.name,
+			tenants.region,
+			tenants.releaseLabel,
+			tenants.isActive,
+			tenants.createdAt,
+			tenantMemberships.role,
+			tenantMemberships.status
+		)
+		.orderBy(desc(tenants.createdAt));
+
+	return rows.map((row) => ({
+		createdAt: formatDateTime(row.createdAt),
+		id: row.id,
+		isActive: row.isActive,
+		memberCount: row.memberCount,
+		name: row.name,
+		recordId: row.id,
+		region: row.region,
+		release: row.releaseLabel,
+		role: row.role,
+		status: row.status,
+	}));
+}
+
+export async function getTenantUsers(
+	tenantId: string
+): Promise<TenantUserRecord[]> {
+	const rows = await db
+		.select({
+			createdAt: tenantMemberships.createdAt,
+			email: user.email,
+			id: user.id,
+			membershipId: tenantMemberships.id,
+			name: user.name,
+			role: tenantMemberships.role,
+			status: tenantMemberships.status,
+		})
+		.from(tenantMemberships)
+		.innerJoin(user, eq(user.id, tenantMemberships.userId))
+		.where(eq(tenantMemberships.tenantId, tenantId))
+		.orderBy(asc(user.name));
+
+	return rows.map((row) => ({
+		createdAt: formatDateTime(row.createdAt),
+		email: row.email,
+		id: row.id,
+		membershipId: row.membershipId,
+		name: row.name,
+		role: row.role,
+		status: row.status,
+	}));
 }
 
 const getTenant = async (tenantId: string): Promise<TenantRow> => {
@@ -482,6 +702,20 @@ const getTenant = async (tenantId: string): Promise<TenantRow> => {
 		.select()
 		.from(tenants)
 		.where(and(eq(tenants.id, tenantId), eq(tenants.isActive, true)))
+		.limit(1);
+
+	if (!tenant) {
+		throw new Error(`Tenant ${tenantId} was not found`);
+	}
+
+	return tenant;
+};
+
+const getTenantRecord = async (tenantId: string): Promise<TenantRow> => {
+	const [tenant] = await db
+		.select()
+		.from(tenants)
+		.where(eq(tenants.id, tenantId))
 		.limit(1);
 
 	if (!tenant) {
@@ -501,6 +735,9 @@ const toTimestampValue = (value: null | string | undefined): Date | null =>
 	value?.trim() ? new Date(value) : null;
 
 const toMoneyValue = (value: number): string => value.toFixed(2);
+
+const toTenantId = (value: string): string =>
+	slugify(value).slice(0, maxTenantIdLength) || `tenant-${Date.now()}`;
 
 const ensureRecordBelongsToTenant = async <T>(
 	tableName: string,
@@ -1322,9 +1559,24 @@ const getLiveAlerts = async (tenantId: string): Promise<LiveAlert[]> => {
 };
 
 export async function getServiceOpsSnapshot(
-	tenantId: string
+	tenantId: string,
+	userId?: string
 ): Promise<ServiceOpsSnapshot> {
 	const tenant = await getTenant(tenantId);
+	const access = userId
+		? await getTenantAccessPolicy(userId, tenantId)
+		: {
+				canManageTenantUsers: false,
+				canManageTenants: false,
+				canRead: true,
+				canWrite: false,
+				role: "observer" as const,
+			};
+
+	if (!access) {
+		throw new Error("Tenant access denied");
+	}
+
 	const [
 		hospitalRows,
 		engineerRows,
@@ -1340,6 +1592,8 @@ export async function getServiceOpsSnapshot(
 		costRows,
 		reportRows,
 		liveAlertRows,
+		tenantRows,
+		userRows,
 	] = await Promise.all([
 		getHospitals(tenantId),
 		getEngineers(tenantId),
@@ -1355,9 +1609,14 @@ export async function getServiceOpsSnapshot(
 		getCostRecords(tenantId),
 		getReportMetrics(tenantId),
 		getLiveAlerts(tenantId),
+		userId ? getTenantsForUser(userId) : Promise.resolve([]),
+		access.canManageTenantUsers
+			? getTenantUsers(tenantId)
+			: Promise.resolve([]),
 	]);
 
 	return {
+		access,
 		assets: assetRows,
 		contracts: contractRows,
 		costRecords: costRows,
@@ -1384,7 +1643,250 @@ export async function getServiceOpsSnapshot(
 			region: tenant.region,
 			release: tenant.releaseLabel,
 		},
+		tenants: tenantRows,
+		users: userRows,
 	};
+}
+
+export async function createTenantForUser(
+	userId: string,
+	input: TenantMutationInput
+) {
+	const tenantId = toTenantId(input.id || input.name);
+
+	await db.transaction(async (tx) => {
+		await tx.insert(tenants).values({
+			id: tenantId,
+			isActive: input.isActive,
+			name: input.name,
+			region: input.region,
+			releaseLabel: input.releaseLabel,
+		} satisfies TenantInsert);
+
+		await tx.insert(tenantMemberships).values({
+			permissions: ["*"],
+			role: "tenant_admin",
+			status: "active",
+			tenantId,
+			userId,
+		});
+
+		await tx
+			.insert(systemParameters)
+			.values(
+				defaultSystemParameters.map((parameter) => ({
+					description: parameter.description,
+					key: parameter.key,
+					tenantId,
+					value: parameter.value,
+					valueType: parameter.valueType,
+				}))
+			)
+			.onConflictDoNothing();
+	});
+
+	return tenantId;
+}
+
+export async function updateTenant(
+	tenantId: string,
+	input: TenantMutationInput
+) {
+	await getTenantRecord(tenantId);
+	await db
+		.update(tenants)
+		.set({
+			isActive: input.isActive,
+			name: input.name,
+			region: input.region,
+			releaseLabel: input.releaseLabel,
+		})
+		.where(eq(tenants.id, tenantId));
+}
+
+export async function deleteTenant(tenantId: string) {
+	if (tenantId === platformTenantId) {
+		throw new Error("The platform administration tenant cannot be deactivated");
+	}
+
+	await getTenantRecord(tenantId);
+	await db
+		.update(tenants)
+		.set({ isActive: false })
+		.where(eq(tenants.id, tenantId));
+}
+
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+const credentialProviderId = "credential";
+
+const getTenantUserPermissions = (role: TenantUserMutationInput["role"]) =>
+	role === "tenant_admin" || role === "operator" ? ["write"] : [];
+
+const resetCredentialPassword = async (
+	userId: string,
+	password: string,
+	now: Date
+) => {
+	await db
+		.delete(account)
+		.where(
+			and(
+				eq(account.userId, userId),
+				eq(account.providerId, credentialProviderId)
+			)
+		);
+	await db.insert(account).values({
+		accountId: userId,
+		createdAt: now,
+		id: randomUUID(),
+		password: await hashPassword(password),
+		providerId: credentialProviderId,
+		updatedAt: now,
+		userId,
+	});
+};
+
+const upsertCredentialUser = async (input: TenantUserMutationInput) => {
+	const email = normalizeEmail(input.email);
+	const now = new Date();
+	const [existingUser] = await db
+		.select({ id: user.id })
+		.from(user)
+		.where(eq(user.email, email))
+		.limit(1);
+	const userId = existingUser?.id ?? randomUUID();
+
+	if (existingUser) {
+		await db
+			.update(user)
+			.set({ name: input.name, updatedAt: now })
+			.where(eq(user.id, userId));
+	} else {
+		await db.insert(user).values({
+			createdAt: now,
+			email,
+			emailVerified: true,
+			id: userId,
+			name: input.name,
+			updatedAt: now,
+		} satisfies UserInsert);
+	}
+
+	if (input.password) {
+		await resetCredentialPassword(userId, input.password, now);
+	}
+
+	return userId;
+};
+
+const updateCredentialUser = async (
+	userId: string,
+	input: TenantUserMutationInput
+) => {
+	const now = new Date();
+
+	await db
+		.update(user)
+		.set({
+			email: normalizeEmail(input.email),
+			name: input.name,
+			updatedAt: now,
+		})
+		.where(eq(user.id, userId));
+
+	if (input.password) {
+		await resetCredentialPassword(userId, input.password, now);
+	}
+};
+
+export async function createTenantUser(
+	tenantId: string,
+	input: TenantUserMutationInput
+) {
+	await getTenantRecord(tenantId);
+	const userId = await upsertCredentialUser(input);
+
+	await db
+		.insert(tenantMemberships)
+		.values({
+			permissions: getTenantUserPermissions(input.role),
+			role: input.role,
+			status: input.status,
+			tenantId,
+			userId,
+		})
+		.onConflictDoUpdate({
+			set: {
+				permissions: getTenantUserPermissions(input.role),
+				role: input.role,
+				status: input.status,
+				updatedAt: new Date(),
+			},
+			target: [tenantMemberships.tenantId, tenantMemberships.userId],
+		});
+}
+
+export async function updateTenantUser(
+	tenantId: string,
+	userId: string,
+	input: TenantUserMutationInput
+) {
+	const [membership] = await db
+		.select({ id: tenantMemberships.id, role: tenantMemberships.role })
+		.from(tenantMemberships)
+		.where(
+			and(
+				eq(tenantMemberships.tenantId, tenantId),
+				eq(tenantMemberships.userId, userId)
+			)
+		)
+		.limit(1);
+
+	if (!membership) {
+		throw new Error("User membership was not found for this tenant");
+	}
+
+	if (membership.role === "super_admin") {
+		throw new Error("Super administrator membership cannot be changed here");
+	}
+
+	await updateCredentialUser(userId, input);
+	await db
+		.update(tenantMemberships)
+		.set({
+			permissions: getTenantUserPermissions(input.role),
+			role: input.role,
+			status: input.status,
+			updatedAt: new Date(),
+		})
+		.where(eq(tenantMemberships.id, membership.id));
+}
+
+export async function deleteTenantUser(tenantId: string, userId: string) {
+	const [membership] = await db
+		.select({ id: tenantMemberships.id, role: tenantMemberships.role })
+		.from(tenantMemberships)
+		.where(
+			and(
+				eq(tenantMemberships.tenantId, tenantId),
+				eq(tenantMemberships.userId, userId)
+			)
+		)
+		.limit(1);
+
+	if (!membership) {
+		throw new Error("User membership was not found for this tenant");
+	}
+
+	if (membership.role === "super_admin") {
+		throw new Error("Super administrator membership cannot be suspended here");
+	}
+
+	await db
+		.update(tenantMemberships)
+		.set({ status: "suspended", updatedAt: new Date() })
+		.where(eq(tenantMemberships.id, membership.id));
 }
 
 export async function createHospital(

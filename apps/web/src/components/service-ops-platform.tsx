@@ -4,10 +4,21 @@
 import { Button } from "@luke/ui/components/button";
 import {
 	Card,
+	CardAction,
 	CardContent,
 	CardHeader,
 	CardTitle,
 } from "@luke/ui/components/card";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@luke/ui/components/dropdown-menu";
 import { Input } from "@luke/ui/components/input";
 import { Label } from "@luke/ui/components/label";
 import { cn } from "@luke/ui/lib/utils";
@@ -15,8 +26,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ActivityIcon,
 	AlertTriangleIcon,
+	ArrowUpRightIcon,
 	BellRingIcon,
+	CalendarDaysIcon,
 	CheckCircle2Icon,
+	ChevronDownIcon,
+	ChevronsUpDownIcon,
 	ClipboardCheckIcon,
 	CommandIcon,
 	EditIcon,
@@ -29,10 +44,11 @@ import {
 	ShieldCheckIcon,
 	Trash2Icon,
 	TrendingUpIcon,
+	XIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
 	buildAssetPayload,
@@ -43,17 +59,22 @@ import {
 	buildJobPayload,
 	buildPartPayload,
 	buildProductPayload,
+	buildTenantPayload,
+	buildTenantUserPayload,
 	type CrudEntity,
 	type CrudState,
 	entityLabels,
 	type FieldConfig,
+	type FormDefaultValue,
 	getCrudStateKey,
 	getFieldConfigs,
 	getFormDefaults,
 	getRecordId,
 } from "@/components/service-ops-crud";
 import { DataTable } from "@/components/service-ops-table";
+import { ThemeColorSwitcher } from "@/components/theme-color-switcher";
 import { authClient } from "@/lib/auth-client";
+import { getServiceOpsMutationError } from "@/lib/business-errors";
 import {
 	type BackOfficeView,
 	type ContractStatus,
@@ -134,16 +155,24 @@ const workflowCards = [
 	},
 ];
 
-const primaryActionClass = "rounded-md shadow-xs";
+const primaryActionClass = "rounded-lg shadow-xs";
 
-const panelClass = "rounded-lg border bg-card text-card-foreground shadow-xs";
+const panelClass =
+	"rounded-xl border-0 bg-card text-card-foreground shadow-none ring-1 ring-foreground/10";
 
-const mutedPanelClass = "rounded-lg border bg-muted/35";
+const mutedPanelClass = "rounded-lg border border-border/60 bg-muted/35";
 
 const iconTileClass =
-	"flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground";
+	"flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground";
 
-const compactButtonClass = "rounded-md";
+const compactButtonClass = "rounded-lg";
+
+const formFieldClass = "flex min-w-0 flex-col gap-1.5";
+
+const formLabelClass = "font-medium text-foreground text-xs";
+
+const formControlClass =
+	"h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50";
 
 const hospitalMapPositions = [
 	{ left: "18%", top: "2rem" },
@@ -159,11 +188,18 @@ const engineerMapPositions = [
 ] as const;
 
 const roleLabels = [
-	"admin",
-	"coordinator",
-	"engineer",
-	"hospital_user",
+	"super_admin",
+	"tenant_admin",
+	"operator",
+	"observer",
 ] as const;
+
+const roleDisplayNames: Record<(typeof roleLabels)[number], string> = {
+	operator: "Operator",
+	observer: "Observer",
+	super_admin: "Super administrator",
+	tenant_admin: "Tenant administrator",
+};
 
 const alertIconByType = {
 	contract: ShieldCheckIcon,
@@ -186,9 +222,71 @@ const backOfficeTitles: Record<BackOfficeView, string> = {
 	parts: "Parts & Stock",
 	products: "Product Catalogue",
 	reports: "Reports",
+	tenants: "Tenant Management",
+	users: "User Management",
 };
 
+const navigationSections = [
+	{ label: "General", items: ["dashboard", "jobs", "map"] },
+	{
+		label: "Operations",
+		items: [
+			"assets",
+			"products",
+			"hospitals",
+			"engineers",
+			"contracts",
+			"parts",
+			"faults",
+			"reports",
+		],
+	},
+	{ label: "Other", items: ["users", "tenants", "config"] },
+] satisfies Array<{ items: BackOfficeView[]; label: string }>;
+
+const dashboardCategoryItems = [
+	{ id: "overview", label: "Overview" },
+	{ id: "analytics", label: "Analytics" },
+	{ id: "reports", label: "Reports" },
+	{ id: "notifications", label: "Notifications" },
+] as const;
+
+type DashboardCategory = (typeof dashboardCategoryItems)[number]["id"];
+
+const dashboardCategoryMeta = {
+	analytics: {
+		description:
+			"Trend service volume, urgent workload, completion momentum, and release coverage.",
+		eyebrow: "Service Analytics",
+		title: "Operational signals",
+	},
+	notifications: {
+		description:
+			"Review live exceptions, schedule pressure, and alerts that need service attention.",
+		eyebrow: "Notification Center",
+		title: "Exceptions and alerts",
+	},
+	overview: {
+		description:
+			"Keep tabs on service demand, open exceptions, contract risk, and field execution across the current release.",
+		eyebrow: "Service Command",
+		title: "Operations Overview",
+	},
+	reports: {
+		description:
+			"Inspect job-level reporting, close-out status, and the current service execution scope.",
+		eyebrow: "Service Reports",
+		title: "Jobs and release scope",
+	},
+} satisfies Record<
+	DashboardCategory,
+	{ description: string; eyebrow: string; title: string }
+>;
+
 const getBackOfficeTitle = (view: BackOfficeView) => backOfficeTitles[view];
+
+const getNavigationItem = (view: BackOfficeView) =>
+	navigationItems.find((item) => item.id === view);
 
 const getHashBackOfficeView = (): BackOfficeView | null => {
 	if (typeof window === "undefined") {
@@ -209,26 +307,56 @@ export default function ServiceOpsPlatform({
 	initialData: ServiceOpsSnapshot;
 }) {
 	const router = useRouter();
-	const snapshotQuery = useQuery(
-		trpc.serviceOps.snapshot.queryOptions(
-			{ tenantId: initialData.tenant.id },
-			{ initialData, staleTime: 30_000 }
-		)
+	const [selectedTenantId, setSelectedTenantId] = useState(
+		initialData.tenant.id
 	);
-	const data = snapshotQuery.data ?? initialData;
-	const { jobs, tenant } = data;
+	const snapshotQuery = useQuery(
+		selectedTenantId === initialData.tenant.id
+			? trpc.serviceOps.snapshot.queryOptions(
+					{ tenantId: selectedTenantId },
+					{ initialData, staleTime: 30_000 }
+				)
+			: trpc.serviceOps.snapshot.queryOptions(
+					{ tenantId: selectedTenantId },
+					{ staleTime: 30_000 }
+				)
+	);
+	const loadedData = snapshotQuery.data;
+	const [knownTenants, setKnownTenants] = useState(initialData.tenants);
+	const currentData =
+		loadedData?.tenant.id === selectedTenantId ? loadedData : null;
+	const tenantOptions = loadedData?.tenants ?? knownTenants;
+	const activeTenants = tenantOptions.filter(
+		(tenantOption) => tenantOption.isActive
+	);
+	const selectedTenantOption = tenantOptions.find(
+		(tenantOption) => tenantOption.id === selectedTenantId
+	);
+	const tenant =
+		currentData?.tenant ?? selectedTenantOption ?? initialData.tenant;
+	const jobs = currentData?.jobs ?? [];
+	const isTenantLoading = !currentData && snapshotQuery.isFetching;
 	const [activeView, setActiveView] = useState<BackOfficeView>("dashboard");
 	const [firstJob] = jobs;
 	const [selectedJobId, setSelectedJobId] = useState(firstJob?.id ?? "");
 	const [crudState, setCrudState] = useState<CrudState | null>(null);
 
 	const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? firstJob;
+	const isActiveViewAllowed =
+		!currentData ||
+		((activeView !== "tenants" || currentData.access.canManageTenants) &&
+			(activeView !== "users" || currentData.access.canManageTenantUsers));
+	const visibleActiveView = isActiveViewAllowed ? activeView : "dashboard";
 
 	useEffect(() => {
-		if (!selectedJobId && firstJob) {
-			setSelectedJobId(firstJob.id);
+		if (loadedData?.tenants) {
+			setKnownTenants(loadedData.tenants);
 		}
-	}, [firstJob, selectedJobId]);
+	}, [loadedData?.tenants]);
+
+	useEffect(() => {
+		setSelectedJobId(firstJob?.id ?? "");
+	}, [firstJob?.id]);
 
 	useEffect(() => {
 		const syncViewFromUrl = () => {
@@ -254,10 +382,10 @@ export default function ServiceOpsPlatform({
 
 		window.requestAnimationFrame(() => {
 			document
-				.getElementById(`back-office-nav-${activeView}`)
+				.getElementById(`back-office-nav-${visibleActiveView}`)
 				?.scrollIntoView({ block: "nearest", inline: "center" });
 		});
-	}, [activeView]);
+	}, [visibleActiveView]);
 
 	const handleSignOut = () => {
 		authClient
@@ -291,49 +419,96 @@ export default function ServiceOpsPlatform({
 		}
 	};
 
-	return (
-		<main className="min-h-svh bg-background text-foreground">
-			<div className="min-h-svh">
-				<div className="grid min-h-svh grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
-					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-sidebar text-sidebar-foreground lg:min-h-svh lg:border-r lg:border-b-0">
-						<div className="flex h-14 items-center gap-3 border-b px-4">
-							<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-xs">
-								<CommandIcon className="size-4" />
-							</div>
-							<div className="min-w-0">
-								<p className="truncate font-semibold text-sm">Utiliti</p>
-								<p className="truncate text-muted-foreground text-xs">
-									{tenant.name}
-								</p>
-							</div>
-						</div>
-						<nav className="flex min-w-0 max-w-full gap-1 overflow-x-auto px-3 py-2 lg:flex-col lg:overflow-visible lg:py-4">
-							{navigationItems.map((item) => {
-								const Icon = item.icon;
-								const isActive = activeView === item.id;
+	const switchTenant = (tenantId: string) => {
+		if (tenantId === selectedTenantId) {
+			return;
+		}
 
-								return (
-									<button
-										aria-current={isActive ? "page" : undefined}
-										className={cn(
-											"flex h-9 min-w-max cursor-pointer items-center gap-3 rounded-md px-3 text-left text-sm transition-colors lg:w-full",
-											isActive
-												? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
-												: "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-										)}
-										data-back-office-nav-active={isActive ? "true" : undefined}
-										id={`back-office-nav-${item.id}`}
-										key={item.id}
-										onClick={() => selectBackOfficeView(item.id)}
-										type="button"
-									>
-										<Icon className="size-4" />
-										{item.label}
-									</button>
-								);
-							})}
+		setCrudState(null);
+		setSelectedJobId("");
+		setSelectedTenantId(tenantId);
+		selectBackOfficeView("dashboard");
+	};
+	const visibleNavigationSections = navigationSections
+		.map((section) => ({
+			...section,
+			items: section.items.filter((itemId) => {
+				if (!currentData) {
+					return true;
+				}
+
+				if (itemId === "tenants") {
+					return currentData.access.canManageTenants;
+				}
+
+				if (itemId === "users") {
+					return currentData.access.canManageTenantUsers;
+				}
+
+				return true;
+			}),
+		}))
+		.filter((section) => section.items.length > 0);
+
+	return (
+		<main className="min-h-svh overflow-x-hidden bg-background text-foreground">
+			<div className="min-h-svh">
+				<div className="grid min-h-svh grid-cols-1 lg:grid-cols-[304px_minmax(0,1fr)]">
+					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-card text-card-foreground shadow-sm lg:sticky lg:top-0 lg:h-svh lg:border-r lg:border-b-0">
+						<TenantSwitcher
+							activeTenants={activeTenants}
+							isLoading={isTenantLoading}
+							onTenantChange={switchTenant}
+							selectedTenant={tenant}
+							selectedTenantId={selectedTenantId}
+						/>
+						<nav className="flex min-w-0 max-w-full gap-2 overflow-x-auto px-3 py-2 [scrollbar-width:none] lg:flex-1 lg:flex-col lg:gap-5 lg:overflow-y-auto lg:px-4 lg:py-3 [&::-webkit-scrollbar]:hidden">
+							{visibleNavigationSections.map((section) => (
+								<div
+									className="flex min-w-max gap-2 lg:min-w-0 lg:flex-col"
+									key={section.label}
+								>
+									<p className="hidden px-3 font-semibold text-muted-foreground text-sm lg:block">
+										{section.label}
+									</p>
+									<div className="flex gap-1 lg:flex-col">
+										{section.items.map((itemId) => {
+											const item = getNavigationItem(itemId);
+
+											if (!item) {
+												return null;
+											}
+
+											const Icon = item.icon;
+											const isActive = visibleActiveView === item.id;
+
+											return (
+												<button
+													aria-current={isActive ? "page" : undefined}
+													className={cn(
+														"flex h-10 min-w-max cursor-pointer items-center gap-3 rounded-xl px-3 text-left font-medium text-base transition-colors lg:w-full",
+														isActive
+															? "bg-muted text-foreground shadow-xs"
+															: "text-foreground/85 hover:bg-muted/70 hover:text-foreground"
+													)}
+													data-back-office-nav-active={
+														isActive ? "true" : undefined
+													}
+													id={`back-office-nav-${item.id}`}
+													key={item.id}
+													onClick={() => selectBackOfficeView(item.id)}
+													type="button"
+												>
+													<Icon className="size-5 shrink-0" />
+													<span className="truncate">{item.label}</span>
+												</button>
+											);
+										})}
+									</div>
+								</div>
+							))}
 						</nav>
-						<div className="mt-auto hidden border-t p-3 lg:block">
+						<div className="mt-auto hidden p-4 lg:block">
 							<UserProfile
 								currentUser={currentUser}
 								onSignOut={handleSignOut}
@@ -341,43 +516,146 @@ export default function ServiceOpsPlatform({
 						</div>
 					</aside>
 					<div className="min-w-0">
-						<header className="sticky top-0 z-20 flex min-h-14 flex-col gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur lg:px-6">
+						<header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b bg-background/95 px-4 py-3 backdrop-blur lg:px-6">
 							<div className="min-w-0">
-								<p className="text-muted-foreground text-xs">
-									Service Operations
-								</p>
-								<h1 className="truncate font-semibold text-lg">
-									{getBackOfficeTitle(activeView)}
+								<p className="text-muted-foreground text-xs">Dashboard</p>
+								<h1 className="truncate font-semibold text-lg leading-tight">
+									{getBackOfficeTitle(visibleActiveView)}
 								</h1>
-								<p className="mt-0.5 text-muted-foreground text-xs">
-									{tenant.release} · {tenant.region} service operations
-								</p>
+							</div>
+							<div className="flex min-w-0 items-center gap-3">
+								<div className="hidden min-w-0 items-center gap-2 text-muted-foreground text-xs md:flex">
+									<span className="truncate">{tenant.release}</span>
+									<span className="size-1 rounded-full bg-border" />
+									<span className="truncate">{tenant.region}</span>
+								</div>
+								<ThemeColorSwitcher />
 							</div>
 						</header>
 						<section
 							className="@container/main min-w-0 px-4 py-4 md:py-6 lg:px-6"
 							id="back-office-content"
 						>
-							<BackOfficeViewPanel
-								activeView={activeView}
-								data={data}
-								onCreate={(entity) => setCrudState({ entity, mode: "create" })}
-								onEdit={(entity, record) =>
-									setCrudState({ entity, mode: "edit", record })
-								}
-								selectedJob={selectedJob}
-								setSelectedJobId={setSelectedJobId}
-							/>
+							{currentData ? (
+								<BackOfficeViewPanel
+									activeView={visibleActiveView}
+									data={currentData}
+									onCreate={(entity) =>
+										setCrudState({ entity, mode: "create" })
+									}
+									onEdit={(entity, record) =>
+										setCrudState({ entity, mode: "edit", record })
+									}
+									selectedJob={selectedJob}
+									setSelectedJobId={setSelectedJobId}
+								/>
+							) : (
+								<TenantSnapshotLoading tenantName={tenant.name} />
+							)}
 						</section>
 					</div>
 				</div>
 			</div>
-			<CrudDialog
-				data={data}
-				onClose={() => setCrudState(null)}
-				state={crudState}
-			/>
+			{currentData ? (
+				<CrudDialog
+					data={currentData}
+					onClose={() => setCrudState(null)}
+					state={crudState}
+				/>
+			) : null}
 		</main>
+	);
+}
+
+function TenantSwitcher({
+	activeTenants,
+	isLoading,
+	onTenantChange,
+	selectedTenant,
+	selectedTenantId,
+}: {
+	activeTenants: ServiceOpsSnapshot["tenants"];
+	isLoading: boolean;
+	onTenantChange: (tenantId: string) => void;
+	selectedTenant: ServiceOpsSnapshot["tenant"];
+	selectedTenantId: string;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<button
+						className="flex w-full cursor-pointer items-center gap-4 px-4 py-4 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted lg:px-6 lg:py-7"
+						disabled={activeTenants.length === 0}
+						type="button"
+					/>
+				}
+			>
+				<div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-foreground text-background shadow-xs">
+					<CommandIcon className="size-6" />
+				</div>
+				<div className="min-w-0 flex-1">
+					<p className="truncate font-bold text-xl leading-tight">Utiliti</p>
+					<p className="truncate font-medium text-muted-foreground text-sm">
+						{selectedTenant.name}
+					</p>
+				</div>
+				<div className="flex size-10 shrink-0 items-center justify-center rounded-xl border bg-background text-foreground shadow-xs">
+					{isLoading ? (
+						<Loader2Icon className="size-5 animate-spin" />
+					) : (
+						<ChevronsUpDownIcon className="size-5" />
+					)}
+				</div>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="start"
+				className="w-72 bg-card"
+				sideOffset={8}
+			>
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuRadioGroup
+					onValueChange={onTenantChange}
+					value={selectedTenantId}
+				>
+					{activeTenants.map((tenantOption) => (
+						<DropdownMenuRadioItem
+							className="items-start gap-3 py-2 pr-8"
+							closeOnClick
+							key={tenantOption.id}
+							value={tenantOption.id}
+						>
+							<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+								<CommandIcon className="size-4" />
+							</span>
+							<span className="min-w-0">
+								<span className="block truncate font-medium">
+									{tenantOption.name}
+								</span>
+								<span className="block truncate text-muted-foreground text-xs">
+									{tenantOption.region} · {tenantOption.release}
+								</span>
+							</span>
+						</DropdownMenuRadioItem>
+					))}
+				</DropdownMenuRadioGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function TenantSnapshotLoading({ tenantName }: { tenantName: string }) {
+	return (
+		<div className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-2xl border bg-card p-8 text-center">
+			<Loader2Icon className="size-6 animate-spin text-muted-foreground" />
+			<div>
+				<p className="font-medium">Loading workspace</p>
+				<p className="text-muted-foreground text-sm">{tenantName}</p>
+			</div>
+		</div>
 	);
 }
 
@@ -392,13 +670,15 @@ function UserProfile({
 	const initials = getInitials(displayName, currentUser.email);
 
 	return (
-		<div className="flex items-center gap-3 rounded-lg border bg-card/80 p-2 shadow-xs">
-			<div className="flex size-8 items-center justify-center rounded-md bg-muted font-semibold text-xs uppercase">
+		<div className="flex items-center gap-3 rounded-2xl bg-card p-2 transition-colors hover:bg-muted/70">
+			<div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted font-semibold text-base uppercase">
 				{initials}
 			</div>
 			<div className="min-w-0 flex-1">
-				<p className="truncate font-medium text-sm">{displayName}</p>
-				<p className="truncate text-muted-foreground text-xs">
+				<p className="truncate font-bold text-base leading-tight">
+					{displayName}
+				</p>
+				<p className="truncate font-medium text-muted-foreground text-sm">
 					{currentUser.email}
 				</p>
 			</div>
@@ -456,12 +736,18 @@ function BackOfficeViewPanel({
 		reportMetrics,
 		shortages,
 		systemParameters,
+		tenants,
+		users,
 	} = data;
+	const canWrite = data.access.canWrite;
+	const canManageTenants = data.access.canManageTenants;
+	const canManageTenantUsers = data.access.canManageTenantUsers;
+	const actionFor = (action: ReactNode) => (canWrite ? action : null);
 
 	if (activeView === "jobs") {
 		return (
 			<PageFrame
-				action={
+				action={actionFor(
 					<Button
 						className={primaryActionClass}
 						onClick={() => onCreate("job")}
@@ -469,12 +755,13 @@ function BackOfficeViewPanel({
 						<PlusIcon className="size-4" />
 						New job
 					</Button>
-				}
+				)}
+				description="Dispatch work, inspect ownership, and audit the current state machine without leaving the service console."
 				eyebrow="A. Job Management"
 				title="Job dispatch and state control"
 			>
 				<div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-					<div className="space-y-4">
+					<div className="flex flex-col gap-4">
 						<DataTable
 							columns={[
 								"Job",
@@ -509,6 +796,7 @@ function BackOfficeViewPanel({
 								],
 								actions: (
 									<RowActions
+										canWrite={canWrite}
 										entity="job"
 										id={job.recordId}
 										onEdit={() => onEdit("job", job)}
@@ -526,7 +814,7 @@ function BackOfficeViewPanel({
 								<CardHeader>
 									<CardTitle>{selectedJob.id} audit trail</CardTitle>
 								</CardHeader>
-								<CardContent className="space-y-4">
+								<CardContent className="flex flex-col gap-4">
 									<StateMachine currentStatus={selectedJob.status} />
 									<div className={`${mutedPanelClass} p-3 text-sm`}>
 										<p className="font-medium">Latest event</p>
@@ -557,7 +845,7 @@ function BackOfficeViewPanel({
 	if (activeView === "assets") {
 		return (
 			<PageFrame
-				action={
+				action={actionFor(
 					<Button
 						className={primaryActionClass}
 						onClick={() => onCreate("asset")}
@@ -565,7 +853,8 @@ function BackOfficeViewPanel({
 						<PlusIcon className="size-4" />
 						Register asset
 					</Button>
-				}
+				)}
+				description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
 				eyebrow="B. Asset & Device Management"
 				title="Installed asset registry"
 			>
@@ -595,6 +884,7 @@ function BackOfficeViewPanel({
 						],
 						actions: (
 							<RowActions
+								canWrite={canWrite}
 								entity="asset"
 								id={asset.recordId}
 								onEdit={() => onEdit("asset", asset)}
@@ -612,7 +902,7 @@ function BackOfficeViewPanel({
 	if (activeView === "products") {
 		return (
 			<PageFrame
-				action={
+				action={actionFor(
 					<Button
 						className={primaryActionClass}
 						onClick={() => onCreate("product")}
@@ -620,7 +910,8 @@ function BackOfficeViewPanel({
 						<PlusIcon className="size-4" />
 						New product
 					</Button>
-				}
+				)}
+				description="Product models, preventive maintenance cadence, parts mapping, and engineer-facing manuals."
 				eyebrow="B-05 Product Catalogue"
 				title="Product models and service manuals"
 			>
@@ -644,6 +935,7 @@ function BackOfficeViewPanel({
 						],
 						actions: (
 							<RowActions
+								canWrite={canWrite}
 								entity="product"
 								id={product.id}
 								onEdit={() => onEdit("product", product)}
@@ -661,7 +953,7 @@ function BackOfficeViewPanel({
 	if (activeView === "hospitals") {
 		return (
 			<PageFrame
-				action={
+				action={actionFor(
 					<Button
 						className={primaryActionClass}
 						onClick={() => onCreate("hospital")}
@@ -669,7 +961,8 @@ function BackOfficeViewPanel({
 						<PlusIcon className="size-4" />
 						New hospital
 					</Button>
-				}
+				)}
+				description="Hospital sites with contract state, asset coverage, location data, and current demand."
 				eyebrow="Tenant sites"
 				title="Hospitals and contract status"
 			>
@@ -700,6 +993,7 @@ function BackOfficeViewPanel({
 						],
 						actions: (
 							<RowActions
+								canWrite={canWrite}
 								entity="hospital"
 								id={hospital.id}
 								onEdit={() => onEdit("hospital", hospital)}
@@ -717,7 +1011,7 @@ function BackOfficeViewPanel({
 	if (activeView === "engineers") {
 		return (
 			<PageFrame
-				action={
+				action={actionFor(
 					<Button
 						className={primaryActionClass}
 						onClick={() => onCreate("engineer")}
@@ -725,7 +1019,8 @@ function BackOfficeViewPanel({
 						<PlusIcon className="size-4" />
 						New engineer
 					</Button>
-				}
+				)}
+				description="Engineer profiles with live status, service region, and billing rate configuration."
 				eyebrow="F-01 Engineer Management"
 				title="Engineer profiles and rates"
 			>
@@ -761,6 +1056,7 @@ function BackOfficeViewPanel({
 						],
 						actions: (
 							<RowActions
+								canWrite={canWrite}
 								entity="engineer"
 								id={engineer.id}
 								onEdit={() => onEdit("engineer", engineer)}
@@ -778,6 +1074,7 @@ function BackOfficeViewPanel({
 	if (activeView === "contracts") {
 		return (
 			<ContractsView
+				canWrite={canWrite}
 				contracts={contracts}
 				onCreate={() => onCreate("contract")}
 				onEdit={(contract) => onEdit("contract", contract)}
@@ -799,7 +1096,7 @@ function BackOfficeViewPanel({
 	if (activeView === "faults") {
 		return (
 			<PageFrame
-				action={
+				action={actionFor(
 					<Button
 						className={primaryActionClass}
 						onClick={() => onCreate("fault")}
@@ -807,7 +1104,8 @@ function BackOfficeViewPanel({
 						<PlusIcon className="size-4" />
 						Manual fault
 					</Button>
-				}
+				)}
+				description="Fault reports submitted from hospital web forms and converted into repair workflow."
 				eyebrow="G. Fault Reporting"
 				title="Fault intake and status tracking"
 			>
@@ -840,6 +1138,7 @@ function BackOfficeViewPanel({
 						],
 						actions: (
 							<RowActions
+								canWrite={canWrite}
 								entity="fault"
 								id={fault.recordId}
 								onEdit={() => onEdit("fault", fault)}
@@ -857,6 +1156,7 @@ function BackOfficeViewPanel({
 	if (activeView === "parts") {
 		return (
 			<PartsView
+				canWrite={canWrite}
 				onCreate={() => onCreate("part")}
 				onEdit={(part) => onEdit("part", part)}
 				parts={parts}
@@ -876,6 +1176,28 @@ function BackOfficeViewPanel({
 		return <ConfigView systemParameters={systemParameters} />;
 	}
 
+	if (activeView === "tenants") {
+		return (
+			<TenantsView
+				canManageTenants={canManageTenants}
+				currentTenantId={data.tenant.id}
+				onCreate={() => onCreate("tenant")}
+				onEdit={(tenantRecord) => onEdit("tenant", tenantRecord)}
+				tenants={tenants}
+			/>
+		);
+	}
+
+	if (activeView === "users") {
+		return (
+			<TenantUsersView
+				canManageTenantUsers={canManageTenantUsers}
+				tenantId={data.tenant.id}
+				users={users}
+			/>
+		);
+	}
+
 	return (
 		<DashboardView
 			dashboardStats={dashboardStats}
@@ -886,11 +1208,13 @@ function BackOfficeViewPanel({
 }
 
 function ContractsView({
+	canWrite,
 	contracts,
 	onCreate,
 	onEdit,
 	tenantId,
 }: {
+	canWrite: boolean;
 	contracts: ServiceOpsSnapshot["contracts"];
 	onCreate: () => void;
 	onEdit: (contract: ServiceOpsSnapshot["contracts"][number]) => void;
@@ -899,11 +1223,14 @@ function ContractsView({
 	return (
 		<PageFrame
 			action={
-				<Button className={primaryActionClass} onClick={onCreate}>
-					<PlusIcon className="size-4" />
-					New contract
-				</Button>
+				canWrite ? (
+					<Button className={primaryActionClass} onClick={onCreate}>
+						<PlusIcon className="size-4" />
+						New contract
+					</Button>
+				) : null
 			}
+			description="Track coverage terms, expiry risk, SLA targets, and model entitlement per hospital."
 			eyebrow="C. Contract Management"
 			title="Coverage and expiry controls"
 		>
@@ -921,6 +1248,7 @@ function ContractsView({
 											{contract.status}
 										</StatusPill>
 										<RowActions
+											canWrite={canWrite}
 											entity="contract"
 											id={contract.recordId}
 											onEdit={() => onEdit(contract)}
@@ -929,7 +1257,7 @@ function ContractsView({
 									</div>
 								</div>
 							</CardHeader>
-							<CardContent className="space-y-3 text-sm">
+							<CardContent className="flex flex-col gap-3 text-sm">
 								<Metric label="Contract" value={contract.id} />
 								<Metric label="Type" value={contract.type} />
 								<Metric label="SLA" value={`${contract.slaHours}h response`} />
@@ -966,13 +1294,14 @@ function MapView({
 
 	return (
 		<PageFrame
+			description="Monitor hospital pins, engineer positions, and geofence or SLA alerts in one operational map."
 			eyebrow="F. Location Operations"
 			title="Live map and geofence alerts"
 		>
 			<div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-				<div className="relative min-h-[560px] overflow-hidden rounded-lg border bg-muted/40">
+				<div className="relative min-h-[560px] overflow-hidden rounded-xl border border-border/60 bg-muted/30">
 					<div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(148,163,184,.22)_1px,transparent_1px),linear-gradient(rgba(148,163,184,.22)_1px,transparent_1px)] bg-[size:44px_44px]" />
-					<div className="absolute inset-0 bg-gradient-to-br from-background/70 via-transparent to-primary/10" />
+					<div className="absolute inset-0 bg-gradient-to-br from-background/75 via-transparent to-muted/30" />
 					{hospitals.slice(0, 4).map((hospital, index) => (
 						<div
 							className="absolute"
@@ -991,7 +1320,7 @@ function MapView({
 							<EngineerDot engineer={engineer.name} status={engineer.status} />
 						</div>
 					))}
-					<div className="absolute right-4 bottom-4 rounded-lg border bg-card/95 p-3 text-xs shadow-xs backdrop-blur">
+					<div className="absolute right-4 bottom-4 rounded-lg bg-card/95 p-3 text-xs shadow-xs ring-1 ring-foreground/10 backdrop-blur">
 						<p className="font-medium">Tenant location layer</p>
 						<p className="mt-1 text-muted-foreground">
 							Hospital pins and live engineer GPS dots are shown from the
@@ -1004,7 +1333,7 @@ function MapView({
 						</div>
 					) : null}
 				</div>
-				<div className="space-y-3">
+				<div className="flex flex-col gap-3">
 					{hasLiveAlerts ? (
 						liveAlerts.map((alert) => {
 							const Icon = alertIconByType[alert.type];
@@ -1035,12 +1364,14 @@ function MapView({
 }
 
 function PartsView({
+	canWrite,
 	onCreate,
 	onEdit,
 	parts,
 	shortages,
 	tenantId,
 }: {
+	canWrite: boolean;
 	onCreate: () => void;
 	onEdit: (part: ServiceOpsSnapshot["parts"][number]) => void;
 	parts: ServiceOpsSnapshot["parts"];
@@ -1050,11 +1381,14 @@ function PartsView({
 	return (
 		<PageFrame
 			action={
-				<Button className={primaryActionClass} onClick={onCreate}>
-					<PlusIcon className="size-4" />
-					New part
-				</Button>
+				canWrite ? (
+					<Button className={primaryActionClass} onClick={onCreate}>
+						<PlusIcon className="size-4" />
+						New part
+					</Button>
+				) : null
 			}
+			description="Parts stock levels, minimum thresholds, supplier records, and shortage handoffs."
 			eyebrow="H. Parts & Inventory"
 			title="Inventory and shortage queue"
 		>
@@ -1088,6 +1422,7 @@ function PartsView({
 						],
 						actions: (
 							<RowActions
+								canWrite={canWrite}
 								entity="part"
 								id={part.recordId}
 								onEdit={() => onEdit(part)}
@@ -1102,7 +1437,7 @@ function PartsView({
 					<CardHeader>
 						<CardTitle>Shortage queue</CardTitle>
 					</CardHeader>
-					<CardContent className="space-y-3">
+					<CardContent className="flex flex-col gap-3">
 						{shortages.length > 0 ? (
 							shortages.map((shortage) => (
 								<div
@@ -1139,6 +1474,7 @@ function ReportsView({
 }) {
 	return (
 		<PageFrame
+			description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
 			eyebrow="I. Reports"
 			title="Operational report and job-level cost view"
 		>
@@ -1146,9 +1482,11 @@ function ReportsView({
 				{reportMetrics.length > 0 ? (
 					reportMetrics.map((metric) => (
 						<Card className={panelClass} key={metric.id}>
-							<CardContent className="pt-4">
+							<CardContent className="pt-0">
 								<p className="text-muted-foreground text-xs">{metric.label}</p>
-								<p className="mt-2 font-semibold text-2xl">{metric.value}</p>
+								<p className="mt-2 font-medium text-3xl tracking-tight">
+									{metric.value}
+								</p>
 								<p className="mt-1 text-primary text-xs">{metric.trend}</p>
 							</CardContent>
 						</Card>
@@ -1159,7 +1497,7 @@ function ReportsView({
 					</div>
 				)}
 			</div>
-			<div className="mt-4">
+			<div>
 				<DataTable
 					columns={[
 						"Job",
@@ -1196,6 +1534,7 @@ function ConfigView({
 }) {
 	return (
 		<PageFrame
+			description="Tenant-level controls for operational thresholds, roles, and notification parameters."
 			eyebrow="J. System Configuration"
 			title="Parameters, roles and notifications"
 		>
@@ -1224,13 +1563,13 @@ function ConfigView({
 					<CardHeader>
 						<CardTitle>User roles</CardTitle>
 					</CardHeader>
-					<CardContent className="space-y-3 text-sm">
+					<CardContent className="flex flex-col gap-3 text-sm">
 						{roleLabels.map((role) => (
 							<div
 								className="flex items-center justify-between border-b pb-2 last:border-b-0"
 								key={role}
 							>
-								<span>{role}</span>
+								<span>{roleDisplayNames[role]}</span>
 								<ShieldCheckIcon className="size-4 text-primary" />
 							</div>
 						))}
@@ -1238,6 +1577,202 @@ function ConfigView({
 				</Card>
 			</div>
 		</PageFrame>
+	);
+}
+
+function TenantsView({
+	canManageTenants,
+	currentTenantId,
+	onCreate,
+	onEdit,
+	tenants,
+}: {
+	canManageTenants: boolean;
+	currentTenantId: string;
+	onCreate: () => void;
+	onEdit: (tenantRecord: ServiceOpsSnapshot["tenants"][number]) => void;
+	tenants: ServiceOpsSnapshot["tenants"];
+}) {
+	return (
+		<PageFrame
+			action={
+				canManageTenants ? (
+					<Button className={primaryActionClass} onClick={onCreate}>
+						<PlusIcon className="size-4" />
+						New tenant
+					</Button>
+				) : null
+			}
+			description="Manage SaaS workspaces that isolate data, users, configuration, and service operations."
+			eyebrow="Tenant Administration"
+			title="Tenant management"
+		>
+			<DataTable
+				columns={[
+					"Tenant",
+					"Region",
+					"Release",
+					"Role",
+					"Status",
+					"Members",
+					"Created",
+				]}
+				description="SaaS tenants accessible to the current signed-in user."
+				filterLabels={["Status", "Region"]}
+				rows={tenants.map((tenantRecord) => ({
+					cells: [
+						<div className="min-w-0" key={`${tenantRecord.id}-name`}>
+							<p className="font-medium">{tenantRecord.name}</p>
+							<p className="text-muted-foreground text-xs">{tenantRecord.id}</p>
+						</div>,
+						tenantRecord.region,
+						tenantRecord.release,
+						tenantRecord.role,
+						<StatusPill
+							className={
+								tenantRecord.isActive
+									? "border-emerald-200 bg-emerald-50 text-emerald-700"
+									: "border-zinc-200 bg-zinc-50 text-zinc-600"
+							}
+							key={`${tenantRecord.id}-status`}
+						>
+							{tenantRecord.isActive ? "Active" : "Inactive"}
+						</StatusPill>,
+						tenantRecord.memberCount,
+						tenantRecord.createdAt,
+					],
+					actions: (
+						<RowActions
+							canWrite={canManageTenants}
+							deleteDisabled={
+								tenantRecord.id === currentTenantId ||
+								tenantRecord.id === "platform"
+							}
+							entity="tenant"
+							id={tenantRecord.id}
+							onEdit={() => onEdit(tenantRecord)}
+							tenantId={tenantRecord.id}
+						/>
+					),
+					id: tenantRecord.id,
+					searchText: `${tenantRecord.name} ${tenantRecord.id} ${tenantRecord.region} ${tenantRecord.release}`,
+				}))}
+				title={`${tenants.length} Tenants`}
+			/>
+		</PageFrame>
+	);
+}
+
+function TenantUsersView({
+	canManageTenantUsers,
+	tenantId,
+	users,
+}: {
+	canManageTenantUsers: boolean;
+	tenantId: string;
+	users: ServiceOpsSnapshot["users"];
+}) {
+	const [userDialogState, setUserDialogState] = useState<CrudState | null>(
+		null
+	);
+	const openCreateDialog = () => {
+		setUserDialogState({ entity: "tenantUser", mode: "create" });
+	};
+	const openEditDialog = (tenantUser: ServiceOpsSnapshot["users"][number]) => {
+		setUserDialogState({
+			entity: "tenantUser",
+			mode: "edit",
+			record: tenantUser,
+		});
+	};
+	const userSnapshot = {
+		access: {
+			canManageTenantUsers,
+			canManageTenants: false,
+			canRead: true,
+			canWrite: canManageTenantUsers,
+			role: "tenant_admin" as const,
+		},
+		assets: [],
+		contracts: [],
+		costRecords: [],
+		dashboardStats: [],
+		engineers: [],
+		faultReports: [],
+		hospitals: [],
+		jobs: [],
+		liveAlerts: [],
+		manualAnswers: [],
+		parts: [],
+		products: [],
+		reportMetrics: [],
+		shortages: [],
+		systemParameters: [],
+		tenant: { id: tenantId, name: "", region: "", release: "" },
+		tenants: [],
+		users,
+	} satisfies ServiceOpsSnapshot;
+
+	return (
+		<>
+			<PageFrame
+				action={
+					canManageTenantUsers ? (
+						<Button className={primaryActionClass} onClick={openCreateDialog}>
+							<PlusIcon className="size-4" />
+							New user
+						</Button>
+					) : null
+				}
+				description="Manage users and tenant-scoped roles for this workspace."
+				eyebrow="User Administration"
+				title="Users and permissions"
+			>
+				<DataTable
+					columns={["User", "Email", "Role", "Status", "Created"]}
+					description="Tenant administrators can manage users within their own tenant. Operators can edit tenant data. Observers are read-only."
+					filterLabels={["Role", "Status"]}
+					rows={users.map((tenantUser) => ({
+						cells: [
+							<span className="font-medium" key={`${tenantUser.id}-name`}>
+								{tenantUser.name}
+							</span>,
+							tenantUser.email,
+							roleDisplayNames[tenantUser.role],
+							<StatusPill
+								className={
+									tenantUser.status === "active"
+										? "border-emerald-200 bg-emerald-50 text-emerald-700"
+										: "border-zinc-200 bg-zinc-50 text-zinc-600"
+								}
+								key={`${tenantUser.id}-status`}
+							>
+								{tenantUser.status}
+							</StatusPill>,
+							tenantUser.createdAt,
+						],
+						actions: (
+							<RowActions
+								canWrite={canManageTenantUsers}
+								deleteDisabled={tenantUser.role === "super_admin"}
+								entity="tenantUser"
+								id={tenantUser.id}
+								onEdit={() => openEditDialog(tenantUser)}
+								tenantId={tenantId}
+							/>
+						),
+						id: tenantUser.id,
+						searchText: `${tenantUser.name} ${tenantUser.email} ${tenantUser.role} ${tenantUser.status}`,
+					}))}
+					title={`${users.length} Users`}
+				/>
+			</PageFrame>
+			<CrudDialog
+				data={userSnapshot}
+				onClose={() => setUserDialogState(null)}
+				state={userDialogState}
+			/>
+		</>
 	);
 }
 
@@ -1251,105 +1786,509 @@ function DashboardView({
 	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
 }) {
 	const hasLiveAlerts = liveAlerts.length > 0;
+	const activeJobs = jobs.filter(
+		(job) => job.status !== "Completed" && job.status !== "Cancelled"
+	);
+	const urgentJobs = activeJobs.filter((job) => job.priority === "Urgent");
+	const timelineJobs = jobs.slice(0, 4);
+	const completionGoal = Math.max(jobs.length, 1);
+	const completedJobs = jobs.filter((job) => job.status === "Completed").length;
+	const [activeCategory, setActiveCategory] =
+		useState<DashboardCategory>("overview");
+	const categoryMeta = dashboardCategoryMeta[activeCategory];
+	const handleCategoryChange = (category: DashboardCategory) => {
+		setActiveCategory(category);
+
+		const dashboardUrl = `${window.location.pathname}${window.location.search}#dashboard`;
+
+		if (window.location.hash !== "#dashboard") {
+			window.history.replaceState(
+				{ backOfficeView: "dashboard", dashboardCategory: category },
+				"",
+				dashboardUrl
+			);
+		}
+	};
 
 	return (
-		<PageFrame eyebrow="Operational Command" title="Today at a glance">
-			<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+		<PageFrame
+			description={categoryMeta.description}
+			eyebrow={categoryMeta.eyebrow}
+			title={categoryMeta.title}
+		>
+			<DashboardCategoryTabs
+				activeCategory={activeCategory}
+				onCategoryChange={handleCategoryChange}
+			/>
+
+			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 				{dashboardStats.map((stat) => (
 					<DashboardStatCard key={stat.id} stat={stat} />
 				))}
 			</div>
-			<div className="mt-3 grid gap-3 xl:grid-cols-[1fr_360px]">
-				<Card className={panelClass}>
-					<CardHeader className="border-b pb-3">
-						<CardTitle>Live exception queue</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col gap-2 pt-0">
-						{hasLiveAlerts ? (
-							liveAlerts.map((alert) => {
-								const Icon = alertIconByType[alert.type];
 
-								return (
-									<div
-										className="flex gap-3 border-b py-3 last:border-b-0"
-										key={alert.id}
-									>
-										<span className={iconTileClass}>
-											<Icon className="size-4" />
-										</span>
-										<div>
-											<p className="font-medium text-sm">{alert.title}</p>
-											<p className="mt-0.5 text-muted-foreground text-xs">
-												{alert.message}
-											</p>
-										</div>
-									</div>
-								);
-							})
-						) : (
-							<EmptyInline message="No live exceptions." />
-						)}
-					</CardContent>
-				</Card>
-				<Card className={panelClass}>
-					<CardHeader className="border-b pb-3">
-						<CardTitle>Release scope coverage</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col gap-3 pt-0">
-						{workflowCards.map((card) => {
-							const Icon = card.icon;
+			{activeCategory === "overview" ? (
+				<DashboardOverviewPanel
+					activeJobsCount={activeJobs.length}
+					completedJobs={completedJobs}
+					completionGoal={completionGoal}
+					jobs={jobs}
+					timelineJobs={timelineJobs}
+					urgentJobsCount={urgentJobs.length}
+				/>
+			) : null}
+			{activeCategory === "analytics" ? (
+				<DashboardAnalyticsPanel
+					activeJobsCount={activeJobs.length}
+					completedJobs={completedJobs}
+					completionGoal={completionGoal}
+					jobs={jobs}
+					urgentJobsCount={urgentJobs.length}
+				/>
+			) : null}
+			{activeCategory === "reports" ? (
+				<DashboardReportsPanel jobs={jobs} />
+			) : null}
+			{activeCategory === "notifications" ? (
+				<DashboardNotificationsPanel
+					hasLiveAlerts={hasLiveAlerts}
+					liveAlerts={liveAlerts}
+					timelineJobs={timelineJobs}
+				/>
+			) : null}
+		</PageFrame>
+	);
+}
 
-							return (
-								<div className="flex gap-3" key={card.id}>
-									<span className={iconTileClass}>
-										<Icon className="size-4" />
-									</span>
-									<div>
-										<p className="font-medium text-sm">{card.title}</p>
-										<p className="text-muted-foreground text-xs leading-relaxed">
-											{card.detail}
-										</p>
-									</div>
-								</div>
-							);
-						})}
-					</CardContent>
-				</Card>
+function DashboardCategoryTabs({
+	activeCategory,
+	onCategoryChange,
+}: {
+	activeCategory: DashboardCategory;
+	onCategoryChange: (category: DashboardCategory) => void;
+}) {
+	return (
+		<div className="max-w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+			<div
+				aria-label="Dashboard category"
+				className="inline-flex rounded-xl bg-muted p-1"
+				role="tablist"
+			>
+				{dashboardCategoryItems.map((item) => {
+					const isActive = activeCategory === item.id;
+
+					return (
+						<button
+							aria-selected={isActive}
+							className={cn(
+								"h-10 shrink-0 cursor-pointer rounded-lg px-4 font-semibold text-sm transition-colors",
+								isActive
+									? "bg-background text-foreground shadow-xs ring-1 ring-foreground/10"
+									: "text-muted-foreground hover:text-foreground"
+							)}
+							key={item.id}
+							onClick={() => onCategoryChange(item.id)}
+							role="tab"
+							type="button"
+						>
+							{item.label}
+						</button>
+					);
+				})}
 			</div>
-			<div className="mt-3">
-				<DataTable
-					columns={[
-						"Job",
-						"Hospital",
-						"Asset",
-						"Engineer",
-						"Status",
-						"Schedule",
-					]}
-					description="Recent field-service work with hospital, assigned engineer, live status, and schedule."
-					filterLabels={["Status", "Engineer"]}
-					rows={jobs.slice(0, 5).map((job) => ({
-						cells: [
-							<span className="font-medium text-primary" key={`${job.id}-id`}>
-								{job.id}
-							</span>,
-							job.hospital,
-							job.asset,
-							job.engineer,
-							<StatusPill
-								className={statusStyles[job.status]}
-								key={`${job.id}-status`}
-							>
-								{job.status}
-							</StatusPill>,
-							job.scheduledFor,
-						],
-						id: `${job.id}-dashboard`,
-					}))}
-					title="Today jobs"
+		</div>
+	);
+}
+
+function DashboardOverviewPanel({
+	activeJobsCount,
+	completedJobs,
+	completionGoal,
+	jobs,
+	timelineJobs,
+	urgentJobsCount,
+}: {
+	activeJobsCount: number;
+	completedJobs: number;
+	completionGoal: number;
+	jobs: Job[];
+	timelineJobs: Job[];
+	urgentJobsCount: number;
+}) {
+	return (
+		<>
+			<DashboardActivityCard
+				activeJobsCount={activeJobsCount}
+				completedJobs={completedJobs}
+				completionGoal={completionGoal}
+				jobs={jobs}
+				urgentJobsCount={urgentJobsCount}
+			/>
+			<div className="grid gap-4 xl:grid-cols-12">
+				<DashboardScheduleCard
+					className="xl:col-span-8"
+					timelineJobs={timelineJobs}
+				/>
+				<DashboardResolutionCard
+					className="xl:col-span-4"
+					completedJobs={completedJobs}
+					completionGoal={completionGoal}
 				/>
 			</div>
-		</PageFrame>
+		</>
+	);
+}
+
+function DashboardAnalyticsPanel({
+	activeJobsCount,
+	completedJobs,
+	completionGoal,
+	jobs,
+	urgentJobsCount,
+}: {
+	activeJobsCount: number;
+	completedJobs: number;
+	completionGoal: number;
+	jobs: Job[];
+	urgentJobsCount: number;
+}) {
+	return (
+		<div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+			<DashboardActivityCard
+				activeJobsCount={activeJobsCount}
+				completedJobs={completedJobs}
+				completionGoal={completionGoal}
+				jobs={jobs}
+				urgentJobsCount={urgentJobsCount}
+			/>
+			<div className="flex flex-col gap-4">
+				<DashboardResolutionCard
+					completedJobs={completedJobs}
+					completionGoal={completionGoal}
+				/>
+				<Card className={panelClass}>
+					<CardHeader>
+						<CardTitle>Workload Mix</CardTitle>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-3">
+						<Metric label="Active jobs" value={activeJobsCount} />
+						<Metric label="Urgent jobs" value={urgentJobsCount} />
+						<Metric label="Closed jobs" value={completedJobs} />
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	);
+}
+
+function DashboardReportsPanel({ jobs }: { jobs: Job[] }) {
+	return (
+		<div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+			<DataTable
+				columns={["Job", "Hospital", "Asset", "Engineer", "Status", "Schedule"]}
+				description="Recent field-service work with hospital, assigned engineer, live status, and schedule."
+				filterLabels={["Status", "Engineer"]}
+				rows={jobs.slice(0, 5).map((job) => ({
+					cells: [
+						<span className="font-medium text-primary" key={`${job.id}-id`}>
+							{job.id}
+						</span>,
+						job.hospital,
+						job.asset,
+						job.engineer,
+						<StatusPill
+							className={statusStyles[job.status]}
+							key={`${job.id}-status`}
+						>
+							{job.status}
+						</StatusPill>,
+						job.scheduledFor,
+					],
+					id: `${job.id}-dashboard`,
+				}))}
+				title="Today jobs"
+			/>
+			<DashboardScopeCard />
+		</div>
+	);
+}
+
+function DashboardNotificationsPanel({
+	hasLiveAlerts,
+	liveAlerts,
+	timelineJobs,
+}: {
+	hasLiveAlerts: boolean;
+	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
+	timelineJobs: Job[];
+}) {
+	return (
+		<div className="grid gap-4 xl:grid-cols-[1fr_420px]">
+			<DashboardAlertQueueCard
+				hasLiveAlerts={hasLiveAlerts}
+				liveAlerts={liveAlerts}
+			/>
+			<DashboardScheduleCard timelineJobs={timelineJobs} />
+		</div>
+	);
+}
+
+function DashboardActivityCard({
+	activeJobsCount,
+	completedJobs,
+	completionGoal,
+	jobs,
+	urgentJobsCount,
+}: {
+	activeJobsCount: number;
+	completedJobs: number;
+	completionGoal: number;
+	jobs: Job[];
+	urgentJobsCount: number;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Service Activity Flow</CardTitle>
+				<CardAction>
+					<Button className={compactButtonClass} size="sm" variant="outline">
+						<CalendarDaysIcon data-icon="inline-start" />
+						Today
+					</Button>
+				</CardAction>
+			</CardHeader>
+			<CardContent>
+				<div className="grid gap-5 lg:grid-cols-12">
+					<div className="flex min-h-72 items-end gap-2 rounded-lg bg-muted/20 p-3 lg:col-span-8">
+						{buildJobActivityBars(jobs).map((bar) => (
+							<div
+								className="flex h-full flex-1 flex-col justify-end gap-2"
+								key={bar.id}
+							>
+								<div
+									className="rounded-t-lg border border-chart-2/45 bg-[repeating-linear-gradient(135deg,var(--color-chart-2)_0_1px,transparent_1px_5px)] bg-chart-2/10"
+									style={{ height: `${bar.height}%` }}
+									title={`${bar.label}: ${bar.count} jobs`}
+								/>
+								<span className="text-center text-muted-foreground text-xs">
+									{bar.label}
+								</span>
+							</div>
+						))}
+					</div>
+					<div className="flex flex-col gap-5 lg:col-span-4">
+						<div className="flex flex-col gap-1">
+							<div className="font-medium text-4xl tabular-nums leading-none">
+								{activeJobsCount}{" "}
+								<span className="font-normal text-lg text-muted-foreground">
+									open
+								</span>
+							</div>
+							<p className="text-muted-foreground text-sm">
+								Active field-service jobs currently moving through dispatch,
+								travel, on-site work, and close-out.
+							</p>
+						</div>
+						<div className="flex flex-col gap-3 rounded-lg border border-border/60 p-3">
+							<div className="text-[11px] text-muted-foreground uppercase tracking-widest">
+								Urgent Workload
+							</div>
+							<div className="font-medium text-2xl tabular-nums leading-none">
+								{urgentJobsCount}{" "}
+								<span className="font-normal text-muted-foreground text-sm">
+									urgent jobs
+								</span>
+							</div>
+							<SegmentedProgress
+								active={urgentJobsCount}
+								total={completionGoal}
+							/>
+							<div className="flex items-center justify-between text-xs">
+								<span className="font-medium tabular-nums">
+									{completedJobs} completed
+								</span>
+								<span className="text-muted-foreground tabular-nums">
+									{completionGoal} total
+								</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function DashboardScheduleCard({
+	className,
+	timelineJobs,
+}: {
+	className?: string;
+	timelineJobs: Job[];
+}) {
+	return (
+		<Card className={className}>
+			<CardHeader>
+				<CardTitle>Upcoming Service Windows</CardTitle>
+				<CardAction>
+					<Button className={compactButtonClass} size="sm" variant="outline">
+						<CalendarDaysIcon data-icon="inline-start" />
+						View schedule
+					</Button>
+				</CardAction>
+			</CardHeader>
+			<CardContent>
+				<div className="flex flex-col gap-3">
+					<div className="grid grid-cols-4 gap-2 text-muted-foreground text-xs tabular-nums">
+						{timelineJobs.map((job) => (
+							<div className="flex flex-col items-center gap-1" key={job.id}>
+								<span>{job.scheduledFor.split(",").at(0) ?? "Today"}</span>
+								<span className="h-2 w-px bg-border" />
+							</div>
+						))}
+					</div>
+					<div className="relative min-h-20 overflow-hidden rounded-lg bg-muted/25">
+						<div className="absolute inset-x-4 top-1/2 h-px bg-border" />
+						{timelineJobs.map((job, index) => (
+							<div
+								className={cn(
+									"absolute top-4 bottom-4 flex min-w-40 items-center rounded-lg px-2 text-xs shadow-sm",
+									index === 0
+										? "bg-primary text-primary-foreground"
+										: "border border-border/70 bg-card"
+								)}
+								key={job.id}
+								style={{
+									left: `${Math.min(8 + index * 22, 70)}%`,
+									width: index === 0 ? "32%" : "24%",
+								}}
+							>
+								<div className="min-w-0">
+									<div className="truncate font-medium">{job.id}</div>
+									<div
+										className={cn(
+											"truncate text-[10px]",
+											index === 0
+												? "text-primary-foreground/75"
+												: "text-muted-foreground"
+										)}
+									>
+										{job.hospital}
+									</div>
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function DashboardResolutionCard({
+	className,
+	completedJobs,
+	completionGoal,
+}: {
+	className?: string;
+	completedJobs: number;
+	completionGoal: number;
+}) {
+	return (
+		<Card className={className}>
+			<CardHeader>
+				<CardTitle>Resolution Goal</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				<div className="flex items-end justify-between gap-3">
+					<div className="font-medium text-2xl tabular-nums leading-none">
+						{completedJobs}{" "}
+						<span className="font-normal text-base text-muted-foreground">
+							closed
+						</span>
+					</div>
+					<div className="text-muted-foreground text-sm tabular-nums">
+						{completionGoal} target
+					</div>
+				</div>
+				<SegmentedProgress active={completedJobs} total={completionGoal} />
+				<p className="text-muted-foreground text-sm">
+					{Math.round((completedJobs / completionGoal) * 100)}% of current
+					service jobs are completed.
+				</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+function DashboardAlertQueueCard({
+	hasLiveAlerts,
+	liveAlerts,
+}: {
+	hasLiveAlerts: boolean;
+	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Live exception queue</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-1">
+				{hasLiveAlerts ? (
+					liveAlerts.map((alert) => {
+						const Icon = alertIconByType[alert.type];
+
+						return (
+							<div
+								className="flex gap-3 border-border/50 border-b py-3 last:border-b-0"
+								key={alert.id}
+							>
+								<span className={iconTileClass}>
+									<Icon className="size-4" />
+								</span>
+								<div>
+									<p className="font-medium text-sm">{alert.title}</p>
+									<p className="mt-0.5 text-muted-foreground text-xs leading-relaxed">
+										{alert.message}
+									</p>
+								</div>
+							</div>
+						);
+					})
+				) : (
+					<EmptyInline message="No live exceptions." />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function DashboardScopeCard() {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Release scope coverage</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{workflowCards.map((card) => {
+					const Icon = card.icon;
+
+					return (
+						<div className="flex gap-3" key={card.id}>
+							<span className={iconTileClass}>
+								<Icon className="size-4" />
+							</span>
+							<div>
+								<p className="font-medium text-sm">{card.title}</p>
+								<p className="text-muted-foreground text-xs leading-relaxed">
+									{card.detail}
+								</p>
+							</div>
+						</div>
+					);
+				})}
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -1398,6 +2337,10 @@ function CrudDialog({
 		state.mode === "create"
 			? `New ${entityLabels[state.entity]}`
 			: `Edit ${entityLabels[state.entity]}`;
+	const description =
+		state.entity === "tenant"
+			? "Creates or updates an isolated SaaS workspace."
+			: "Saved to the current tenant only.";
 	const descriptionId = "crud-dialog-description";
 	const titleId = "crud-dialog-title";
 
@@ -1406,30 +2349,33 @@ function CrudDialog({
 			aria-describedby={descriptionId}
 			aria-labelledby={titleId}
 			aria-modal="true"
-			className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 px-4 py-8 backdrop-blur-sm"
+			className="fixed inset-0 z-50 flex justify-end bg-foreground/12 backdrop-blur-[2px]"
 			role="dialog"
 		>
-			<div className="w-full max-w-2xl rounded-lg border bg-card shadow-lg">
-				<div className="flex items-start justify-between gap-4 border-b px-5 py-4">
-					<div>
-						<p className="font-semibold text-lg" id={titleId}>
+			<div className="flex h-full w-full max-w-[560px] flex-col border-l bg-card shadow-2xl">
+				<div className="flex min-h-16 items-center justify-between gap-4 border-b px-5">
+					<div className="min-w-0">
+						<p
+							className="truncate font-semibold text-base leading-none"
+							id={titleId}
+						>
 							{title}
 						</p>
 						<p
-							className="mt-1 text-muted-foreground text-sm"
+							className="mt-1 truncate text-muted-foreground text-xs"
 							id={descriptionId}
 						>
-							Changes are saved to the current tenant only.
+							{description}
 						</p>
 					</div>
 					<Button
 						aria-label="Close dialog"
 						className={compactButtonClass}
 						onClick={onClose}
-						size="sm"
+						size="icon-sm"
 						variant="ghost"
 					>
-						Close
+						<XIcon className="size-4" />
 					</Button>
 				</div>
 				<CrudForm
@@ -1455,7 +2401,10 @@ function CrudForm({
 	const tenantId = data.tenant.id;
 	const mutations = useEntityMutations(tenantId, onClose);
 	const fields = getFieldConfigs(state.entity, data);
-	const defaults = getFormDefaults(state.entity, state.record);
+	const defaults = useMemo(
+		() => getFormDefaults(state.entity, state.record),
+		[state.entity, state.record]
+	);
 	const isSaving = isEntityMutationPending(mutations);
 
 	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -1471,10 +2420,10 @@ function CrudForm({
 
 	return (
 		<form
-			className="flex max-h-[calc(100vh-10rem)] flex-col"
+			className="flex min-h-0 flex-1 flex-col bg-muted/20"
 			onSubmit={handleSubmit}
 		>
-			<div className="grid gap-4 overflow-y-auto p-5 md:grid-cols-2">
+			<div className="grid flex-1 auto-rows-min gap-4 overflow-y-auto px-5 py-5 md:grid-cols-2">
 				{fields.map((field) => (
 					<FormField
 						defaultValue={defaults[field.name]}
@@ -1483,24 +2432,29 @@ function CrudForm({
 					/>
 				))}
 			</div>
-			<div className="flex justify-end gap-2 border-t p-5">
-				<Button
-					className={compactButtonClass}
-					disabled={isSaving}
-					onClick={onClose}
-					type="button"
-					variant="outline"
-				>
-					Cancel
-				</Button>
-				<Button
-					className={primaryActionClass}
-					disabled={isSaving}
-					type="submit"
-				>
-					{isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-					{isSaving ? "Saving" : "Save"}
-				</Button>
+			<div className="flex flex-col items-stretch gap-3 border-t bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+				<p className="hidden text-muted-foreground text-xs sm:block">
+					Required fields are marked by the browser.
+				</p>
+				<div className="flex shrink-0 justify-end gap-2">
+					<Button
+						className={compactButtonClass}
+						disabled={isSaving}
+						onClick={onClose}
+						type="button"
+						variant="outline"
+					>
+						Cancel
+					</Button>
+					<Button
+						className={primaryActionClass}
+						disabled={isSaving}
+						type="submit"
+					>
+						{isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+						{isSaving ? "Saving" : "Save"}
+					</Button>
+				</div>
 			</div>
 		</form>
 	);
@@ -1516,63 +2470,71 @@ function FormField({
 	defaultValue,
 	field,
 }: {
-	defaultValue?: boolean | number | string | string[];
+	defaultValue?: FormDefaultValue;
 	field: FieldConfig;
 }) {
 	if (field.type === "checkbox") {
 		return (
-			<label className="flex items-center gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+			<label className="flex min-h-9 items-center gap-3 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-xs transition-colors hover:bg-muted/30">
 				<input
+					className="size-4 accent-primary"
 					defaultChecked={Boolean(defaultValue)}
 					name={field.name}
 					type="checkbox"
 				/>
-				<span>{field.label}</span>
+				<span className="font-medium text-xs">{field.label}</span>
 			</label>
 		);
 	}
 
 	if (field.type === "select") {
-		const defaultValues = Array.isArray(defaultValue)
-			? defaultValue.map(String)
-			: undefined;
+		const selectDefaultValue = getSelectDefaultValue(
+			defaultValue,
+			field.multiple
+		);
 
 		return (
-			<div className="flex flex-col gap-2">
-				<Label htmlFor={field.name}>{field.label}</Label>
-				<select
-					className={cn(
-						"w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring/50",
-						field.multiple ? "min-h-28 py-2" : "h-8"
+			<div className={formFieldClass}>
+				<Label className={formLabelClass} htmlFor={field.name}>
+					{field.label}
+				</Label>
+				<div className="relative">
+					<select
+						className={cn(
+							formControlClass,
+							"appearance-none pr-9",
+							field.multiple ? "min-h-28 py-2" : ""
+						)}
+						defaultValue={selectDefaultValue}
+						id={field.name}
+						multiple={field.multiple}
+						name={field.name}
+						required={field.required}
+					>
+						{field.multiple ? null : <option value="">Select...</option>}
+						{field.options?.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.label}
+							</option>
+						))}
+					</select>
+					{field.multiple ? null : (
+						<ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					)}
-					defaultValue={defaultValues ?? String(defaultValue ?? "")}
-					id={field.name}
-					multiple={field.multiple}
-					name={field.name}
-					required={field.required}
-				>
-					{field.multiple ? null : <option value="">Select...</option>}
-					{field.options?.map((option) => (
-						<option key={option.value} value={option.value}>
-							{option.label}
-						</option>
-					))}
-				</select>
+				</div>
 			</div>
 		);
 	}
 
 	if (field.type === "textarea") {
 		return (
-			<div className="flex flex-col gap-2 md:col-span-2">
-				<Label htmlFor={field.name}>{field.label}</Label>
+			<div className={`${formFieldClass} md:col-span-2`}>
+				<Label className={formLabelClass} htmlFor={field.name}>
+					{field.label}
+				</Label>
 				<textarea
-					className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring/50"
-					defaultValue={
-						Array.isArray(defaultValue) || typeof defaultValue === "boolean"
-							? ""
-							: (defaultValue ?? "")
-					}
+					className={cn(formControlClass, "min-h-28 resize-y py-2")}
+					defaultValue={getInputDefaultValue(defaultValue)}
 					id={field.name}
 					name={field.name}
 					required={field.required}
@@ -1582,16 +2544,16 @@ function FormField({
 	}
 
 	return (
-		<div className="flex flex-col gap-2">
-			<Label htmlFor={field.name}>{field.label}</Label>
+		<div className={formFieldClass}>
+			<Label className={formLabelClass} htmlFor={field.name}>
+				{field.label}
+			</Label>
 			<Input
-				className="rounded-md"
-				defaultValue={
-					Array.isArray(defaultValue) || typeof defaultValue === "boolean"
-						? undefined
-						: (defaultValue ?? "")
-				}
+				className={formControlClass}
+				defaultValue={getInputDefaultValue(defaultValue)}
 				id={field.name}
+				max={field.max}
+				min={field.min}
 				name={field.name}
 				required={field.required}
 				step={field.type === "number" ? "any" : undefined}
@@ -1601,77 +2563,142 @@ function FormField({
 	);
 }
 
+function getInputDefaultValue(defaultValue: FormDefaultValue | undefined) {
+	if (Array.isArray(defaultValue) || typeof defaultValue === "boolean") {
+		return "";
+	}
+
+	return String(defaultValue ?? "");
+}
+
+function getSelectDefaultValue(
+	defaultValue: FormDefaultValue | undefined,
+	multiple?: boolean
+) {
+	if (multiple) {
+		return Array.isArray(defaultValue) ? defaultValue.map(String) : [];
+	}
+
+	return getInputDefaultValue(defaultValue);
+}
+
 function useEntityMutations(tenantId: string, onDone: () => void) {
 	const assetCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Asset created.",
+		"asset",
 		onDone
 	);
 	const assetUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Asset updated.",
+		"asset",
 		onDone
 	);
 	const contractCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Contract created.",
+		"contract",
 		onDone
 	);
 	const contractUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Contract updated.",
+		"contract",
 		onDone
 	);
 	const engineerCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Engineer created.",
+		"engineer",
 		onDone
 	);
 	const engineerUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Engineer updated.",
+		"engineer",
 		onDone
 	);
 	const faultCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Fault report created.",
+		"fault report",
 		onDone
 	);
 	const faultUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Fault report updated.",
+		"fault report",
 		onDone
 	);
 	const hospitalCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Hospital created.",
+		"hospital",
 		onDone
 	);
 	const hospitalUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Hospital updated.",
+		"hospital",
 		onDone
 	);
-	const jobCreateSuccess = useMutationSuccess(tenantId, "Job created.", onDone);
-	const jobUpdateSuccess = useMutationSuccess(tenantId, "Job updated.", onDone);
+	const jobCreateSuccess = useMutationSuccess(
+		tenantId,
+		"Job created.",
+		"job",
+		onDone
+	);
+	const jobUpdateSuccess = useMutationSuccess(
+		tenantId,
+		"Job updated.",
+		"job",
+		onDone
+	);
 	const partCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Part created.",
+		"part",
 		onDone
 	);
 	const partUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Part updated.",
+		"part",
 		onDone
 	);
 	const productCreateSuccess = useMutationSuccess(
 		tenantId,
 		"Product created.",
+		"product",
 		onDone
 	);
 	const productUpdateSuccess = useMutationSuccess(
 		tenantId,
 		"Product updated.",
+		"product",
+		onDone
+	);
+	const tenantCreateSuccess = useTenantMutationSuccess(
+		"Tenant created.",
+		"tenant",
+		onDone
+	);
+	const tenantUpdateSuccess = useTenantMutationSuccess(
+		"Tenant updated.",
+		"tenant",
+		onDone
+	);
+	const tenantUserCreateSuccess = useMutationSuccess(
+		tenantId,
+		"User created.",
+		"user",
+		onDone
+	);
+	const tenantUserUpdateSuccess = useMutationSuccess(
+		tenantId,
+		"User updated.",
+		"user",
 		onDone
 	);
 
@@ -1700,6 +2727,12 @@ function useEntityMutations(tenantId: string, onDone: () => void) {
 		createProduct: useMutation(
 			trpc.serviceOps.createProduct.mutationOptions(productCreateSuccess)
 		),
+		createTenant: useMutation(
+			trpc.serviceOps.createTenant.mutationOptions(tenantCreateSuccess)
+		),
+		createTenantUser: useMutation(
+			trpc.serviceOps.createTenantUser.mutationOptions(tenantUserCreateSuccess)
+		),
 		updateAsset: useMutation(
 			trpc.serviceOps.updateAsset.mutationOptions(assetUpdateSuccess)
 		),
@@ -1724,6 +2757,12 @@ function useEntityMutations(tenantId: string, onDone: () => void) {
 		updateProduct: useMutation(
 			trpc.serviceOps.updateProduct.mutationOptions(productUpdateSuccess)
 		),
+		updateTenant: useMutation(
+			trpc.serviceOps.updateTenant.mutationOptions(tenantUpdateSuccess)
+		),
+		updateTenantUser: useMutation(
+			trpc.serviceOps.updateTenantUser.mutationOptions(tenantUserUpdateSuccess)
+		),
 	};
 }
 
@@ -1747,6 +2786,8 @@ function submitCrudForm({
 		job: submitJobForm,
 		part: submitPartForm,
 		product: submitProductForm,
+		tenant: submitTenantForm,
+		tenantUser: submitTenantUserForm,
 	} as const;
 
 	submitters[state.entity]({ formData, mutations, state, tenantId });
@@ -1875,12 +2916,48 @@ function submitProductForm({
 	mutations.updateProduct.mutate({ data, id: getUpdateId(state), tenantId });
 }
 
+function submitTenantForm({
+	formData,
+	mutations,
+	state,
+	tenantId,
+}: SubmitFormArgs) {
+	const data = buildTenantPayload(formData);
+	if (state.mode === "create") {
+		mutations.createTenant.mutate({ data });
+		return;
+	}
+	mutations.updateTenant.mutate({ data, id: getUpdateId(state), tenantId });
+}
+
+function submitTenantUserForm({
+	formData,
+	mutations,
+	state,
+	tenantId,
+}: SubmitFormArgs) {
+	const data = buildTenantUserPayload(formData);
+	if (state.mode === "create") {
+		mutations.createTenantUser.mutate({ data, tenantId });
+		return;
+	}
+	mutations.updateTenantUser.mutate({
+		data,
+		id: getUpdateId(state),
+		tenantId,
+	});
+}
+
 function RowActions({
+	canWrite,
+	deleteDisabled,
 	entity,
 	id,
 	onEdit,
 	tenantId,
 }: {
+	canWrite: boolean;
+	deleteDisabled?: boolean;
 	entity: CrudEntity;
 	id: string;
 	onEdit: () => void;
@@ -1906,6 +2983,10 @@ function RowActions({
 		deleteMutation.mutate({ id, tenantId });
 	};
 
+	if (!canWrite) {
+		return null;
+	}
+
 	return (
 		<div className="inline-flex items-center justify-end gap-1">
 			<Button
@@ -1923,7 +3004,7 @@ function RowActions({
 					compactButtonClass,
 					isConfirmingDelete ? "w-auto px-2" : ""
 				)}
-				disabled={isDeleting}
+				disabled={deleteDisabled || isDeleting}
 				onClick={handleDelete}
 				onMouseLeave={() => setIsConfirmingDelete(false)}
 				size={isConfirmingDelete ? "sm" : "icon-sm"}
@@ -1938,13 +3019,32 @@ function RowActions({
 function useMutationSuccess(
 	tenantId: string,
 	label: string,
+	errorLabel = "record",
+	onDone?: () => void
+) {
+	return useMutationResult(tenantId, label, errorLabel, "save", onDone);
+}
+
+function useMutationResult(
+	tenantId: string,
+	label: string,
+	errorLabel: string,
+	errorAction: "delete" | "save",
 	onDone?: () => void
 ) {
 	const queryClient = useQueryClient();
 
 	return {
 		onError(error: { message?: string }) {
-			toast.error(error.message ?? "Request failed.");
+			const businessError = getServiceOpsMutationError({
+				action: errorAction,
+				entityLabel: errorLabel,
+				message: error.message,
+			});
+
+			toast.error(businessError.title, {
+				description: businessError.description,
+			});
 		},
 		onSuccess() {
 			toast.success(label);
@@ -1958,11 +3058,60 @@ function useMutationSuccess(
 	};
 }
 
+function useTenantMutationSuccess(
+	label: string,
+	errorLabel = "tenant",
+	onDone?: () => void
+) {
+	return useTenantMutationResult(label, errorLabel, "save", onDone);
+}
+
+function useTenantMutationResult(
+	label: string,
+	errorLabel: string,
+	errorAction: "delete" | "save",
+	onDone?: () => void
+) {
+	const queryClient = useQueryClient();
+
+	return {
+		onError(error: { message?: string }) {
+			const businessError = getServiceOpsMutationError({
+				action: errorAction,
+				entityLabel: errorLabel,
+				message: error.message,
+			});
+
+			toast.error(businessError.title, {
+				description: businessError.description,
+			});
+		},
+		onSuccess() {
+			toast.success(label);
+			onDone?.();
+			queryClient
+				.invalidateQueries(trpc.serviceOps.snapshot.queryFilter())
+				.catch(() => {
+					toast.error("Unable to refresh tenant data.");
+				});
+		},
+	};
+}
+
 function useDeleteMutation(entity: CrudEntity, tenantId: string) {
-	const successOptions = useMutationSuccess(
+	const entityDeleteSuccess = useMutationResult(
 		tenantId,
-		`${entityLabels[entity]} deleted.`
+		`${entityLabels[entity]} deleted.`,
+		entityLabels[entity],
+		"delete"
 	);
+	const tenantDeleteSuccess = useTenantMutationResult(
+		`${entityLabels[entity]} deleted.`,
+		entityLabels[entity],
+		"delete"
+	);
+	const successOptions =
+		entity === "tenant" ? tenantDeleteSuccess : entityDeleteSuccess;
 	const mutations = {
 		asset: useMutation(
 			trpc.serviceOps.deleteAsset.mutationOptions(successOptions)
@@ -1986,6 +3135,12 @@ function useDeleteMutation(entity: CrudEntity, tenantId: string) {
 		product: useMutation(
 			trpc.serviceOps.deleteProduct.mutationOptions(successOptions)
 		),
+		tenant: useMutation(
+			trpc.serviceOps.deleteTenant.mutationOptions(successOptions)
+		),
+		tenantUser: useMutation(
+			trpc.serviceOps.deleteTenantUser.mutationOptions(successOptions)
+		),
 	};
 
 	return mutations[entity];
@@ -1994,30 +3149,45 @@ function useDeleteMutation(entity: CrudEntity, tenantId: string) {
 function PageFrame({
 	action,
 	children,
+	description,
 	eyebrow,
 	title,
 }: {
 	action?: ReactNode;
 	children: ReactNode;
+	description?: string;
 	eyebrow: string;
 	title: string;
 }) {
 	return (
 		<div className="mx-auto flex max-w-[1320px] flex-col gap-4 md:gap-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-				<PageHeader eyebrow={eyebrow} title={title} />
-				{action}
+			<div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+				<PageHeader description={description} eyebrow={eyebrow} title={title} />
+				{action ? <div className="flex shrink-0">{action}</div> : null}
 			</div>
 			{children}
 		</div>
 	);
 }
 
-function PageHeader({ eyebrow, title }: { eyebrow: string; title: string }) {
+function PageHeader({
+	description,
+	eyebrow,
+	title,
+}: {
+	description?: string;
+	eyebrow: string;
+	title: string;
+}) {
 	return (
-		<div>
+		<div className="max-w-3xl">
 			<p className="font-medium text-muted-foreground text-xs">{eyebrow}</p>
-			<h2 className="mt-1 font-semibold text-2xl">{title}</h2>
+			<h2 className="mt-1 font-medium text-3xl tracking-tight">{title}</h2>
+			{description ? (
+				<p className="mt-1 text-muted-foreground text-sm leading-relaxed">
+					{description}
+				</p>
+			) : null}
 		</div>
 	);
 }
@@ -2031,14 +3201,14 @@ function StatusPill({
 }) {
 	return (
 		<span
-			className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium text-xs ${className}`}
+			className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium text-xs ${className}`}
 		>
 			{children}
 		</span>
 	);
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value }: { label: string; value: ReactNode }) {
 	return (
 		<div className={`${mutedPanelClass} p-3`}>
 			<p className="text-muted-foreground text-xs">{label}</p>
@@ -2053,22 +3223,83 @@ function DashboardStatCard({
 	stat: ServiceOpsSnapshot["dashboardStats"][number];
 }) {
 	return (
-		<Card className={`${panelClass} bg-gradient-to-t from-primary/5 to-card`}>
-			<CardContent>
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle className="text-muted-foreground text-sm">
+					{stat.label}
+				</CardTitle>
+				<CardAction>
+					<ArrowUpRightIcon className="size-4 text-muted-foreground" />
+				</CardAction>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-2">
 				<div className="flex items-start justify-between gap-3">
 					<div>
-						<p className="text-muted-foreground text-xs">{stat.label}</p>
-						<p className="mt-2 font-semibold text-2xl">{stat.value}</p>
+						<p className="font-medium text-3xl leading-none tracking-tight">
+							{stat.value}
+						</p>
 					</div>
-					<span className={iconTileClass}>
-						<TrendingUpIcon className="size-4" />
-					</span>
+					<StatusPill className="border-green-200 bg-green-500/10 text-green-700">
+						<TrendingUpIcon className="size-3" />
+						Live
+					</StatusPill>
 				</div>
-				<p className="mt-3 border-t pt-3 text-muted-foreground text-xs">
-					{stat.meta}
-				</p>
+				<p className="text-sm">{stat.meta}</p>
 			</CardContent>
 		</Card>
+	);
+}
+
+function buildJobActivityBars(jobs: Job[]) {
+	const activityLabels = ["Created", "Assigned", "On-site", "Closed"] as const;
+	const counts = {
+		Assigned: jobs.filter((job) => job.status === "Assigned").length,
+		Closed: jobs.filter((job) => job.status === "Completed").length,
+		Created: jobs.filter((job) => job.status === "Created").length,
+		"On-site": jobs.filter(
+			(job) =>
+				job.status === "In Progress" ||
+				job.status === "Paused" ||
+				job.status === "Timer Anomaly"
+		).length,
+	};
+	const maxCount = Math.max(...Object.values(counts), 1);
+
+	return activityLabels.map((label) => ({
+		count: counts[label],
+		height: Math.max(18, Math.round((counts[label] / maxCount) * 100)),
+		id: label,
+		label,
+	}));
+}
+
+function SegmentedProgress({
+	active,
+	total,
+}: {
+	active: number;
+	total: number;
+}) {
+	const barCount = 34;
+	const activeBars = Math.round((active / Math.max(total, 1)) * barCount);
+	const bars = Array.from({ length: barCount }, (_, index) => ({
+		active: index < activeBars,
+		id: `progress-bar-${index + 1}`,
+	}));
+
+	return (
+		<div className="flex h-10 w-full items-end gap-0.5">
+			{bars.map((bar) => (
+				<div className="flex flex-1 justify-center" key={bar.id}>
+					<div
+						className={cn(
+							"h-10 w-1.5 rounded-full",
+							bar.active ? "bg-muted-foreground/75" : "bg-muted-foreground/25"
+						)}
+					/>
+				</div>
+			))}
+		</div>
 	);
 }
 
@@ -2078,7 +3309,7 @@ function StateMachine({ currentStatus }: { currentStatus: JobStatus }) {
 	);
 
 	return (
-		<div className="space-y-2">
+		<div className="flex flex-col gap-2">
 			{serviceStateMachine.map((state, index) => {
 				const complete = activeIndex >= index && activeIndex !== -1;
 
@@ -2113,7 +3344,7 @@ function MapPin({ label, status }: { label: string; status: ContractStatus }) {
 	};
 
 	return (
-		<div className="flex items-center gap-2 rounded-md border bg-card px-2 py-1 text-xs shadow-xs">
+		<div className="flex items-center gap-2 rounded-lg bg-card px-2 py-1 text-xs shadow-xs ring-1 ring-foreground/10">
 			<span className={`size-3 rounded-full ${colorByStatus[status]}`} />
 			{label}
 		</div>
@@ -2128,7 +3359,7 @@ function EngineerDot({
 	status: EngineerStatus;
 }) {
 	return (
-		<div className="flex items-center gap-2 rounded-md bg-foreground px-2 py-1 text-background text-xs shadow-xs">
+		<div className="flex items-center gap-2 rounded-lg bg-foreground px-2 py-1 text-background text-xs shadow-xs">
 			<span className={`size-3 rounded-full ${engineerStatusStyles[status]}`} />
 			{engineer}
 		</div>

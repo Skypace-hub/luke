@@ -1,12 +1,16 @@
+import { normalizeSignInEmail } from "@luke/auth/default-admin";
 import { Button } from "@luke/ui/components/button";
 import { Input } from "@luke/ui/components/input";
 import { Label } from "@luke/ui/components/label";
 import { useForm } from "@tanstack/react-form";
+import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import z from "zod";
 
+import { AuthCard, AuthShell } from "@/components/auth-shell";
 import { authClient } from "@/lib/auth-client";
+import { getAuthError } from "@/lib/business-errors";
 
 import Loader from "./loader";
 
@@ -26,7 +30,7 @@ export default function SignInForm({
 		onSubmit: async ({ value }) => {
 			await authClient.signIn.email(
 				{
-					email: value.email,
+					email: normalizeSignInEmail(value.email),
 					password: value.password,
 				},
 				{
@@ -35,15 +39,22 @@ export default function SignInForm({
 						toast.success("Sign in successful");
 					},
 					onError: (error) => {
-						toast.error(error.error.message || error.error.statusText);
+						const businessError = getAuthError({
+							action: "sign-in",
+							message: error.error.message || error.error.statusText,
+						});
+
+						toast.error(businessError.title, {
+							description: businessError.description,
+						});
 					},
 				}
 			);
 		},
 		validators: {
 			onSubmit: z.object({
-				email: z.email("Invalid email address"),
-				password: z.string().min(8, "Password must be at least 8 characters"),
+				email: z.string().trim().min(1, "Email or username is required"),
+				password: z.string().min(1, "Password is required"),
 			}),
 		},
 	});
@@ -53,90 +64,93 @@ export default function SignInForm({
 	}
 
 	return (
-		<div className="mx-auto mt-10 w-full max-w-md p-6">
-			<h1 className="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
-
-			<form
-				className="space-y-4"
-				onSubmit={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					form.handleSubmit();
-				}}
+		<AuthShell>
+			<AuthCard
+				description="Sign in to manage service operations, jobs, assets, and tenant controls."
+				title="Welcome back"
 			>
-				<div>
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						form.handleSubmit();
+					}}
+				>
 					<form.Field name="email">
 						{(field) => (
-							<div className="space-y-2">
-								<Label htmlFor={field.name}>Email</Label>
+							<div className="flex flex-col gap-2">
+								<Label htmlFor={field.name}>Email or username</Label>
 								<Input
+									autoComplete="username"
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
-									type="email"
+									onChange={(event) => field.handleChange(event.target.value)}
+									type="text"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
-									<p className="text-red-500" key={error?.message}>
+									<p className="text-destructive text-xs" key={error?.message}>
 										{error?.message}
 									</p>
 								))}
 							</div>
 						)}
 					</form.Field>
-				</div>
 
-				<div>
 					<form.Field name="password">
 						{(field) => (
-							<div className="space-y-2">
+							<div className="flex flex-col gap-2">
 								<Label htmlFor={field.name}>Password</Label>
 								<Input
+									autoComplete="current-password"
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
+									onChange={(event) => field.handleChange(event.target.value)}
 									type="password"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
-									<p className="text-red-500" key={error?.message}>
+									<p className="text-destructive text-xs" key={error?.message}>
 										{error?.message}
 									</p>
 								))}
 							</div>
 						)}
 					</form.Field>
+
+					<form.Subscribe
+						selector={(state) => ({
+							canSubmit: state.canSubmit,
+							isSubmitting: state.isSubmitting,
+						})}
+					>
+						{({ canSubmit, isSubmitting }) => (
+							<Button
+								className="w-full"
+								disabled={!canSubmit || isSubmitting}
+								type="submit"
+							>
+								{isSubmitting ? (
+									<Loader2Icon
+										className="animate-spin"
+										data-icon="inline-start"
+									/>
+								) : null}
+								{isSubmitting ? "Submitting..." : "Sign In"}
+							</Button>
+						)}
+					</form.Subscribe>
+				</form>
+
+				<div className="mt-4 text-center">
+					<Button onClick={onSwitchToSignUp} variant="link">
+						Need an account? Sign Up
+					</Button>
 				</div>
-
-				<form.Subscribe
-					selector={(state) => ({
-						canSubmit: state.canSubmit,
-						isSubmitting: state.isSubmitting,
-					})}
-				>
-					{({ canSubmit, isSubmitting }) => (
-						<Button
-							className="w-full"
-							disabled={!canSubmit || isSubmitting}
-							type="submit"
-						>
-							{isSubmitting ? "Submitting..." : "Sign In"}
-						</Button>
-					)}
-				</form.Subscribe>
-			</form>
-
-			<div className="mt-4 text-center">
-				<Button
-					className="text-indigo-600 hover:text-indigo-800"
-					onClick={onSwitchToSignUp}
-					variant="link"
-				>
-					Need an account? Sign Up
-				</Button>
-			</div>
-		</div>
+			</AuthCard>
+		</AuthShell>
 	);
 }

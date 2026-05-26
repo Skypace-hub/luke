@@ -46,8 +46,8 @@ const { db } = await import("../index");
 
 const demoTenantId = "arjo-hk";
 const demoTenantName = "ARJO HONG KONG";
-const adminEmail = "admin@utiliti.com";
-const adminPassword = "password";
+const adminEmail = "admin@utiliti.local";
+const adminPassword = "admin";
 const adminUserId = "demo-admin-user";
 const adminCredentialAccountId = "demo-admin-credential";
 
@@ -250,7 +250,7 @@ async function seedReferenceData(adminId: string) {
 	await db.insert(tenantMemberships).values({
 		tenantId: demoTenantId,
 		userId: adminId,
-		role: "admin",
+		role: "super_admin",
 		status: "active",
 		permissions: ["*"],
 	});

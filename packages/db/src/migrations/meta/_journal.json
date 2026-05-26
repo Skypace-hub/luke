@@ -8,6 +8,20 @@
       "when": 1779701633033,
       "tag": "0000_boring_iron_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779790000000,
+      "tag": "0001_role_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779790001000,
+      "tag": "0002_role_membership_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -2,11 +2,14 @@ import { Button } from "@luke/ui/components/button";
 import { Input } from "@luke/ui/components/input";
 import { Label } from "@luke/ui/components/label";
 import { useForm } from "@tanstack/react-form";
+import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import z from "zod";
 
+import { AuthCard, AuthShell } from "@/components/auth-shell";
 import { authClient } from "@/lib/auth-client";
+import { getAuthError } from "@/lib/business-errors";
 
 import Loader from "./loader";
 
@@ -37,7 +40,14 @@ export default function SignUpForm({
 						toast.success("Sign up successful");
 					},
 					onError: (error) => {
-						toast.error(error.error.message || error.error.statusText);
+						const businessError = getAuthError({
+							action: "sign-up",
+							message: error.error.message || error.error.statusText,
+						});
+
+						toast.error(businessError.title, {
+							description: businessError.description,
+						});
 					},
 				}
 			);
@@ -56,112 +66,114 @@ export default function SignUpForm({
 	}
 
 	return (
-		<div className="mx-auto mt-10 w-full max-w-md p-6">
-			<h1 className="mb-6 text-center font-bold text-3xl">Create Account</h1>
-
-			<form
-				className="space-y-4"
-				onSubmit={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					form.handleSubmit();
-				}}
+		<AuthShell>
+			<AuthCard
+				description="Create a tenant workspace and start tracking service operations."
+				title="Create account"
 			>
-				<div>
+				<form
+					className="flex flex-col gap-4"
+					onSubmit={(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						form.handleSubmit();
+					}}
+				>
 					<form.Field name="name">
 						{(field) => (
-							<div className="space-y-2">
+							<div className="flex flex-col gap-2">
 								<Label htmlFor={field.name}>Name</Label>
 								<Input
+									autoComplete="name"
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
+									onChange={(event) => field.handleChange(event.target.value)}
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
-									<p className="text-red-500" key={error?.message}>
+									<p className="text-destructive text-xs" key={error?.message}>
 										{error?.message}
 									</p>
 								))}
 							</div>
 						)}
 					</form.Field>
-				</div>
 
-				<div>
 					<form.Field name="email">
 						{(field) => (
-							<div className="space-y-2">
+							<div className="flex flex-col gap-2">
 								<Label htmlFor={field.name}>Email</Label>
 								<Input
+									autoComplete="email"
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
+									onChange={(event) => field.handleChange(event.target.value)}
 									type="email"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
-									<p className="text-red-500" key={error?.message}>
+									<p className="text-destructive text-xs" key={error?.message}>
 										{error?.message}
 									</p>
 								))}
 							</div>
 						)}
 					</form.Field>
-				</div>
 
-				<div>
 					<form.Field name="password">
 						{(field) => (
-							<div className="space-y-2">
+							<div className="flex flex-col gap-2">
 								<Label htmlFor={field.name}>Password</Label>
 								<Input
+									autoComplete="new-password"
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
-									onChange={(e) => field.handleChange(e.target.value)}
+									onChange={(event) => field.handleChange(event.target.value)}
 									type="password"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
-									<p className="text-red-500" key={error?.message}>
+									<p className="text-destructive text-xs" key={error?.message}>
 										{error?.message}
 									</p>
 								))}
 							</div>
 						)}
 					</form.Field>
+
+					<form.Subscribe
+						selector={(state) => ({
+							canSubmit: state.canSubmit,
+							isSubmitting: state.isSubmitting,
+						})}
+					>
+						{({ canSubmit, isSubmitting }) => (
+							<Button
+								className="w-full"
+								disabled={!canSubmit || isSubmitting}
+								type="submit"
+							>
+								{isSubmitting ? (
+									<Loader2Icon
+										className="animate-spin"
+										data-icon="inline-start"
+									/>
+								) : null}
+								{isSubmitting ? "Submitting..." : "Sign Up"}
+							</Button>
+						)}
+					</form.Subscribe>
+				</form>
+
+				<div className="mt-4 text-center">
+					<Button onClick={onSwitchToSignIn} variant="link">
+						Already have an account? Sign In
+					</Button>
 				</div>
-
-				<form.Subscribe
-					selector={(state) => ({
-						canSubmit: state.canSubmit,
-						isSubmitting: state.isSubmitting,
-					})}
-				>
-					{({ canSubmit, isSubmitting }) => (
-						<Button
-							className="w-full"
-							disabled={!canSubmit || isSubmitting}
-							type="submit"
-						>
-							{isSubmitting ? "Submitting..." : "Sign Up"}
-						</Button>
-					)}
-				</form.Subscribe>
-			</form>
-
-			<div className="mt-4 text-center">
-				<Button
-					className="text-indigo-600 hover:text-indigo-800"
-					onClick={onSwitchToSignIn}
-					variant="link"
-				>
-					Already have an account? Sign In
-				</Button>
-			</div>
-		</div>
+			</AuthCard>
+		</AuthShell>
 	);
 }

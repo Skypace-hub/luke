@@ -22,11 +22,15 @@ export type {
 	Severity,
 	Shortage,
 	SystemParameter,
+	TenantManagementRecord,
+	TenantRole,
 	TenantSummary,
+	TenantUserRecord,
 } from "@luke/api/types/service-ops";
 
 import {
 	BoxesIcon,
+	Building2Icon,
 	ClipboardListIcon,
 	FileTextIcon,
 	HospitalIcon,
@@ -36,6 +40,7 @@ import {
 	ShieldCheckIcon,
 	SirenIcon,
 	StethoscopeIcon,
+	UserCogIcon,
 	UsersIcon,
 	WrenchIcon,
 } from "lucide-react";
@@ -53,7 +58,9 @@ export type BackOfficeView =
 	| "faults"
 	| "parts"
 	| "reports"
-	| "config";
+	| "config"
+	| "tenants"
+	| "users";
 
 export interface NavigationItem {
 	icon: ComponentType<SVGProps<SVGSVGElement>>;
@@ -74,6 +81,8 @@ export const navigationItems: NavigationItem[] = [
 	{ id: "faults", label: "Faults", icon: SirenIcon },
 	{ id: "reports", label: "Reports", icon: FileTextIcon },
 	{ id: "config", label: "System Config", icon: SettingsIcon },
+	{ id: "users", label: "User Management", icon: UserCogIcon },
+	{ id: "tenants", label: "Tenant Management", icon: Building2Icon },
 ];
 
 export const serviceStateMachine = [

@@ -11,6 +11,8 @@ import {
 	createJob,
 	createPart,
 	createProduct,
+	createTenantForUser,
+	createTenantUser,
 	deleteAsset,
 	deleteContract,
 	deleteEngineer,
@@ -19,9 +21,12 @@ import {
 	deleteJob,
 	deletePart,
 	deleteProduct,
+	deleteTenant,
+	deleteTenantUser,
 	ensureDefaultTenantForUser,
 	getDefaultTenantIdForUser,
 	getServiceOpsSnapshot,
+	getTenantAccessPolicy,
 	updateAsset,
 	updateContract,
 	updateEngineer,
@@ -30,7 +35,8 @@ import {
 	updateJob,
 	updatePart,
 	updateProduct,
-	userCanAccessTenant,
+	updateTenant,
+	updateTenantUser,
 } from "../services/service-ops";
 
 const optionalTextSchema = z
@@ -49,12 +55,28 @@ const idSchema = z.object({
 	tenantId: z.string().min(1),
 });
 
+const tenantSchema = z.object({
+	id: optionalTextSchema,
+	isActive: z.boolean(),
+	name: z.string().trim().min(1),
+	region: z.string().trim().min(1),
+	releaseLabel: z.string().trim().min(1),
+});
+
+const tenantUserSchema = z.object({
+	email: z.email(),
+	name: z.string().trim().min(1),
+	password: optionalTextSchema,
+	role: z.enum(["tenant_admin", "operator", "observer"]),
+	status: z.enum(["active", "invited", "suspended"]),
+});
+
 const hospitalSchema = z.object({
 	address: optionalTextSchema,
 	code: z.string().trim().min(1),
 	district: z.string().trim().min(1),
-	latitude: z.number().nullable().optional(),
-	longitude: z.number().nullable().optional(),
+	latitude: z.number().min(-90).max(90).nullable().optional(),
+	longitude: z.number().min(-180).max(180).nullable().optional(),
 	name: z.string().trim().min(1),
 	primaryContactEmail: optionalTextSchema,
 	primaryContactName: optionalTextSchema,
@@ -163,15 +185,38 @@ const faultSchema = z.object({
 
 const mutationResponse = { ok: true } as const;
 
-const ensureTenantAccess = async (userId: string, tenantId: string) => {
-	const canAccessTenant = await userCanAccessTenant(userId, tenantId);
+const ensureTenantAccess = async (
+	userId: string,
+	tenantId: string,
+	capability: "manageTenantUsers" | "manageTenants" | "read" | "write" = "read"
+) => {
+	const access = await getTenantAccessPolicy(userId, tenantId);
+	let isAllowed = false;
 
-	if (!canAccessTenant) {
+	if (capability === "read") {
+		isAllowed = Boolean(access?.canRead);
+	}
+
+	if (capability === "write") {
+		isAllowed = Boolean(access?.canWrite);
+	}
+
+	if (capability === "manageTenants") {
+		isAllowed = Boolean(access?.canManageTenants);
+	}
+
+	if (capability === "manageTenantUsers") {
+		isAllowed = Boolean(access?.canManageTenantUsers);
+	}
+
+	if (!isAllowed) {
 		throw new TRPCError({
 			code: "FORBIDDEN",
 			message: "Tenant access denied",
 		});
 	}
+
+	return access;
 };
 
 export const appRouter = router({
@@ -202,126 +247,199 @@ export const appRouter = router({
 					});
 				}
 
-				await ensureTenantAccess(ctx.session.user.id, requestedTenantId);
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					requestedTenantId,
+					"read"
+				);
 
-				return getServiceOpsSnapshot(requestedTenantId);
+				return getServiceOpsSnapshot(requestedTenantId, ctx.session.user.id);
+			}),
+		createTenant: protectedProcedure
+			.input(z.object({ data: tenantSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					"platform",
+					"manageTenants"
+				);
+				const tenantId = await createTenantForUser(
+					ctx.session.user.id,
+					input.data
+				);
+				return { ...mutationResponse, tenantId };
+			}),
+		updateTenant: protectedProcedure
+			.input(idSchema.extend({ data: tenantSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					input.id,
+					"manageTenants"
+				);
+				await updateTenant(input.id, input.data);
+				return mutationResponse;
+			}),
+		deleteTenant: protectedProcedure
+			.input(tenantInputSchema)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					input.tenantId,
+					"manageTenants"
+				);
+				await deleteTenant(input.tenantId);
+				return mutationResponse;
+			}),
+		createTenantUser: protectedProcedure
+			.input(tenantInputSchema.extend({ data: tenantUserSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					input.tenantId,
+					"manageTenantUsers"
+				);
+				await createTenantUser(input.tenantId, input.data);
+				return mutationResponse;
+			}),
+		updateTenantUser: protectedProcedure
+			.input(idSchema.extend({ data: tenantUserSchema }))
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					input.tenantId,
+					"manageTenantUsers"
+				);
+				await updateTenantUser(input.tenantId, input.id, input.data);
+				return mutationResponse;
+			}),
+		deleteTenantUser: protectedProcedure
+			.input(idSchema)
+			.mutation(async ({ ctx, input }) => {
+				await ensureTenantAccess(
+					ctx.session.user.id,
+					input.tenantId,
+					"manageTenantUsers"
+				);
+				await deleteTenantUser(input.tenantId, input.id);
+				return mutationResponse;
 			}),
 		createHospital: protectedProcedure
 			.input(tenantInputSchema.extend({ data: hospitalSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createHospital(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updateHospital: protectedProcedure
 			.input(idSchema.extend({ data: hospitalSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateHospital(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deleteHospital: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteHospital(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createEngineer: protectedProcedure
 			.input(tenantInputSchema.extend({ data: engineerSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createEngineer(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updateEngineer: protectedProcedure
 			.input(idSchema.extend({ data: engineerSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateEngineer(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deleteEngineer: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteEngineer(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createProduct: protectedProcedure
 			.input(tenantInputSchema.extend({ data: productSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createProduct(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updateProduct: protectedProcedure
 			.input(idSchema.extend({ data: productSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateProduct(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deleteProduct: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteProduct(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createPart: protectedProcedure
 			.input(tenantInputSchema.extend({ data: partSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createPart(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updatePart: protectedProcedure
 			.input(idSchema.extend({ data: partSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updatePart(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deletePart: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deletePart(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createAsset: protectedProcedure
 			.input(tenantInputSchema.extend({ data: assetSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createAsset(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updateAsset: protectedProcedure
 			.input(idSchema.extend({ data: assetSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateAsset(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deleteAsset: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteAsset(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createJob: protectedProcedure
 			.input(tenantInputSchema.extend({ data: jobSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createJob(input.tenantId, ctx.session.user.id, input.data);
 				return mutationResponse;
 			}),
 		updateJob: protectedProcedure
 			.input(idSchema.extend({ data: jobSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateJob(
 					input.tenantId,
 					ctx.session.user.id,
@@ -333,49 +451,49 @@ export const appRouter = router({
 		deleteJob: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteJob(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createContract: protectedProcedure
 			.input(tenantInputSchema.extend({ data: contractSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createContract(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updateContract: protectedProcedure
 			.input(idSchema.extend({ data: contractSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateContract(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deleteContract: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteContract(input.tenantId, input.id);
 				return mutationResponse;
 			}),
 		createFault: protectedProcedure
 			.input(tenantInputSchema.extend({ data: faultSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await createFault(input.tenantId, input.data);
 				return mutationResponse;
 			}),
 		updateFault: protectedProcedure
 			.input(idSchema.extend({ data: faultSchema }))
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await updateFault(input.tenantId, input.id, input.data);
 				return mutationResponse;
 			}),
 		deleteFault: protectedProcedure
 			.input(idSchema)
 			.mutation(async ({ ctx, input }) => {
-				await ensureTenantAccess(ctx.session.user.id, input.tenantId);
+				await ensureTenantAccess(ctx.session.user.id, input.tenantId, "write");
 				await deleteFault(input.tenantId, input.id);
 				return mutationResponse;
 			}),
