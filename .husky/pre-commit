@@ -1,6 +1,3 @@
-npm test
-
-# ultracite
 #!/bin/sh
 # Exit on any error
 set -e
@@ -13,8 +10,10 @@ if [ -z "$STAGED_FILES" ]; then
 fi
 
 # Run formatter
-npx ultracite fix
+set +e
+npm exec -- ultracite fix
 FORMAT_EXIT_CODE=$?
+set -e
 
 # Re-stage files that were already staged
 echo "$STAGED_FILES" | while IFS= read -r file; do

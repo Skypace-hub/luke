@@ -1048,6 +1048,11 @@ const getTenantRecord = async (tenantId: string): Promise<TenantRow> => {
 const toNullableString = (value: null | string | undefined): null | string =>
 	value?.trim() ? value.trim() : null;
 
+const toNullableCoordinate = (
+	value: null | number | undefined
+): null | string =>
+	value === null || value === undefined ? null : String(value);
+
 const toDateValue = (value: null | string | undefined): null | string =>
 	value?.trim() ? value.trim() : null;
 
@@ -3845,14 +3850,16 @@ export async function startJobWithNfc(
 			eventType: "activated",
 			hospitalId: job.hospitalId,
 			jobId: id,
-			latitude: input.latitude === null ? null : String(input.latitude ?? ""),
-			longitude:
-				input.longitude === null ? null : String(input.longitude ?? ""),
+			latitude: toNullableCoordinate(input.latitude),
+			longitude: toNullableCoordinate(input.longitude),
 			radiusMeters,
 			tenantId,
 		});
 
-		if (input.latitude !== undefined && input.longitude !== undefined) {
+		if (
+			typeof input.latitude === "number" &&
+			typeof input.longitude === "number"
+		) {
 			await tx.insert(engineerLocations).values({
 				accuracyMeters:
 					input.accuracyMeters === null
@@ -3976,9 +3983,8 @@ export async function endJobWithNfc(
 			eventType: "resolved",
 			hospitalId: job.hospitalId,
 			jobId: id,
-			latitude: input.latitude === null ? null : String(input.latitude ?? ""),
-			longitude:
-				input.longitude === null ? null : String(input.longitude ?? ""),
+			latitude: toNullableCoordinate(input.latitude),
+			longitude: toNullableCoordinate(input.longitude),
 			tenantId,
 		});
 	});
@@ -4174,9 +4180,8 @@ export async function reportTimerAnomaly(
 			eventType: "timer_anomaly",
 			hospitalId: job.hospitalId,
 			jobId: id,
-			latitude: input.latitude === null ? null : String(input.latitude ?? ""),
-			longitude:
-				input.longitude === null ? null : String(input.longitude ?? ""),
+			latitude: toNullableCoordinate(input.latitude),
+			longitude: toNullableCoordinate(input.longitude),
 			tenantId,
 		});
 		await tx.insert(jobStateEvents).values({

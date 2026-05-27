@@ -224,6 +224,19 @@ export const entityLabels: Record<CrudEntity, string> = {
 	tenantUser: "user",
 };
 
+export const destructiveActionLabels = {
+	asset: "delete",
+	contract: "delete",
+	engineer: "delete",
+	fault: "delete",
+	hospital: "delete",
+	job: "delete",
+	part: "delete",
+	product: "delete",
+	tenant: "deactivate",
+	tenantUser: "suspend",
+} satisfies Record<CrudEntity, "deactivate" | "delete" | "suspend">;
+
 const coverageOptions: FieldOption[] = [
 	{ label: "In contract", value: "in_contract" },
 	{ label: "Out of contract", value: "out_of_contract" },

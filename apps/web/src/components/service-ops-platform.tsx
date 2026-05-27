@@ -40,17 +40,19 @@ import {
 	LogOutIcon,
 	NfcIcon,
 	PlusIcon,
+	PowerOffIcon,
 	ReceiptTextIcon,
 	RefreshCwIcon,
 	ShieldCheckIcon,
 	Trash2Icon,
 	TrendingUpIcon,
+	UserXIcon,
 	WrenchIcon,
 	XIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode, RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	buildAssetPayload,
@@ -65,6 +67,7 @@ import {
 	buildTenantUserPayload,
 	type CrudEntity,
 	type CrudState,
+	destructiveActionLabels,
 	entityLabels,
 	type FieldConfig,
 	type FormDefaultValue,
@@ -76,7 +79,10 @@ import {
 import { DataTable } from "@/components/service-ops-table";
 import { ThemeColorSwitcher } from "@/components/theme-color-switcher";
 import { authClient } from "@/lib/auth-client";
-import { getServiceOpsMutationError } from "@/lib/business-errors";
+import {
+	getServiceOpsMutationError,
+	type ServiceOpsAction,
+} from "@/lib/business-errors";
 import {
 	type BackOfficeView,
 	type ContractStatus,
@@ -182,12 +188,37 @@ const formControlClass =
 
 const actionButtonClass = "rounded-lg";
 
+const selectedTenantStorageKey = "luke-service-ops-selected-tenant";
+
+const deleteConfirmationTimeoutMs = 4000;
+
+const inlinePanelViewportPadding = 12;
+
+const inlinePanelWidth = 320;
+
+const inlinePanelOffset = 8;
+
 const hongKongBounds = {
 	maxLat: 22.56,
 	maxLng: 114.35,
 	minLat: 22.15,
 	minLng: 113.82,
 } as const;
+
+const titleCase = (value: string) =>
+	value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const toPastTense = (value: string) => {
+	if (value === "deactivate") {
+		return "deactivated";
+	}
+
+	if (value === "suspend") {
+		return "suspended";
+	}
+
+	return "deleted";
+};
 
 const coordinateStyle = (lat: number, lng: number) => {
 	const left =
@@ -373,8 +404,30 @@ export default function ServiceOpsPlatform({
 	}, [loadedData?.tenants]);
 
 	useEffect(() => {
+		const storedTenantId = window.localStorage.getItem(
+			selectedTenantStorageKey
+		);
+
+		if (!storedTenantId || storedTenantId === selectedTenantId) {
+			return;
+		}
+
+		const storedTenant = tenantOptions.find(
+			(tenantOption) => tenantOption.id === storedTenantId
+		);
+
+		if (storedTenant?.isActive) {
+			setSelectedTenantId(storedTenantId);
+		}
+	}, [selectedTenantId, tenantOptions]);
+
+	useEffect(() => {
+		if (jobs.some((job) => job.id === selectedJobId)) {
+			return;
+		}
+
 		setSelectedJobId(firstJob?.id ?? "");
-	}, [firstJob?.id]);
+	}, [firstJob?.id, jobs, selectedJobId]);
 
 	useEffect(() => {
 		const syncViewFromUrl = () => {
@@ -394,7 +447,7 @@ export default function ServiceOpsPlatform({
 	}, []);
 
 	useEffect(() => {
-		if (!window.matchMedia("(max-width: 1023px)").matches) {
+		if (!window.matchMedia("(max-width: 1279px)").matches) {
 			return;
 		}
 
@@ -428,7 +481,7 @@ export default function ServiceOpsPlatform({
 			window.history.pushState({ backOfficeView: view }, "", nextUrl);
 		}
 
-		if (window.matchMedia("(max-width: 1023px)").matches) {
+		if (window.matchMedia("(max-width: 1279px)").matches) {
 			window.requestAnimationFrame(() => {
 				document
 					.getElementById("back-office-content")
@@ -445,6 +498,7 @@ export default function ServiceOpsPlatform({
 		setCrudState(null);
 		setSelectedJobId("");
 		setSelectedTenantId(tenantId);
+		window.localStorage.setItem(selectedTenantStorageKey, tenantId);
 		selectBackOfficeView("dashboard");
 	};
 	const visibleNavigationSections = navigationSections
@@ -471,8 +525,8 @@ export default function ServiceOpsPlatform({
 	return (
 		<main className="min-h-svh overflow-x-hidden bg-background text-foreground">
 			<div className="min-h-svh">
-				<div className="grid min-h-svh grid-cols-1 lg:grid-cols-[304px_minmax(0,1fr)]">
-					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-card text-card-foreground shadow-sm lg:sticky lg:top-0 lg:h-svh lg:border-r lg:border-b-0">
+				<div className="grid min-h-svh grid-cols-1 xl:grid-cols-[304px_minmax(0,1fr)]">
+					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-card text-card-foreground shadow-sm xl:sticky xl:top-0 xl:h-svh xl:border-r xl:border-b-0">
 						<TenantSwitcher
 							activeTenants={activeTenants}
 							isLoading={isTenantLoading}
@@ -480,16 +534,16 @@ export default function ServiceOpsPlatform({
 							selectedTenant={tenant}
 							selectedTenantId={selectedTenantId}
 						/>
-						<nav className="flex min-w-0 max-w-full gap-2 overflow-x-auto px-3 py-2 [scrollbar-width:none] lg:flex-1 lg:flex-col lg:gap-5 lg:overflow-y-auto lg:px-4 lg:py-3 [&::-webkit-scrollbar]:hidden">
+						<nav className="flex min-w-0 max-w-full gap-2 overflow-x-auto px-3 py-2 [scrollbar-width:none] xl:flex-1 xl:flex-col xl:gap-5 xl:overflow-y-auto xl:px-4 xl:py-3 [&::-webkit-scrollbar]:hidden">
 							{visibleNavigationSections.map((section) => (
 								<div
-									className="flex min-w-max gap-2 lg:min-w-0 lg:flex-col"
+									className="flex min-w-max gap-2 xl:min-w-0 xl:flex-col"
 									key={section.label}
 								>
-									<p className="hidden px-3 font-semibold text-muted-foreground text-sm lg:block">
+									<p className="hidden px-3 font-semibold text-muted-foreground text-sm xl:block">
 										{section.label}
 									</p>
-									<div className="flex gap-1 lg:flex-col">
+									<div className="flex gap-1 xl:flex-col">
 										{section.items.map((itemId) => {
 											const item = getNavigationItem(itemId);
 
@@ -504,7 +558,7 @@ export default function ServiceOpsPlatform({
 												<button
 													aria-current={isActive ? "page" : undefined}
 													className={cn(
-														"flex h-10 min-w-max cursor-pointer items-center gap-3 rounded-xl px-3 text-left font-medium text-base transition-colors lg:w-full",
+														"flex h-10 min-w-max cursor-pointer items-center gap-3 rounded-xl px-3 text-left font-medium text-base transition-colors xl:w-full",
 														isActive
 															? "bg-muted text-foreground shadow-xs"
 															: "text-foreground/85 hover:bg-muted/70 hover:text-foreground"
@@ -526,7 +580,13 @@ export default function ServiceOpsPlatform({
 								</div>
 							))}
 						</nav>
-						<div className="mt-auto hidden p-4 lg:block">
+						<div className="border-t px-3 py-3 xl:hidden">
+							<UserProfile
+								currentUser={currentUser}
+								onSignOut={handleSignOut}
+							/>
+						</div>
+						<div className="mt-auto hidden p-4 xl:block">
 							<UserProfile
 								currentUser={currentUser}
 								onSignOut={handleSignOut}
@@ -536,7 +596,9 @@ export default function ServiceOpsPlatform({
 					<div className="min-w-0">
 						<header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b bg-background/95 px-4 py-3 backdrop-blur lg:px-6">
 							<div className="min-w-0">
-								<p className="text-muted-foreground text-xs">Dashboard</p>
+								<p className="text-muted-foreground text-xs">
+									Service operations
+								</p>
 								<h1 className="truncate font-semibold text-lg leading-tight">
 									{getBackOfficeTitle(visibleActiveView)}
 								</h1>
@@ -779,8 +841,8 @@ function BackOfficeViewPanel({
 				eyebrow="A. Job Management"
 				title="Job dispatch and state control"
 			>
-				<div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-					<div className="flex flex-col gap-4">
+				<div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+					<div className="flex min-w-0 flex-col gap-4">
 						<DataTable
 							columns={[
 								"Job",
@@ -827,7 +889,7 @@ function BackOfficeViewPanel({
 							title={`${jobs.length} Jobs`}
 						/>
 					</div>
-					<Card className={panelClass}>
+					<Card className={cn(panelClass, "min-w-0")}>
 						{selectedJob ? (
 							<>
 								<CardHeader>
@@ -2924,6 +2986,19 @@ function AssetNfcInlineActions({
 	const [isOpen, setIsOpen] = useState(false);
 	const [nfcUid, setNfcUid] = useState(asset.nfcUid);
 	const [engineerId, setEngineerId] = useState("");
+	const triggerRef = useRef<HTMLButtonElement | null>(null);
+	const panelRef = useRef<HTMLDivElement | null>(null);
+	const panelPosition = useInlinePanelPosition({
+		isOpen,
+		panelRef,
+		triggerRef,
+	});
+	useInlinePanelDismiss({
+		isOpen,
+		onDismiss: () => setIsOpen(false),
+		panelRef,
+		triggerRef,
+	});
 
 	useEffect(() => {
 		setNfcUid(asset.nfcUid);
@@ -2944,6 +3019,7 @@ function AssetNfcInlineActions({
 				aria-label="Manage NFC tag"
 				className={compactButtonClass}
 				onClick={() => setIsOpen((current) => !current)}
+				ref={triggerRef}
 				size="icon-sm"
 				type="button"
 				variant="ghost"
@@ -2951,19 +3027,37 @@ function AssetNfcInlineActions({
 				<NfcIcon className="size-4" />
 			</Button>
 			{isOpen ? (
-				<div className="absolute right-0 z-10 mt-2 flex w-80 flex-col gap-3 rounded-xl border bg-card p-3 text-left shadow-lg">
+				<div
+					className="fixed z-50 flex max-h-[calc(100vh-1.5rem)] w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-3 overflow-y-auto rounded-xl border bg-card p-3 text-left shadow-lg"
+					ref={panelRef}
+					style={panelPosition}
+				>
 					<div className="flex flex-col gap-1">
-						<Label className={formLabelClass}>NFC UID</Label>
+						<Label
+							className={formLabelClass}
+							htmlFor={`${asset.recordId}-nfc-uid`}
+						>
+							NFC UID
+						</Label>
 						<Input
 							className={formControlClass}
+							id={`${asset.recordId}-nfc-uid`}
+							name={`${asset.recordId}-nfc-uid`}
 							onChange={(event) => setNfcUid(event.target.value)}
 							value={nfcUid}
 						/>
 					</div>
 					<div className="flex flex-col gap-1">
-						<Label className={formLabelClass}>Engineer</Label>
+						<Label
+							className={formLabelClass}
+							htmlFor={`${asset.recordId}-nfc-engineer`}
+						>
+							Engineer
+						</Label>
 						<select
 							className={formControlClass}
+							id={`${asset.recordId}-nfc-engineer`}
+							name={`${asset.recordId}-nfc-engineer`}
 							onChange={(event) => setEngineerId(event.target.value)}
 							value={engineerId}
 						>
@@ -3033,6 +3127,19 @@ function ProductInlineActions({
 	tenantId: string;
 }) {
 	const [isOpen, setIsOpen] = useState(false);
+	const triggerRef = useRef<HTMLButtonElement | null>(null);
+	const panelRef = useRef<HTMLDivElement | null>(null);
+	const panelPosition = useInlinePanelPosition({
+		isOpen,
+		panelRef,
+		triggerRef,
+	});
+	useInlinePanelDismiss({
+		isOpen,
+		onDismiss: () => setIsOpen(false),
+		panelRef,
+		triggerRef,
+	});
 
 	if (!canWrite) {
 		return null;
@@ -3044,6 +3151,7 @@ function ProductInlineActions({
 				aria-label="Configure product"
 				className={compactButtonClass}
 				onClick={() => setIsOpen((current) => !current)}
+				ref={triggerRef}
 				size="icon-sm"
 				type="button"
 				variant="ghost"
@@ -3051,7 +3159,11 @@ function ProductInlineActions({
 				<FileQuestionIcon className="size-4" />
 			</Button>
 			{isOpen ? (
-				<div className="absolute right-0 z-10 mt-2 flex w-80 flex-col gap-3 rounded-xl border bg-card p-3 text-left shadow-lg">
+				<div
+					className="fixed z-50 flex max-h-[calc(100vh-1.5rem)] w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-3 overflow-y-auto rounded-xl border bg-card p-3 text-left shadow-lg"
+					ref={panelRef}
+					style={panelPosition}
+				>
 					<ProductPartsForm
 						mutations={mutations}
 						onDone={() => setIsOpen(false)}
@@ -3185,6 +3297,113 @@ function ProductManualForm({
 			</Button>
 		</div>
 	);
+}
+
+function useInlinePanelPosition({
+	isOpen,
+	panelRef,
+	triggerRef,
+}: {
+	isOpen: boolean;
+	panelRef: RefObject<HTMLDivElement | null>;
+	triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+	const [panelPosition, setPanelPosition] = useState({ left: 0, top: 0 });
+
+	useLayoutEffect(() => {
+		if (!(isOpen && triggerRef.current)) {
+			return;
+		}
+
+		const updatePanelPosition = () => {
+			const triggerRect = triggerRef.current?.getBoundingClientRect();
+
+			if (!triggerRect) {
+				return;
+			}
+
+			const panelHeight =
+				panelRef.current?.offsetHeight ??
+				Math.min(window.innerHeight - 24, 360);
+			const panelWidth = panelRef.current?.offsetWidth ?? inlinePanelWidth;
+			const maxLeft =
+				window.innerWidth - panelWidth - inlinePanelViewportPadding;
+			const maxTop =
+				window.innerHeight - panelHeight - inlinePanelViewportPadding;
+			const preferredLeft = triggerRect.right - panelWidth;
+			const preferredTop = triggerRect.bottom + inlinePanelOffset;
+
+			setPanelPosition({
+				left: Math.max(
+					inlinePanelViewportPadding,
+					Math.min(preferredLeft, maxLeft)
+				),
+				top: Math.max(
+					inlinePanelViewportPadding,
+					Math.min(preferredTop, maxTop)
+				),
+			});
+		};
+
+		updatePanelPosition();
+		window.addEventListener("resize", updatePanelPosition);
+		window.addEventListener("scroll", updatePanelPosition, true);
+
+		return () => {
+			window.removeEventListener("resize", updatePanelPosition);
+			window.removeEventListener("scroll", updatePanelPosition, true);
+		};
+	}, [isOpen, panelRef, triggerRef]);
+
+	return panelPosition;
+}
+
+function useInlinePanelDismiss({
+	isOpen,
+	onDismiss,
+	panelRef,
+	triggerRef,
+}: {
+	isOpen: boolean;
+	onDismiss: () => void;
+	panelRef: RefObject<HTMLDivElement | null>;
+	triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+
+			if (!(target instanceof Node)) {
+				return;
+			}
+
+			if (
+				panelRef.current?.contains(target) ||
+				triggerRef.current?.contains(target)
+			) {
+				return;
+			}
+
+			onDismiss();
+		};
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				onDismiss();
+			}
+		};
+
+		window.addEventListener("pointerdown", handlePointerDown);
+		window.addEventListener("keydown", handleKeyDown);
+
+		return () => {
+			window.removeEventListener("pointerdown", handlePointerDown);
+			window.removeEventListener("keydown", handleKeyDown);
+		};
+	}, [isOpen, onDismiss, panelRef, triggerRef]);
 }
 
 function CrudDialog({
@@ -3919,7 +4138,28 @@ function RowActions({
 	const deleteMutation = useDeleteMutation(entity, tenantId);
 	const isDeleting = deleteMutation.isPending;
 	const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+	const destructiveActionLabel = destructiveActionLabels[entity];
 	let deleteButtonContent: ReactNode = <Trash2Icon className="size-4" />;
+
+	if (entity === "tenantUser") {
+		deleteButtonContent = <UserXIcon className="size-4" />;
+	} else if (entity === "tenant") {
+		deleteButtonContent = <PowerOffIcon className="size-4" />;
+	}
+
+	useEffect(() => {
+		if (!isConfirmingDelete) {
+			return;
+		}
+
+		const resetConfirmation = window.setTimeout(() => {
+			setIsConfirmingDelete(false);
+		}, deleteConfirmationTimeoutMs);
+
+		return () => {
+			window.clearTimeout(resetConfirmation);
+		};
+	}, [isConfirmingDelete]);
 
 	if (isDeleting) {
 		deleteButtonContent = <Loader2Icon className="size-4 animate-spin" />;
@@ -3952,14 +4192,18 @@ function RowActions({
 				<EditIcon className="size-4" />
 			</Button>
 			<Button
-				aria-label={`Delete ${entityLabels[entity]}`}
+				aria-label={
+					isConfirmingDelete
+						? `Confirm ${destructiveActionLabel} ${entityLabels[entity]}`
+						: `${titleCase(destructiveActionLabel)} ${entityLabels[entity]}`
+				}
 				className={cn(
 					compactButtonClass,
 					isConfirmingDelete ? "w-auto px-2" : ""
 				)}
 				disabled={deleteDisabled || isDeleting}
+				onBlur={() => setIsConfirmingDelete(false)}
 				onClick={handleDelete}
-				onMouseLeave={() => setIsConfirmingDelete(false)}
 				size={isConfirmingDelete ? "sm" : "icon-sm"}
 				variant="ghost"
 			>
@@ -3982,7 +4226,7 @@ function useMutationResult(
 	tenantId: string,
 	label: string,
 	errorLabel: string,
-	errorAction: "delete" | "save",
+	errorAction: ServiceOpsAction,
 	onDone?: () => void
 ) {
 	const queryClient = useQueryClient();
@@ -4022,7 +4266,7 @@ function useTenantMutationSuccess(
 function useTenantMutationResult(
 	label: string,
 	errorLabel: string,
-	errorAction: "delete" | "save",
+	errorAction: ServiceOpsAction,
 	onDone?: () => void
 ) {
 	const queryClient = useQueryClient();
@@ -4052,16 +4296,17 @@ function useTenantMutationResult(
 }
 
 function useDeleteMutation(entity: CrudEntity, tenantId: string) {
+	const actionLabel = destructiveActionLabels[entity];
 	const entityDeleteSuccess = useMutationResult(
 		tenantId,
-		`${entityLabels[entity]} deleted.`,
+		`${entityLabels[entity]} ${toPastTense(actionLabel)}.`,
 		entityLabels[entity],
-		"delete"
+		actionLabel
 	);
 	const tenantDeleteSuccess = useTenantMutationResult(
-		`${entityLabels[entity]} deleted.`,
+		`${entityLabels[entity]} ${toPastTense(actionLabel)}.`,
 		entityLabels[entity],
-		"delete"
+		actionLabel
 	);
 	const successOptions =
 		entity === "tenant" ? tenantDeleteSuccess : entityDeleteSuccess;

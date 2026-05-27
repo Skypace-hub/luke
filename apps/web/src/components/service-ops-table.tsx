@@ -61,6 +61,7 @@ export interface DataTableRow {
 
 interface ServiceTableRow {
 	actions?: ReactNode;
+	cells: ReactNode[];
 	id: string;
 	search: string;
 	values: string[];
@@ -269,7 +270,7 @@ export function DataTable({
 					</div>
 				</div>
 			</div>
-			<div className="overflow-hidden border-t">
+			<div className="overflow-x-auto overflow-y-hidden border-t">
 				<Table className="min-w-[820px] **:data-[slot=table-cell]:px-4 **:data-[slot=table-head]:px-4 **:data-[slot=table-cell]:py-4">
 					<TableHeader className="**:data-[slot=table-head]:h-11 **:data-[slot=table-head]:font-medium **:data-[slot=table-head]:text-foreground **:data-[slot=table-head]:text-sm">
 						{table.getHeaderGroups().map((headerGroup) => (
@@ -343,6 +344,7 @@ export function DataTable({
 						<select
 							aria-label="Rows per page"
 							className="h-8 rounded-lg border bg-background px-2 text-foreground text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+							name="rows-per-page"
 							onChange={(event) => {
 								table.setPageSize(Number(event.target.value));
 							}}
@@ -558,6 +560,7 @@ function getRowSearchText(row: DataTableRow) {
 function toServiceTableRows(rows: DataTableRow[]): ServiceTableRow[] {
 	return rows.map((row) => ({
 		actions: row.actions,
+		cells: row.cells,
 		id: row.id,
 		search: getRowSearchText(row),
 		values: row.cells.map(getNodeText),
@@ -715,7 +718,8 @@ function getServiceTableColumns(
 		},
 		...columns.map<ColumnDef<ServiceTableRow>>((column, index) => ({
 			accessorFn: (row) => row.values[index] ?? "",
-			cell: ({ row }) => row.original.values[index] ?? "",
+			cell: ({ row }) =>
+				row.original.cells[index] ?? row.original.values[index] ?? "",
 			filterFn: serviceTableColumnFilter,
 			header: column,
 			id: `column-${index}`,

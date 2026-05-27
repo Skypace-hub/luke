@@ -12,6 +12,14 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.luke"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "38382a10-0d36-4bb0-91a8-f4eaab6cbbc1"
+      }
     }
   }
 }

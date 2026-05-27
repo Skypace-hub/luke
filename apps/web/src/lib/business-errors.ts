@@ -1,4 +1,4 @@
-type ServiceOpsAction = "delete" | "save";
+export type ServiceOpsAction = "deactivate" | "delete" | "save" | "suspend";
 
 interface BusinessToast {
 	description: string;
@@ -73,11 +73,9 @@ export function getServiceOpsMutationError({
 	entityLabel: string;
 	message?: string;
 }): BusinessToast {
-	const actionLabel = action === "delete" ? "delete" : "save";
-
 	return {
 		description: getServiceOpsDescription(message),
-		title: `Unable to ${actionLabel} ${entityLabel}.`,
+		title: `Unable to ${action} ${entityLabel}.`,
 	};
 }
 

@@ -47,16 +47,17 @@ function DrawerLayout() {
 			<Drawer.Screen
 				name="(tabs)"
 				options={{
-					headerTitle: "Tabs",
+					headerShown: false,
+					headerTitle: "Engineer App",
 					drawerLabel: ({ color, focused }) => (
 						<Text style={{ color: focused ? color : themeColorForeground }}>
-							Tabs
+							Engineer App
 						</Text>
 					),
 					drawerIcon: ({ size, color, focused }) => (
 						<MaterialIcons
 							color={focused ? color : themeColorForeground}
-							name="border-bottom"
+							name="engineering"
 							size={size}
 						/>
 					),
