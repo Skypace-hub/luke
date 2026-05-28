@@ -7552,6 +7552,7 @@ function ProductPartPickerDialog({
 	const [draftSelectedValues, setDraftSelectedValues] =
 		useState(selectedValues);
 	const selectedValueSet = new Set(draftSelectedValues);
+	const selectedCount = draftSelectedValues.length;
 	const normalizedQuery = searchQuery.trim().toLowerCase();
 	const filteredOptions =
 		normalizedQuery.length > 0
@@ -7620,23 +7621,41 @@ function ProductPartPickerDialog({
 					placeholder="Search parts by name or number..."
 					value={searchQuery}
 				/>
+				<div className="mt-2 flex items-center justify-between gap-3 text-xs">
+					<span className="text-muted-foreground">
+						{selectedCount} part{selectedCount === 1 ? "" : "s"} selected
+					</span>
+					{selectedCount > 0 ? (
+						<button
+							className="font-medium text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+							onClick={() => setDraftSelectedValues([])}
+							type="button"
+						>
+							Clear selected
+						</button>
+					) : null}
+				</div>
 				<div className="mt-3 max-h-64 overflow-y-auto rounded-lg border bg-background">
 					{filteredOptions.length > 0 ? (
 						filteredOptions.map((option) => {
 							const isSelected = selectedValueSet.has(option.value);
 
 							return (
-								<button
-									aria-pressed={isSelected}
+								<label
 									className={cn(
-										"flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 hover:bg-muted/60",
+										"flex w-full cursor-pointer items-center gap-3 border-b px-4 py-3 text-left last:border-b-0 hover:bg-muted/60",
 										isSelected ? "bg-primary/10" : ""
 									)}
 									key={option.value}
-									onClick={() => toggleDraftPart(option.value)}
-									type="button"
 								>
-									<span className="min-w-0">
+									<input
+										aria-label={`Select ${option.label}`}
+										checked={isSelected}
+										className="size-4 shrink-0 accent-primary"
+										onChange={() => toggleDraftPart(option.value)}
+										type="checkbox"
+									/>
+									<span className="min-w-0 flex-1">
 										<span className="block truncate font-medium text-sm">
 											{option.label}
 										</span>
@@ -7649,7 +7668,7 @@ function ProductPartPickerDialog({
 									<span className="shrink-0 text-muted-foreground text-sm">
 										{option.meta}
 									</span>
-								</button>
+								</label>
 							);
 						})
 					) : (
@@ -7675,7 +7694,7 @@ function ProductPartPickerDialog({
 						}}
 						type="button"
 					>
-						Done
+						Done{selectedCount > 0 ? ` (${selectedCount})` : ""}
 					</Button>
 				</div>
 			</div>
