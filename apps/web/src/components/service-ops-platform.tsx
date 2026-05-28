@@ -573,7 +573,7 @@ export default function ServiceOpsPlatform({
 			window.requestAnimationFrame(() => {
 				document
 					.getElementById("back-office-content")
-					?.scrollIntoView({ behavior: "smooth", block: "start" });
+					?.scrollTo({ behavior: "smooth", top: 0 });
 			});
 		}
 	};
@@ -626,7 +626,7 @@ export default function ServiceOpsPlatform({
 			window.requestAnimationFrame(() => {
 				document
 					.getElementById("back-office-content")
-					?.scrollIntoView({ behavior: "smooth", block: "start" });
+					?.scrollTo({ behavior: "smooth", top: 0 });
 			});
 		}
 	};
@@ -638,10 +638,10 @@ export default function ServiceOpsPlatform({
 	};
 
 	return (
-		<main className="min-h-svh overflow-x-hidden bg-background text-foreground">
-			<div className="min-h-svh">
-				<div className="grid min-h-svh grid-cols-1 xl:grid-cols-[304px_minmax(0,1fr)]">
-					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-card text-card-foreground shadow-sm xl:sticky xl:top-0 xl:h-svh xl:border-r xl:border-b-0">
+		<main className="h-svh overflow-hidden bg-background text-foreground">
+			<div className="h-full min-h-0">
+				<div className="grid h-full min-h-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[304px_minmax(0,1fr)] xl:grid-rows-1">
+					<aside className="flex w-full min-w-0 flex-col overflow-hidden border-b bg-card text-card-foreground shadow-sm xl:h-full xl:border-r xl:border-b-0">
 						<TenantSwitcher
 							activeTenants={activeTenants}
 							isLoading={isTenantLoading}
@@ -708,8 +708,8 @@ export default function ServiceOpsPlatform({
 							/>
 						</div>
 					</aside>
-					<div className="min-w-0">
-						<header className="sticky top-0 z-20 flex min-h-18 items-center justify-between gap-4 border-b bg-background/95 px-4 pt-5 pb-3 backdrop-blur lg:px-6">
+					<div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+						<header className="z-20 flex min-h-18 shrink-0 items-center justify-between gap-4 border-b bg-background/95 px-4 pt-5 pb-3 backdrop-blur lg:px-6">
 							<div className="min-w-0">
 								<p className="text-muted-foreground text-xs">
 									Service operations
@@ -728,7 +728,7 @@ export default function ServiceOpsPlatform({
 							</div>
 						</header>
 						<section
-							className="@container/main min-w-0 px-4 py-4 md:py-6 lg:px-6"
+							className="@container/main min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 md:py-6 lg:px-6"
 							id="back-office-content"
 						>
 							{currentData ? (
@@ -980,11 +980,11 @@ function BackOfficeViewPanel({
 					</Button>
 				)}
 				description="Dispatch work, inspect ownership, and audit the current state machine without leaving the service console."
-				eyebrow="A. Job Management"
+				eyebrow="Job Management"
 				title="Job dispatch and state control"
 				width="full"
 			>
-				<div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+				<div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(340px,0.85fr)]">
 					<div className="flex min-w-0 flex-col gap-4">
 						<DataTable
 							columns={[
@@ -1016,7 +1016,7 @@ function BackOfficeViewPanel({
 										{job.status}
 									</StatusPill>,
 									job.priority,
-									job.engineer,
+									formatProperName(job.engineer),
 									job.scheduledFor,
 								],
 								actions: (
@@ -1065,9 +1065,7 @@ function BackOfficeViewPanel({
 								</CardContent>
 							</>
 						) : (
-							<CardContent className="pt-4">
-								<EmptyInline message="Select or create a job to view the audit trail." />
-							</CardContent>
+							<JobAuditEmptyState />
 						)}
 					</Card>
 				</div>
@@ -1077,69 +1075,19 @@ function BackOfficeViewPanel({
 
 	if (activeView === "assets") {
 		return (
-			<PageFrame
-				action={actionFor(
-					<Button
-						className={primaryActionClass}
-						onClick={() => onCreate("asset")}
-					>
-						<PlusIcon className="size-4" />
-						Register asset
-					</Button>
-				)}
-				description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
-				eyebrow="B. Asset & Device Management"
-				hideHeader
-				title="Installed asset registry"
-				width="full"
-			>
-				<DataTable
-					columns={[
-						"Asset",
-						"Model",
-						"Hospital",
-						"Location",
-						"NFC UID",
-						"Coverage",
-						"Next PM",
-					]}
-					description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
-					filterLabels={["Coverage", "Hospital"]}
-					rows={assets.map((asset) => ({
-						cells: [
-							<span className="font-medium" key={`${asset.id}-label`}>
-								{asset.id}
-							</span>,
-							asset.model,
-							asset.hospital,
-							asset.location,
-							asset.nfcUid,
-							asset.contractCoverage,
-							asset.nextPmDue,
-						],
-						actions: (
-							<div className="flex items-center justify-end gap-1">
-								<AssetNfcInlineActions
-									asset={asset}
-									canWrite={canWrite}
-									engineers={engineers}
-									mutations={actionMutations}
-									tenantId={data.tenant.id}
-								/>
-								<RowActions
-									canWrite={canWrite}
-									entity="asset"
-									id={asset.recordId}
-									onEdit={() => onEdit("asset", asset)}
-									tenantId={data.tenant.id}
-								/>
-							</div>
-						),
-						id: asset.id,
-					}))}
-					title={`${assets.length} Assets`}
-				/>
-			</PageFrame>
+			<AssetsView
+				assets={assets}
+				canWrite={canWrite}
+				engineers={engineers}
+				jobs={jobs}
+				mutations={actionMutations}
+				onCreate={() => onCreate("asset")}
+				onEdit={(asset) => onEdit("asset", asset)}
+				onOpenJob={onOpenJob}
+				onOpenProduct={onOpenProduct}
+				products={products}
+				tenantId={data.tenant.id}
+			/>
 		);
 	}
 
@@ -1944,6 +1892,468 @@ const coverageStatusStyles: Record<Asset["contractCoverage"], string> = {
 	Expired: "border-zinc-200 bg-zinc-50 text-zinc-600",
 	"In contract": "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
+
+function AssetsView({
+	assets,
+	canWrite,
+	engineers,
+	jobs,
+	mutations,
+	onCreate,
+	onEdit,
+	onOpenJob,
+	onOpenProduct,
+	products,
+	tenantId,
+}: {
+	assets: Asset[];
+	canWrite: boolean;
+	engineers: ServiceOpsSnapshot["engineers"];
+	jobs: Job[];
+	mutations: ActionMutations;
+	onCreate: () => void;
+	onEdit: (asset: Asset) => void;
+	onOpenJob: (jobId: string) => void;
+	onOpenProduct: (productId: string) => void;
+	products: ProductModel[];
+	tenantId: string;
+}) {
+	const [selectedAssetId, setSelectedAssetId] = useState("");
+	const selectedAsset =
+		assets.find((asset) => asset.recordId === selectedAssetId) ?? null;
+
+	useEffect(() => {
+		if (
+			!selectedAssetId ||
+			assets.some((asset) => asset.recordId === selectedAssetId)
+		) {
+			return;
+		}
+
+		setSelectedAssetId("");
+	}, [assets, selectedAssetId]);
+
+	if (selectedAsset) {
+		return (
+			<AssetDetailView
+				asset={selectedAsset}
+				canWrite={canWrite}
+				jobs={jobs.filter((job) => job.assetId === selectedAsset.recordId)}
+				onBack={() => setSelectedAssetId("")}
+				onEdit={() => onEdit(selectedAsset)}
+				onOpenJob={onOpenJob}
+				onOpenProduct={onOpenProduct}
+				product={
+					products.find(
+						(product) => product.id === selectedAsset.productModelId
+					) ?? null
+				}
+				tenantId={tenantId}
+			/>
+		);
+	}
+
+	return (
+		<PageFrame
+			action={
+				canWrite ? (
+					<Button className={primaryActionClass} onClick={onCreate}>
+						<PlusIcon className="size-4" />
+						Register asset
+					</Button>
+				) : null
+			}
+			description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
+			eyebrow="B. Asset & Device Management"
+			hideHeader
+			title="Installed asset registry"
+			width="full"
+		>
+			<DataTable
+				columns={[
+					"Asset",
+					"Model",
+					"Hospital",
+					"Location",
+					"NFC UID",
+					"Coverage",
+					"Next PM",
+				]}
+				description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
+				filterLabels={["Coverage", "Hospital"]}
+				rows={assets.map((asset) => ({
+					detailAriaLabel: `View ${asset.id} details`,
+					cells: [
+						<button
+							className="font-medium text-primary hover:underline"
+							key={`${asset.id}-label`}
+							onClick={() => setSelectedAssetId(asset.recordId)}
+							type="button"
+						>
+							{asset.id}
+						</button>,
+						asset.model,
+						asset.hospital,
+						asset.location,
+						asset.nfcUid,
+						<StatusPill
+							className={coverageStatusStyles[asset.contractCoverage]}
+							key={`${asset.id}-coverage`}
+						>
+							{asset.contractCoverage}
+						</StatusPill>,
+						asset.nextPmDue,
+					],
+					actions: (
+						<div className="inline-flex items-center justify-end gap-1">
+							<Button
+								aria-label={`View ${asset.id} details`}
+								className={compactButtonClass}
+								onClick={() => setSelectedAssetId(asset.recordId)}
+								size="icon-sm"
+								type="button"
+								variant="ghost"
+							>
+								<EyeIcon className="size-4" />
+							</Button>
+							<AssetNfcInlineActions
+								asset={asset}
+								canWrite={canWrite}
+								engineers={engineers}
+								mutations={mutations}
+								tenantId={tenantId}
+							/>
+							<RowActions
+								canWrite={canWrite}
+								entity="asset"
+								id={asset.recordId}
+								onEdit={() => onEdit(asset)}
+								tenantId={tenantId}
+							/>
+						</div>
+					),
+					id: asset.id,
+					onClick: () => setSelectedAssetId(asset.recordId),
+				}))}
+				title={`${assets.length} Assets`}
+			/>
+		</PageFrame>
+	);
+}
+
+function AssetDetailView({
+	asset,
+	canWrite,
+	jobs,
+	onBack,
+	onEdit,
+	onOpenJob,
+	onOpenProduct,
+	product,
+	tenantId,
+}: {
+	asset: Asset;
+	canWrite: boolean;
+	jobs: Job[];
+	onBack: () => void;
+	onEdit: () => void;
+	onOpenJob: (jobId: string) => void;
+	onOpenProduct: (productId: string) => void;
+	product: ProductModel | null;
+	tenantId: string;
+}) {
+	return (
+		<PageFrame
+			description="Installed device identity, service status, location, job history, and NFC audit context."
+			eyebrow="B. Asset & Device Management"
+			hideHeader
+			title={`${asset.id} detail`}
+			width="full"
+		>
+			<div className="flex flex-col gap-6">
+				<div className="flex flex-col gap-4">
+					<button
+						className="inline-flex w-fit items-center gap-2 text-base text-muted-foreground transition-colors hover:text-foreground"
+						onClick={onBack}
+						type="button"
+					>
+						<ArrowLeftIcon className="size-5" />
+						Back
+					</button>
+					<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+						<div className="min-w-0">
+							<h2 className="truncate font-semibold text-3xl tracking-tight">
+								{asset.model}
+							</h2>
+							<p className="mt-2 font-mono text-lg text-muted-foreground">
+								{asset.serial}
+							</p>
+						</div>
+						<div className="flex shrink-0 flex-wrap items-center gap-2">
+							<StatusPill
+								className={coverageStatusStyles[asset.contractCoverage]}
+							>
+								{asset.contractCoverage}
+							</StatusPill>
+							<RowActions
+								canWrite={canWrite}
+								entity="asset"
+								id={asset.recordId}
+								onEdit={onEdit}
+								tenantId={tenantId}
+							/>
+						</div>
+					</div>
+				</div>
+				<div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.95fr)]">
+					<div className="flex min-w-0 flex-col gap-6">
+						<AssetDeviceIdentityCard
+							asset={asset}
+							onOpenProduct={onOpenProduct}
+							product={product}
+						/>
+						<AssetLocationCard asset={asset} />
+						<AssetJobHistoryCard jobs={jobs} onOpenJob={onOpenJob} />
+						<AssetNfcAuditCard asset={asset} jobs={jobs} />
+					</div>
+					<AssetServiceStatusCard asset={asset} jobs={jobs} />
+				</div>
+			</div>
+		</PageFrame>
+	);
+}
+
+function AssetDeviceIdentityCard({
+	asset,
+	onOpenProduct,
+	product,
+}: {
+	asset: Asset;
+	onOpenProduct: (productId: string) => void;
+	product: ProductModel | null;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Device Identity</CardTitle>
+			</CardHeader>
+			<CardContent className="grid gap-6 sm:grid-cols-2">
+				<PartDetailField
+					label="Model"
+					value={
+						product ? (
+							<button
+								className="text-left text-primary hover:underline"
+								onClick={() => onOpenProduct(product.id)}
+								type="button"
+							>
+								{product.modelName}
+							</button>
+						) : (
+							asset.model
+						)
+					}
+				/>
+				<PartDetailField
+					label="Manufacturer"
+					value={product?.manufacturer ?? "Not set"}
+				/>
+				<PartDetailField
+					label="Category"
+					value={product?.category ?? "Not set"}
+				/>
+				<PartDetailField label="Serial Number" value={asset.serial} />
+				<PartDetailField label="Purchase Date" value={asset.installationDate} />
+				<PartDetailField label="Warranty Expiry" value={asset.warrantyExpiry} />
+			</CardContent>
+		</Card>
+	);
+}
+
+function AssetServiceStatusCard({
+	asset,
+	jobs,
+}: {
+	asset: Asset;
+	jobs: Job[];
+}) {
+	const activeJob = jobs.find(
+		(job) => job.status !== "Completed" && job.status !== "Cancelled"
+	);
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Service Status</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-5">
+				<div>
+					<p className="text-muted-foreground text-sm">NFC Tag</p>
+					<div className="mt-3 flex items-center gap-2">
+						<span className="size-2 rounded-full bg-emerald-500" />
+						<p className="font-semibold text-base text-emerald-700">
+							Commissioned
+						</p>
+					</div>
+					<p className="mt-2 break-all font-mono text-muted-foreground text-sm">
+						{asset.nfcUid}
+					</p>
+				</div>
+				<div className="border-t pt-5">
+					<p className="text-muted-foreground text-sm">
+						Preventive Maintenance
+					</p>
+					<p className="mt-2 font-medium text-base">
+						{asset.nextPmDue === "Not scheduled"
+							? "No PM schedule set"
+							: asset.nextPmDue}
+					</p>
+				</div>
+				{activeJob ? (
+					<div className="border-t pt-5">
+						<p className="text-muted-foreground text-sm">Current Job</p>
+						<p className="mt-2 font-semibold">{activeJob.id}</p>
+						<p className="mt-1 text-muted-foreground text-sm">
+							{activeJob.description}
+						</p>
+					</div>
+				) : null}
+				<div className="border-t pt-5">
+					<p className="text-muted-foreground text-sm">Designated Engineer</p>
+					<p className="mt-2 font-medium text-base">
+						{asset.designatedEngineer}
+					</p>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function AssetLocationCard({ asset }: { asset: Asset }) {
+	const locationParts = parseAssetLocation(asset.location);
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Location</CardTitle>
+			</CardHeader>
+			<CardContent className="grid gap-6 sm:grid-cols-2">
+				<PartDetailField label="Hospital" value={asset.hospital} />
+				<PartDetailField label="Floor" value={locationParts.floor} />
+				<PartDetailField label="Room" value={locationParts.room} />
+				<PartDetailField
+					label="Installation Date"
+					value={asset.installationDate}
+				/>
+				<PartDetailField
+					className="sm:col-span-2"
+					label="Notes"
+					value={locationParts.notes}
+				/>
+			</CardContent>
+		</Card>
+	);
+}
+
+function AssetJobHistoryCard({
+	jobs,
+	onOpenJob,
+}: {
+	jobs: Job[];
+	onOpenJob: (jobId: string) => void;
+}) {
+	const recentJobs = [...jobs]
+		.sort((first, second) => second.id.localeCompare(first.id))
+		.slice(0, 4);
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Job History</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{recentJobs.length > 0 ? (
+					recentJobs.map((job) => (
+						<div className={`${mutedPanelClass} p-4`} key={job.recordId}>
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+								<div className="min-w-0">
+									<p className="truncate font-semibold text-base">
+										{job.id} · {job.type}
+									</p>
+									<p className="mt-1 truncate text-muted-foreground text-sm">
+										{job.description}
+									</p>
+								</div>
+								<div className="flex shrink-0 items-center gap-3">
+									<StatusPill className={statusStyles[job.status]}>
+										{job.status}
+									</StatusPill>
+									<button
+										className="inline-flex items-center gap-1 font-medium text-primary text-sm hover:underline"
+										onClick={() => onOpenJob(job.id)}
+										type="button"
+									>
+										View
+										<ArrowUpRightIcon className="size-3.5" />
+									</button>
+								</div>
+							</div>
+						</div>
+					))
+				) : (
+					<EmptyInline message="No jobs for this asset" />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function AssetNfcAuditCard({ asset, jobs }: { asset: Asset; jobs: Job[] }) {
+	const latestJob = [...jobs].sort((first, second) =>
+		second.id.localeCompare(first.id)
+	)[0];
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>NFC Audit Log</CardTitle>
+			</CardHeader>
+			<CardContent>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<div className="flex min-w-0 items-center gap-3">
+						<span className="rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700 text-sm">
+							Read
+						</span>
+						<div className="min-w-0">
+							<p className="truncate font-medium">
+								{latestJob?.engineer ?? asset.designatedEngineer}
+							</p>
+							<p className="mt-1 truncate text-muted-foreground text-xs">
+								{asset.nfcUid}
+							</p>
+						</div>
+					</div>
+					<p className="text-muted-foreground text-sm">
+						{latestJob?.id ?? "Latest record"}
+					</p>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function parseAssetLocation(location: string) {
+	const parts = location
+		.split("/")
+		.map((part) => part.trim())
+		.filter(Boolean);
+
+	return {
+		floor: parts[1] ?? "Not set",
+		notes: parts[0] ?? location,
+		room: parts[2] ?? parts.at(-1) ?? "Not set",
+	};
+}
 
 const pmDueWindowMs = 30 * 24 * 60 * 60 * 1000;
 
@@ -4266,6 +4676,21 @@ function EmptyInline({ message }: { message: string }) {
 	);
 }
 
+function JobAuditEmptyState() {
+	return (
+		<CardContent className="flex min-h-[420px] items-center justify-center p-8">
+			<div className="flex max-w-xs flex-col items-center text-center">
+				<div className="flex size-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground">
+					<ClipboardCheckIcon className="size-7" />
+				</div>
+				<p className="mt-4 font-medium text-foreground text-sm">
+					Select or create a job to view the audit trail.
+				</p>
+			</div>
+		</CardContent>
+	);
+}
+
 function JobActionPanel({
 	canWrite,
 	job,
@@ -6062,7 +6487,7 @@ function CrudForm({
 			className="flex min-h-0 flex-1 flex-col bg-muted/20"
 			onSubmit={handleSubmit}
 		>
-			<div className="grid flex-1 auto-rows-min gap-y-5 overflow-y-auto px-6 py-5 md:grid-cols-2 md:gap-x-4">
+			<div className="grid flex-1 auto-rows-min gap-y-6 overflow-y-auto px-6 py-6 md:grid-cols-2 md:gap-x-5">
 				{fields.map((field) => {
 					const contractDateField = getContractDateFieldState(
 						field,
@@ -6522,7 +6947,7 @@ function FormField({
 						name={field.name}
 						required={field.required}
 					>
-						<option value="">Select...</option>
+						<option value="">{field.placeholder ?? "Select..."}</option>
 						{field.options?.map((option) => (
 							<option key={option.value} value={option.value}>
 								{option.label}
@@ -6618,7 +7043,7 @@ function TextFormField({
 			</Label>
 			<div className="relative">
 				<Input
-					className={cn(formControlClass, hasSuffix ? "pr-20" : "")}
+					className={cn(formControlClass, hasSuffix ? "pr-16" : "")}
 					defaultValue={
 						isControlled ? undefined : getInputDefaultValue(defaultValue)
 					}
@@ -6634,7 +7059,7 @@ function TextFormField({
 					value={value}
 				/>
 				{field.suffix ? (
-					<span className="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-muted-foreground text-sm">
+					<span className="pointer-events-none absolute inset-y-0 right-2.5 inline-flex items-center text-muted-foreground text-sm">
 						{field.suffix}
 					</span>
 				) : null}
@@ -6769,13 +7194,13 @@ function MultiSelectFormField({
 					<button
 						aria-expanded={isOpen}
 						aria-haspopup="listbox"
-						className="inline-flex min-h-7 shrink-0 items-center justify-center gap-1 rounded-md px-2 font-medium text-muted-foreground text-xs transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+						aria-label={`Toggle ${field.label}`}
+						className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
 						id={`${field.name}-toggle`}
 						onClick={() => setIsOpen((currentValue) => !currentValue)}
 						onKeyDown={handleTriggerKeyDown}
 						type="button"
 					>
-						<span>Select</span>
 						<ChevronDownIcon className="size-4" />
 					</button>
 				</div>

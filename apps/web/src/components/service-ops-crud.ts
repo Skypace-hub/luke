@@ -420,6 +420,7 @@ export function getFieldConfigs(
 				label: "Hospital",
 				name: "hospitalId",
 				options: hospitalOptions,
+				placeholder: "Select hospital...",
 				required: true,
 				type: "select",
 			},
@@ -448,6 +449,7 @@ export function getFieldConfigs(
 				label: "Hospital",
 				name: "hospitalId",
 				options: hospitalOptions,
+				placeholder: "Select hospital...",
 				required: true,
 				type: "select",
 			},
@@ -477,7 +479,7 @@ export function getFieldConfigs(
 			{
 				label: "Account manager",
 				name: "accountManagerName",
-				placeholder: "Please enter account manager",
+				placeholder: "Enter account manager...",
 				required: true,
 			},
 			{
@@ -1197,9 +1199,21 @@ function getTenantUserDefaults(
 	return null;
 }
 
+function getDateInputValue(date: Date) {
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+
+	return `${date.getFullYear()}-${month}-${day}`;
+}
+
 function getCreateDefaults(entity: CrudEntity) {
 	const suffix = Date.now().toString().slice(-5);
-	const today = new Date().toISOString().slice(0, 10);
+	const todayDate = new Date();
+	const oneYearFromToday = new Date(todayDate);
+	oneYearFromToday.setFullYear(oneYearFromToday.getFullYear() + 1);
+
+	const today = getDateInputValue(todayDate);
+	const oneYearFromTodayValue = getDateInputValue(oneYearFromToday);
 	const defaults: Record<string, FormDefaultValue> = {
 		status: "",
 	};
@@ -1241,7 +1255,7 @@ function getCreateDefaults(entity: CrudEntity) {
 		defaults.contractNumber = `CTR-${suffix}`;
 		defaults.coveredModelIds = [];
 		defaults.coveredPartIds = [];
-		defaults.endDate = today;
+		defaults.endDate = oneYearFromTodayValue;
 		defaults.startDate = today;
 		defaults.type = "full";
 		defaults.status = "active";
