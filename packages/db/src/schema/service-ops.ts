@@ -238,6 +238,7 @@ export const hospitals = pgTable(
 		code: text("code").notNull(),
 		name: text("name").notNull(),
 		district: text("district").notNull(),
+		regionProvince: text("region_province"),
 		address: text("address"),
 		latitude: numeric("latitude", { precision: 10, scale: 7 }),
 		longitude: numeric("longitude", { precision: 10, scale: 7 }),
@@ -345,6 +346,7 @@ export const parts = pgTable(
 			precision: 10,
 			scale: 2,
 		}).notNull(),
+		description: text("description"),
 		isActive: boolean("is_active").default(true).notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.defaultNow()

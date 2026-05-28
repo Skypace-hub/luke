@@ -26,8 +26,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ActivityIcon,
 	AlertTriangleIcon,
+	ArrowLeftIcon,
 	ArrowUpRightIcon,
 	BellRingIcon,
+	BoxIcon,
 	CalendarDaysIcon,
 	CheckCircle2Icon,
 	ChevronDownIcon,
@@ -35,9 +37,15 @@ import {
 	ClipboardCheckIcon,
 	CommandIcon,
 	EditIcon,
+	ExternalLinkIcon,
+	EyeIcon,
 	FileQuestionIcon,
+	LayoutGridIcon,
+	LayoutListIcon,
 	Loader2Icon,
 	LogOutIcon,
+	MapPinIcon,
+	MapPinOffIcon,
 	NfcIcon,
 	PlusIcon,
 	PowerOffIcon,
@@ -50,6 +58,7 @@ import {
 	WrenchIcon,
 	XIcon,
 } from "lucide-react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode, RefObject } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -70,6 +79,7 @@ import {
 	destructiveActionLabels,
 	entityLabels,
 	type FieldConfig,
+	type FieldOption,
 	type FormDefaultValue,
 	getCrudStateKey,
 	getFieldConfigs,
@@ -84,10 +94,18 @@ import {
 	type ServiceOpsAction,
 } from "@/lib/business-errors";
 import {
+	defaultDialCode,
+	internationalDialCodes,
+	internationalDialCodesByPrefix,
+} from "@/lib/international-dial-codes";
+import {
+	type Asset,
 	type BackOfficeView,
+	type Contract,
 	type ContractStatus,
 	type EngineerStatus,
 	type FaultStatus,
+	type Hospital,
 	type Job,
 	type JobStatus,
 	navigationItems,
@@ -121,6 +139,14 @@ const engineerStatusStyles: Record<EngineerStatus, string> = {
 	"Off duty": "bg-zinc-400",
 	"On-site": "bg-emerald-500",
 	"Timer anomaly": "bg-rose-500",
+};
+
+const engineerStatusPillStyles: Record<EngineerStatus, string> = {
+	Idle: "border-amber-200 bg-amber-50 text-amber-700",
+	"In transit": "border-sky-200 bg-sky-50 text-sky-700",
+	"Off duty": "border-zinc-200 bg-zinc-100 text-zinc-600",
+	"On-site": "border-emerald-200 bg-emerald-50 text-emerald-700",
+	"Timer anomaly": "border-rose-200 bg-rose-50 text-rose-700",
 };
 
 const contractStatusStyles: Record<ContractStatus, string> = {
@@ -197,6 +223,16 @@ const inlinePanelViewportPadding = 12;
 const inlinePanelWidth = 320;
 
 const inlinePanelOffset = 8;
+
+const coordinateFormatter = new Intl.NumberFormat("en", {
+	maximumFractionDigits: 4,
+	minimumFractionDigits: 4,
+});
+
+const currencyValueFormatter = new Intl.NumberFormat("en-HK", {
+	maximumFractionDigits: 2,
+	minimumFractionDigits: 2,
+});
 
 const hongKongBounds = {
 	maxLat: 22.56,
@@ -351,9 +387,11 @@ const getHashBackOfficeView = (): BackOfficeView | null => {
 export default function ServiceOpsPlatform({
 	currentUser,
 	initialData,
+	initialHospitalId = "",
 }: {
 	currentUser: CurrentUser;
 	initialData: ServiceOpsSnapshot;
+	initialHospitalId?: string;
 }) {
 	const router = useRouter();
 	const [selectedTenantId, setSelectedTenantId] = useState(
@@ -385,12 +423,15 @@ export default function ServiceOpsPlatform({
 		currentData?.tenant ?? selectedTenantOption ?? initialData.tenant;
 	const jobs = currentData?.jobs ?? [];
 	const isTenantLoading = !currentData && snapshotQuery.isFetching;
-	const [activeView, setActiveView] = useState<BackOfficeView>("dashboard");
-	const [firstJob] = jobs;
-	const [selectedJobId, setSelectedJobId] = useState(firstJob?.id ?? "");
+	const [activeView, setActiveView] = useState<BackOfficeView>(
+		initialHospitalId ? "hospitals" : "dashboard"
+	);
+	const [selectedJobId, setSelectedJobId] = useState("");
+	const [selectedHospitalId, setSelectedHospitalId] =
+		useState(initialHospitalId);
 	const [crudState, setCrudState] = useState<CrudState | null>(null);
 
-	const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? firstJob;
+	const selectedJob = jobs.find((job) => job.id === selectedJobId);
 	const isActiveViewAllowed =
 		!currentData ||
 		((activeView !== "tenants" || currentData.access.canManageTenants) &&
@@ -422,18 +463,20 @@ export default function ServiceOpsPlatform({
 	}, [selectedTenantId, tenantOptions]);
 
 	useEffect(() => {
-		if (jobs.some((job) => job.id === selectedJobId)) {
+		if (!selectedJobId || jobs.some((job) => job.id === selectedJobId)) {
 			return;
 		}
 
-		setSelectedJobId(firstJob?.id ?? "");
-	}, [firstJob?.id, jobs, selectedJobId]);
+		setSelectedJobId("");
+	}, [jobs, selectedJobId]);
 
 	useEffect(() => {
 		const syncViewFromUrl = () => {
 			const hashView = getHashBackOfficeView();
 
-			setActiveView(hashView ?? "dashboard");
+			setActiveView(
+				hashView ?? (initialHospitalId ? "hospitals" : "dashboard")
+			);
 		};
 
 		syncViewFromUrl();
@@ -444,7 +487,7 @@ export default function ServiceOpsPlatform({
 			window.removeEventListener("hashchange", syncViewFromUrl);
 			window.removeEventListener("popstate", syncViewFromUrl);
 		};
-	}, []);
+	}, [initialHospitalId]);
 
 	useEffect(() => {
 		if (!window.matchMedia("(max-width: 1279px)").matches) {
@@ -474,8 +517,11 @@ export default function ServiceOpsPlatform({
 
 	const selectBackOfficeView = (view: BackOfficeView) => {
 		setActiveView(view);
+		setSelectedHospitalId("");
 
-		const nextUrl = `${window.location.pathname}${window.location.search}#${view}`;
+		const currentPath = window.location.pathname;
+		const nextPath = currentPath.startsWith("/hospitals/") ? "/" : currentPath;
+		const nextUrl = `${nextPath}${window.location.search}#${view}`;
 
 		if (window.location.href !== new URL(nextUrl, window.location.href).href) {
 			window.history.pushState({ backOfficeView: view }, "", nextUrl);
@@ -496,6 +542,7 @@ export default function ServiceOpsPlatform({
 		}
 
 		setCrudState(null);
+		setSelectedHospitalId("");
 		setSelectedJobId("");
 		setSelectedTenantId(tenantId);
 		window.localStorage.setItem(selectedTenantStorageKey, tenantId);
@@ -521,6 +568,27 @@ export default function ServiceOpsPlatform({
 			}),
 		}))
 		.filter((section) => section.items.length > 0);
+
+	const openHospitalDetail = (hospitalId: string) => {
+		setSelectedHospitalId(hospitalId);
+		setActiveView("hospitals");
+		const hospitalDetailRoute: Route = `/hospitals/${hospitalId}` as Route;
+		router.push(hospitalDetailRoute);
+
+		if (window.matchMedia("(max-width: 1279px)").matches) {
+			window.requestAnimationFrame(() => {
+				document
+					.getElementById("back-office-content")
+					?.scrollIntoView({ behavior: "smooth", block: "start" });
+			});
+		}
+	};
+
+	const closeHospitalDetail = () => {
+		setSelectedHospitalId("");
+		setActiveView("hospitals");
+		router.push("/#hospitals");
+	};
 
 	return (
 		<main className="min-h-svh overflow-x-hidden bg-background text-foreground">
@@ -594,7 +662,7 @@ export default function ServiceOpsPlatform({
 						</div>
 					</aside>
 					<div className="min-w-0">
-						<header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b bg-background/95 px-4 py-3 backdrop-blur lg:px-6">
+						<header className="sticky top-0 z-20 flex min-h-18 items-center justify-between gap-4 border-b bg-background/95 px-4 pt-5 pb-3 backdrop-blur lg:px-6">
 							<div className="min-w-0">
 								<p className="text-muted-foreground text-xs">
 									Service operations
@@ -620,13 +688,21 @@ export default function ServiceOpsPlatform({
 								<BackOfficeViewPanel
 									activeView={visibleActiveView}
 									data={currentData}
+									onCloseHospital={closeHospitalDetail}
 									onCreate={(entity) =>
 										setCrudState({ entity, mode: "create" })
 									}
 									onEdit={(entity, record) =>
 										setCrudState({ entity, mode: "edit", record })
 									}
+									onOpenHospital={openHospitalDetail}
+									onOpenJob={(jobId) => {
+										setSelectedJobId(jobId);
+										selectBackOfficeView("jobs");
+									}}
+									selectedHospitalId={selectedHospitalId}
 									selectedJob={selectedJob}
+									selectedJobId={selectedJobId}
 									setSelectedJobId={setSelectedJobId}
 								/>
 							) : (
@@ -790,15 +866,25 @@ function BackOfficeViewPanel({
 	activeView,
 	data,
 	onCreate,
+	onCloseHospital,
 	onEdit,
+	onOpenHospital,
+	onOpenJob,
+	selectedHospitalId,
 	selectedJob,
+	selectedJobId,
 	setSelectedJobId,
 }: {
 	activeView: BackOfficeView;
 	data: ServiceOpsSnapshot;
 	onCreate: (entity: CrudEntity) => void;
+	onCloseHospital: () => void;
 	onEdit: (entity: CrudEntity, record: unknown) => void;
+	onOpenHospital: (hospitalId: string) => void;
+	onOpenJob: (jobId: string) => void;
+	selectedHospitalId: string;
 	selectedJob?: Job;
+	selectedJobId: string;
 	setSelectedJobId: (jobId: string) => void;
 }) {
 	const {
@@ -840,6 +926,7 @@ function BackOfficeViewPanel({
 				description="Dispatch work, inspect ownership, and audit the current state machine without leaving the service console."
 				eyebrow="A. Job Management"
 				title="Job dispatch and state control"
+				width="full"
 			>
 				<div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
 					<div className="flex min-w-0 flex-col gap-4">
@@ -854,6 +941,7 @@ function BackOfficeViewPanel({
 							]}
 							description="Recent service jobs with dispatch state, priority, engineer ownership, and schedule activity."
 							filterLabels={["Status", "Job type", "Engineer"]}
+							onSelectedRowIdChange={setSelectedJobId}
 							rows={jobs.map((job) => ({
 								cells: [
 									<button
@@ -886,6 +974,7 @@ function BackOfficeViewPanel({
 								),
 								id: job.id,
 							}))}
+							selectedRowId={selectedJobId}
 							title={`${jobs.length} Jobs`}
 						/>
 					</div>
@@ -944,7 +1033,9 @@ function BackOfficeViewPanel({
 				)}
 				description="Installed equipment records with NFC tags, contract coverage, and preventive maintenance dates."
 				eyebrow="B. Asset & Device Management"
+				hideHeader
 				title="Installed asset registry"
+				width="full"
 			>
 				<DataTable
 					columns={[
@@ -998,194 +1089,49 @@ function BackOfficeViewPanel({
 
 	if (activeView === "products") {
 		return (
-			<PageFrame
-				action={actionFor(
-					<Button
-						className={primaryActionClass}
-						onClick={() => onCreate("product")}
-					>
-						<PlusIcon className="size-4" />
-						New product
-					</Button>
-				)}
-				description="Product models, preventive maintenance cadence, parts mapping, and engineer-facing manuals."
-				eyebrow="B-05 Product Catalogue"
-				title="Product models and service manuals"
-			>
-				<DataTable
-					columns={[
-						"Model",
-						"Default PM cycle",
-						"Parts list",
-						"Manual",
-						"Engineer access",
-					]}
-					description="Product models, PM cycles, parts lists, and engineer-facing manual access."
-					filterLabels={["PM cycle", "Manual"]}
-					rows={products.map((product) => ({
-						cells: [
-							product.modelName,
-							`${product.defaultPmCycleMonths} months`,
-							product.partsList.join(", ") || "No parts linked",
-							product.manualFileUrl ? (
-								<a
-									className="font-medium text-primary hover:underline"
-									href={product.manualFileUrl}
-									key={`${product.id}-manual`}
-									rel="noopener"
-									target="_blank"
-								>
-									{product.manualFileName}
-								</a>
-							) : (
-								product.manualFileName
-							),
-							product.engineerAccess,
-						],
-						actions: (
-							<div className="flex items-center justify-end gap-1">
-								<ProductInlineActions
-									canWrite={canWrite}
-									mutations={actionMutations}
-									parts={parts}
-									product={product}
-									tenantId={data.tenant.id}
-								/>
-								<RowActions
-									canWrite={canWrite}
-									entity="product"
-									id={product.id}
-									onEdit={() => onEdit("product", product)}
-									tenantId={data.tenant.id}
-								/>
-							</div>
-						),
-						id: product.id,
-					}))}
-					title={`${products.length} Products`}
-				/>
-			</PageFrame>
+			<ProductCatalogue
+				canWrite={canWrite}
+				mutations={actionMutations}
+				onCreate={() => onCreate("product")}
+				onEdit={(product) => onEdit("product", product)}
+				parts={parts}
+				products={products}
+				tenantId={data.tenant.id}
+			/>
 		);
 	}
 
 	if (activeView === "hospitals") {
 		return (
-			<PageFrame
-				action={actionFor(
-					<Button
-						className={primaryActionClass}
-						onClick={() => onCreate("hospital")}
-					>
-						<PlusIcon className="size-4" />
-						New hospital
-					</Button>
-				)}
-				description="Hospital sites with contract state, asset coverage, location data, and current demand."
-				eyebrow="Tenant sites"
-				title="Hospitals and contract status"
-			>
-				<DataTable
-					columns={[
-						"Hospital",
-						"District",
-						"Contract",
-						"Assets",
-						"Open jobs",
-						"Location",
-					]}
-					description="Hospital sites with contract state, asset count, and open field-service demand."
-					filterLabels={["Contract", "District"]}
-					rows={hospitals.map((hospital) => ({
-						cells: [
-							hospital.name,
-							hospital.district,
-							<StatusPill
-								className={contractStatusStyles[hospital.contractStatus]}
-								key={`${hospital.id}-status`}
-							>
-								{hospital.contractStatus}
-							</StatusPill>,
-							hospital.assets,
-							hospital.openJobs,
-							`${hospital.lat}, ${hospital.lng}`,
-						],
-						actions: (
-							<RowActions
-								canWrite={canWrite}
-								entity="hospital"
-								id={hospital.id}
-								onEdit={() => onEdit("hospital", hospital)}
-								tenantId={data.tenant.id}
-							/>
-						),
-						id: hospital.id,
-					}))}
-					title={`${hospitals.length} Hospitals`}
-				/>
-			</PageFrame>
+			<HospitalsView
+				assets={assets}
+				canWrite={canWrite}
+				contracts={contracts}
+				faultReports={faultReports}
+				hospitals={hospitals}
+				jobs={jobs}
+				onCloseHospital={onCloseHospital}
+				onCreate={() => onCreate("hospital")}
+				onEdit={(hospital) => onEdit("hospital", hospital)}
+				onOpenHospital={onOpenHospital}
+				onOpenJob={onOpenJob}
+				selectedHospitalId={selectedHospitalId}
+				tenantId={data.tenant.id}
+			/>
 		);
 	}
 
 	if (activeView === "engineers") {
 		return (
-			<PageFrame
-				action={actionFor(
-					<Button
-						className={primaryActionClass}
-						onClick={() => onCreate("engineer")}
-					>
-						<PlusIcon className="size-4" />
-						New engineer
-					</Button>
-				)}
-				description="Engineer profiles with live status, service region, and billing rate configuration."
-				eyebrow="F-01 Engineer Management"
-				title="Engineer profiles and rates"
-			>
-				<DataTable
-					columns={[
-						"Engineer",
-						"Grade",
-						"Status",
-						"Region",
-						"Hourly",
-						"Mileage",
-						"Meal cap",
-					]}
-					description="Engineer profiles with live status, service region, and billing rate configuration."
-					filterLabels={["Status", "Region"]}
-					rows={engineers.map((engineer) => ({
-						cells: [
-							engineer.name,
-							engineer.grade,
-							<div
-								className="flex items-center gap-2"
-								key={`${engineer.id}-status`}
-							>
-								<span
-									className={`size-2 rounded-full ${engineerStatusStyles[engineer.status]}`}
-								/>
-								{engineer.status}
-							</div>,
-							engineer.region,
-							`HK$${engineer.hourlyRate}`,
-							`HK$${engineer.mileageRate}/km`,
-							`HK$${engineer.mealCap}`,
-						],
-						actions: (
-							<RowActions
-								canWrite={canWrite}
-								entity="engineer"
-								id={engineer.id}
-								onEdit={() => onEdit("engineer", engineer)}
-								tenantId={data.tenant.id}
-							/>
-						),
-						id: engineer.id,
-					}))}
-					title={`${engineers.length} Engineers`}
-				/>
-			</PageFrame>
+			<EngineersView
+				canWrite={canWrite}
+				engineers={engineers}
+				jobs={jobs}
+				onCreate={() => onCreate("engineer")}
+				onEdit={(engineer) => onEdit("engineer", engineer)}
+				onOpenJob={onOpenJob}
+				tenantId={data.tenant.id}
+			/>
 		);
 	}
 
@@ -1236,6 +1182,7 @@ function BackOfficeViewPanel({
 				description="Fault reports submitted from hospital web forms and converted into repair workflow."
 				eyebrow="G. Fault Reporting"
 				title="Fault intake and status tracking"
+				width="full"
 			>
 				<DataTable
 					columns={[
@@ -1306,6 +1253,7 @@ function BackOfficeViewPanel({
 				onCreate={() => onCreate("part")}
 				onEdit={(part) => onEdit("part", part)}
 				parts={parts}
+				products={products}
 				shortages={shortages}
 				tenantId={data.tenant.id}
 			/>
@@ -1373,6 +1321,602 @@ function BackOfficeViewPanel({
 	);
 }
 
+function HospitalsView({
+	assets,
+	canWrite,
+	contracts,
+	faultReports,
+	hospitals,
+	jobs,
+	onCloseHospital,
+	onCreate,
+	onEdit,
+	onOpenHospital,
+	onOpenJob,
+	selectedHospitalId,
+	tenantId,
+}: {
+	assets: Asset[];
+	canWrite: boolean;
+	contracts: Contract[];
+	faultReports: ServiceOpsSnapshot["faultReports"];
+	hospitals: Hospital[];
+	jobs: Job[];
+	onCloseHospital: () => void;
+	onCreate: () => void;
+	onEdit: (hospital: Hospital) => void;
+	onOpenHospital: (hospitalId: string) => void;
+	onOpenJob: (jobId: string) => void;
+	selectedHospitalId: string;
+	tenantId: string;
+}) {
+	const selectedHospital =
+		hospitals.find((hospital) => hospital.id === selectedHospitalId) ?? null;
+
+	if (selectedHospitalId) {
+		return (
+			<HospitalDetailView
+				assets={assets.filter(
+					(asset) => asset.hospitalId === selectedHospitalId
+				)}
+				canWrite={canWrite}
+				contracts={contracts.filter(
+					(contract) => contract.hospitalId === selectedHospitalId
+				)}
+				faultReports={faultReports.filter(
+					(fault) => fault.hospitalId === selectedHospitalId
+				)}
+				hospital={selectedHospital}
+				hospitalId={selectedHospitalId}
+				jobs={jobs.filter((job) => job.hospitalId === selectedHospitalId)}
+				onBack={onCloseHospital}
+				onEdit={selectedHospital ? () => onEdit(selectedHospital) : undefined}
+				onOpenJob={onOpenJob}
+				tenantId={tenantId}
+			/>
+		);
+	}
+
+	return (
+		<PageFrame
+			action={
+				canWrite ? (
+					<Button className={primaryActionClass} onClick={onCreate}>
+						<PlusIcon className="size-4" />
+						New hospital
+					</Button>
+				) : null
+			}
+			description="Hospital sites with contract state, asset coverage, location data, and current demand."
+			eyebrow="Tenant sites"
+			hideHeader
+			title="Hospitals and contract status"
+			width="full"
+		>
+			<DataTable
+				columns={[
+					"Hospital",
+					"City",
+					"Region / Province",
+					"Contract",
+					"Assets",
+					"Open jobs",
+					"Location",
+				]}
+				description="Hospital sites with contract state, asset count, and open field-service demand."
+				filterLabels={["Contract", "City", "Region"]}
+				rows={hospitals.map((hospital) => ({
+					detailAriaLabel: `View ${hospital.name} details`,
+					cells: [
+						<button
+							className="font-medium text-primary hover:underline"
+							key={`${hospital.id}-name`}
+							onClick={() => onOpenHospital(hospital.id)}
+							type="button"
+						>
+							{hospital.name}
+						</button>,
+						hospital.district,
+						hospital.regionProvince ?? "Not set",
+						<StatusPill
+							className={contractStatusStyles[hospital.contractStatus]}
+							key={`${hospital.id}-status`}
+						>
+							{hospital.contractStatus}
+						</StatusPill>,
+						hospital.assets,
+						hospital.openJobs,
+						<HospitalLocationCell
+							address={hospital.address}
+							key={`${hospital.id}-location`}
+							lat={hospital.lat}
+							lng={hospital.lng}
+						/>,
+					],
+					actions: (
+						<div className="inline-flex items-center justify-end gap-1">
+							<Button
+								aria-label={`View ${hospital.name} details`}
+								className={compactButtonClass}
+								onClick={() => onOpenHospital(hospital.id)}
+								size="icon-sm"
+								type="button"
+								variant="ghost"
+							>
+								<EyeIcon className="size-4" />
+							</Button>
+							<RowActions
+								canWrite={canWrite}
+								entity="hospital"
+								id={hospital.id}
+								onEdit={() => onEdit(hospital)}
+								tenantId={tenantId}
+							/>
+						</div>
+					),
+					id: hospital.id,
+					onClick: () => onOpenHospital(hospital.id),
+				}))}
+				title={`${hospitals.length} Hospitals`}
+			/>
+		</PageFrame>
+	);
+}
+
+function HospitalDetailView({
+	assets,
+	canWrite,
+	contracts,
+	faultReports,
+	hospital,
+	hospitalId,
+	jobs,
+	onBack,
+	onEdit,
+	onOpenJob,
+	tenantId,
+}: {
+	assets: Asset[];
+	canWrite: boolean;
+	contracts: Contract[];
+	faultReports: ServiceOpsSnapshot["faultReports"];
+	hospital: Hospital | null;
+	hospitalId: string;
+	jobs: Job[];
+	onBack: () => void;
+	onEdit?: () => void;
+	onOpenJob: (jobId: string) => void;
+	tenantId: string;
+}) {
+	if (!hospital) {
+		return (
+			<PageFrame
+				description="The requested hospital record is not available in this tenant."
+				eyebrow="Hospitals"
+				hideHeader
+				title="Hospital not found"
+				width="full"
+			>
+				<div className="flex flex-col gap-6">
+					<button
+						className="inline-flex w-fit items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
+						onClick={onBack}
+						type="button"
+					>
+						<ArrowLeftIcon className="size-4" />
+						Back
+					</button>
+					<EmptyInline message={`No hospital found for ${hospitalId}.`} />
+				</div>
+			</PageFrame>
+		);
+	}
+
+	const activeJobs = jobs.filter((job) => job.status !== "Completed");
+	const completedJobs = jobs.filter((job) => job.status === "Completed");
+	const primaryContract = getPrimaryHospitalContract(contracts);
+	const pmDueSoonAssets = getPmDueSoonAssets(assets);
+	const addressSummary = getHospitalAddressSummary(hospital);
+
+	return (
+		<PageFrame
+			description="Hospital profile, current work, installed devices, contact ownership, and contract coverage."
+			eyebrow="Hospitals"
+			hideHeader
+			title={`${hospital.name} detail`}
+			width="full"
+		>
+			<div className="flex flex-col gap-6">
+				<div className="flex flex-col gap-3">
+					<button
+						className="inline-flex w-fit items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
+						onClick={onBack}
+						type="button"
+					>
+						<ArrowLeftIcon className="size-4" />
+						Back
+					</button>
+					<div className="text-muted-foreground text-sm">
+						<button
+							className="font-medium transition-colors hover:text-foreground"
+							onClick={onBack}
+							type="button"
+						>
+							Hospitals
+						</button>
+						<span className="mx-2">/</span>
+						<span className="font-medium text-foreground">{hospital.name}</span>
+					</div>
+				</div>
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+					<div className="min-w-0">
+						<h2 className="truncate font-semibold text-3xl tracking-tight">
+							{hospital.name}
+						</h2>
+						<p className="mt-1 text-muted-foreground">{addressSummary}</p>
+					</div>
+					<div className="flex shrink-0 flex-wrap items-center gap-2">
+						<StatusPill
+							className={contractStatusStyles[hospital.contractStatus]}
+						>
+							{hospital.contractStatus} contract
+						</StatusPill>
+						{canWrite && onEdit ? (
+							<RowActions
+								canWrite={canWrite}
+								entity="hospital"
+								id={hospital.id}
+								onEdit={onEdit}
+								tenantId={tenantId}
+							/>
+						) : null}
+					</div>
+				</div>
+				<div className="grid gap-4 md:grid-cols-3">
+					<HospitalStatCard label="Installed Devices" value={assets.length} />
+					<HospitalStatCard label="Active Jobs" value={activeJobs.length} />
+					<HospitalStatCard
+						label="Completed Jobs"
+						value={completedJobs.length}
+					/>
+				</div>
+				<div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.95fr)]">
+					<div className="flex min-w-0 flex-col gap-6">
+						<HospitalActivityCard
+							emptyMessage="No active jobs for this hospital."
+							items={activeJobs}
+							onOpenJob={onOpenJob}
+							title="Active Jobs"
+							type="job"
+						/>
+						<HospitalActivityCard
+							emptyMessage="No installed devices for this hospital."
+							items={assets}
+							title="Installed Devices"
+							type="asset"
+						/>
+					</div>
+					<div className="flex min-w-0 flex-col gap-6">
+						<HospitalContactCard hospital={hospital} />
+						<HospitalContractCard contract={primaryContract} />
+						<HospitalLocationCard hospital={hospital} />
+						<HospitalPmDueCard assets={pmDueSoonAssets} />
+						<HospitalFaultCard faultReports={faultReports} />
+					</div>
+				</div>
+			</div>
+		</PageFrame>
+	);
+}
+
+function HospitalStatCard({ label, value }: { label: string; value: number }) {
+	return (
+		<div className={`${panelClass} p-4`}>
+			<p className="font-medium text-3xl leading-none tracking-tight">
+				{value}
+			</p>
+			<p className="mt-3 text-muted-foreground text-sm">{label}</p>
+		</div>
+	);
+}
+
+function HospitalActivityCard({
+	emptyMessage,
+	items,
+	onOpenJob,
+	title,
+	type,
+}: {
+	emptyMessage: string;
+	items: Asset[] | Job[];
+	onOpenJob?: (jobId: string) => void;
+	title: string;
+	type: "asset" | "job";
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>{title}</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{items.length > 0 ? (
+					items.map((item) =>
+						type === "job" ? (
+							<HospitalJobRow
+								job={item as Job}
+								key={(item as Job).recordId}
+								onOpenJob={onOpenJob}
+							/>
+						) : (
+							<HospitalAssetRow
+								asset={item as Asset}
+								key={(item as Asset).id}
+							/>
+						)
+					)
+				) : (
+					<EmptyInline message={emptyMessage} />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function HospitalJobRow({
+	job,
+	onOpenJob,
+}: {
+	job: Job;
+	onOpenJob?: (jobId: string) => void;
+}) {
+	return (
+		<div className={`${mutedPanelClass} p-4`}>
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div className="min-w-0">
+					<p className="truncate font-semibold text-base">{job.description}</p>
+					<p className="mt-1 truncate text-muted-foreground text-sm">
+						{job.typeValue} · {job.engineer}
+					</p>
+				</div>
+				<div className="flex shrink-0 items-center gap-3">
+					<StatusPill className={statusStyles[job.status]}>
+						{job.status}
+					</StatusPill>
+					{onOpenJob ? (
+						<button
+							className="inline-flex items-center gap-1 font-medium text-primary text-sm hover:underline"
+							onClick={() => onOpenJob(job.id)}
+							type="button"
+						>
+							View
+							<ArrowUpRightIcon className="size-3.5" />
+						</button>
+					) : null}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function HospitalAssetRow({ asset }: { asset: Asset }) {
+	return (
+		<div className={`${mutedPanelClass} p-4`}>
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div className="min-w-0">
+					<p className="truncate font-semibold text-base">{asset.model}</p>
+					<p className="mt-1 truncate text-muted-foreground text-sm">
+						{asset.serial || "No serial"} · {asset.location}
+					</p>
+				</div>
+				<StatusPill className={coverageStatusStyles[asset.contractCoverage]}>
+					{asset.contractCoverage}
+				</StatusPill>
+			</div>
+		</div>
+	);
+}
+
+function HospitalContactCard({ hospital }: { hospital: Hospital }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Contact</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				<HospitalDetailField
+					label="Primary contact"
+					value={hospital.primaryContactName ?? "Not set"}
+				/>
+				<HospitalDetailField
+					label="Phone"
+					value={hospital.primaryContactPhone ?? "Not set"}
+				/>
+				<HospitalDetailField
+					label="Email"
+					value={hospital.primaryContactEmail ?? "Not set"}
+				/>
+			</CardContent>
+		</Card>
+	);
+}
+
+function HospitalContractCard({ contract }: { contract: Contract | null }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Contract</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				{contract ? (
+					<>
+						<HospitalDetailField label="Contract number" value={contract.id} />
+						<HospitalDetailField label="Type" value={contract.typeValue} />
+						<HospitalDetailField label="Valid until" value={contract.expiry} />
+						<HospitalDetailField
+							label="Response SLA"
+							value={`${contract.slaHours}h`}
+						/>
+					</>
+				) : (
+					<EmptyInline message="No active contract configured." />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function HospitalLocationCard({ hospital }: { hospital: Hospital }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Location</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				<HospitalDetailField label="Hospital code" value={hospital.code} />
+				<HospitalDetailField label="City" value={hospital.district} />
+				<HospitalDetailField
+					label="Region / Province"
+					value={hospital.regionProvince ?? "Not set"}
+				/>
+				<HospitalDetailField
+					label="Address"
+					value={hospital.address ?? "Not set"}
+				/>
+				<HospitalLocationCell
+					address={hospital.address}
+					lat={hospital.lat}
+					lng={hospital.lng}
+				/>
+			</CardContent>
+		</Card>
+	);
+}
+
+function HospitalPmDueCard({ assets }: { assets: Asset[] }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>PM Due Soon</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{assets.length > 0 ? (
+					assets.map((asset) => (
+						<div className={`${mutedPanelClass} p-3`} key={`${asset.id}-pm`}>
+							<p className="truncate font-medium text-sm">{asset.model}</p>
+							<p className="mt-1 text-muted-foreground text-xs">
+								{asset.nextPmDue}
+							</p>
+						</div>
+					))
+				) : (
+					<EmptyInline message="No PM due in the next 30 days." />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function HospitalFaultCard({
+	faultReports,
+}: {
+	faultReports: ServiceOpsSnapshot["faultReports"];
+}) {
+	const openFaults = faultReports.filter(
+		(fault) => fault.status !== "Resolved"
+	);
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Open Faults</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{openFaults.length > 0 ? (
+					openFaults.slice(0, 4).map((fault) => (
+						<div className={`${mutedPanelClass} p-3`} key={fault.recordId}>
+							<div className="flex items-start justify-between gap-3">
+								<div className="min-w-0">
+									<p className="truncate font-medium text-sm">
+										{fault.description}
+									</p>
+									<p className="mt-1 truncate text-muted-foreground text-xs">
+										{fault.asset} · {fault.severity}
+									</p>
+								</div>
+								<StatusPill className={faultStatusStyles[fault.status]}>
+									{fault.status}
+								</StatusPill>
+							</div>
+						</div>
+					))
+				) : (
+					<EmptyInline message="No open fault reports." />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function HospitalDetailField({
+	label,
+	value,
+}: {
+	label: string;
+	value: ReactNode;
+}) {
+	return (
+		<div>
+			<p className="text-muted-foreground text-xs">{label}</p>
+			<p className="mt-1 break-words font-medium text-sm">{value}</p>
+		</div>
+	);
+}
+
+function getPrimaryHospitalContract(contracts: Contract[]) {
+	return (
+		contracts.find((contract) => contract.status === "Active") ??
+		contracts.find((contract) => contract.status === "Expiring") ??
+		contracts.at(0) ??
+		null
+	);
+}
+
+const coverageStatusStyles: Record<Asset["contractCoverage"], string> = {
+	"Billable exception": "border-amber-200 bg-amber-50 text-amber-700",
+	Expired: "border-zinc-200 bg-zinc-50 text-zinc-600",
+	"In contract": "border-emerald-200 bg-emerald-50 text-emerald-700",
+};
+
+const pmDueWindowMs = 30 * 24 * 60 * 60 * 1000;
+
+function getPmDueSoonAssets(assets: Asset[]) {
+	const today = new Date();
+	const windowEnd = new Date(today.getTime() + pmDueWindowMs);
+
+	return assets
+		.filter((asset) => {
+			const dueDate = new Date(asset.nextPmDue);
+
+			return (
+				!Number.isNaN(dueDate.getTime()) &&
+				dueDate >= today &&
+				dueDate <= windowEnd
+			);
+		})
+		.sort((first, second) => first.nextPmDue.localeCompare(second.nextPmDue))
+		.slice(0, 4);
+}
+
+function getHospitalAddressSummary(hospital: Hospital) {
+	const parts = [
+		hospital.district,
+		hospital.regionProvince,
+		hospital.address,
+	].filter((part): part is string => Boolean(part?.trim()));
+
+	return parts.length > 0 ? parts.join(" · ") : hospital.code;
+}
+
 function ContractsView({
 	canWrite,
 	contracts,
@@ -1415,57 +1959,56 @@ function ContractsView({
 			}
 			description="Track coverage terms, expiry risk, SLA targets, and model entitlement per hospital."
 			eyebrow="C. Contract Management"
+			hideHeader
 			title="Coverage and expiry controls"
+			width="full"
 		>
-			<div className="grid gap-4 lg:grid-cols-3">
-				{contracts.length > 0 ? (
-					contracts.map((contract) => (
-						<Card className={panelClass} key={contract.id}>
-							<CardHeader>
-								<div className="flex items-start justify-between gap-3">
-									<CardTitle>{contract.hospital}</CardTitle>
-									<div className="flex items-center gap-2">
-										<StatusPill
-											className={contractStatusStyles[contract.status]}
-										>
-											{contract.status}
-										</StatusPill>
-										<RowActions
-											canWrite={canWrite}
-											entity="contract"
-											id={contract.recordId}
-											onEdit={() => onEdit(contract)}
-											tenantId={tenantId}
-										/>
-									</div>
-								</div>
-							</CardHeader>
-							<CardContent className="flex flex-col gap-3 text-sm">
-								<Metric label="Contract" value={contract.id} />
-								<Metric label="Type" value={contract.type} />
-								<Metric label="SLA" value={`${contract.slaHours}h response`} />
-								<Metric label="Expiry" value={contract.expiry} />
-								<div>
-									<p className="text-muted-foreground text-xs">
-										Covered models
-									</p>
-									<p className="mt-1">{contract.coveredModels.join(", ")}</p>
-								</div>
-								<div>
-									<p className="text-muted-foreground text-xs">Covered parts</p>
-									<p className="mt-1">
-										{contract.coveredParts.join(", ") || "No parts configured"}
-									</p>
-								</div>
-							</CardContent>
-						</Card>
-					))
-				) : (
-					<div className="lg:col-span-3">
-						<EmptyInline message="No contracts yet." />
-					</div>
-				)}
-			</div>
+			<DataTable
+				columns={[
+					"Hospital",
+					"Contract",
+					"Type",
+					"Status",
+					"SLA",
+					"Start",
+					"Expiry",
+					"Covered models",
+					"Covered parts",
+				]}
+				description="Contract coverage terms, expiry risk, SLA targets, and model entitlement per hospital."
+				filterLabels={["Status", "Type", "Hospital"]}
+				rows={contracts.map((contract) => ({
+					cells: [
+						<span className="font-medium" key={`${contract.id}-hospital`}>
+							{contract.hospital}
+						</span>,
+						contract.id,
+						contract.type,
+						<StatusPill
+							className={contractStatusStyles[contract.status]}
+							key={`${contract.id}-status`}
+						>
+							{contract.status}
+						</StatusPill>,
+						`${contract.slaHours}h response`,
+						contract.startDate,
+						contract.expiry,
+						contract.coveredModels.join(", ") || "No models configured",
+						contract.coveredParts.join(", ") || "No parts configured",
+					],
+					actions: (
+						<RowActions
+							canWrite={canWrite}
+							entity="contract"
+							id={contract.recordId}
+							onEdit={() => onEdit(contract)}
+							tenantId={tenantId}
+						/>
+					),
+					id: contract.id,
+				}))}
+				title={`${contracts.length} Contracts`}
+			/>
 		</PageFrame>
 	);
 }
@@ -1504,6 +2047,7 @@ function MapView({
 			description="Monitor hospital pins, engineer positions, and geofence or SLA alerts in one operational map."
 			eyebrow="F. Location Operations"
 			title="Live map and geofence alerts"
+			width="full"
 		>
 			<div className="grid gap-4 xl:grid-cols-[1fr_360px]">
 				<div className="relative min-h-[560px] overflow-hidden rounded-xl border border-border/60 bg-muted/30">
@@ -1596,12 +2140,411 @@ function MapView({
 	);
 }
 
+function EngineersView({
+	canWrite,
+	engineers,
+	jobs,
+	onCreate,
+	onEdit,
+	onOpenJob,
+	tenantId,
+}: {
+	canWrite: boolean;
+	engineers: ServiceOpsSnapshot["engineers"];
+	jobs: ServiceOpsSnapshot["jobs"];
+	onCreate: () => void;
+	onEdit: (engineer: ServiceOpsSnapshot["engineers"][number]) => void;
+	onOpenJob: (jobId: string) => void;
+	tenantId: string;
+}) {
+	const [selectedEngineerId, setSelectedEngineerId] = useState("");
+	const selectedEngineer =
+		engineers.find((engineer) => engineer.id === selectedEngineerId) ?? null;
+
+	useEffect(() => {
+		if (
+			!selectedEngineerId ||
+			engineers.some((engineer) => engineer.id === selectedEngineerId)
+		) {
+			return;
+		}
+
+		setSelectedEngineerId("");
+	}, [engineers, selectedEngineerId]);
+
+	if (selectedEngineer) {
+		return (
+			<EngineerDetailView
+				canWrite={canWrite}
+				engineer={selectedEngineer}
+				jobs={jobs.filter((job) => job.engineerId === selectedEngineer.id)}
+				onBack={() => setSelectedEngineerId("")}
+				onEdit={() => onEdit(selectedEngineer)}
+				onOpenJob={onOpenJob}
+				tenantId={tenantId}
+			/>
+		);
+	}
+
+	return (
+		<PageFrame
+			action={
+				canWrite ? (
+					<Button className={primaryActionClass} onClick={onCreate}>
+						<PlusIcon className="size-4" />
+						New engineer
+					</Button>
+				) : null
+			}
+			description="Engineer profiles with live status, service region, and billing rate configuration."
+			eyebrow="F-01 Engineer Management"
+			hideHeader
+			title="Engineer profiles and rates"
+			width="full"
+		>
+			<DataTable
+				columns={[
+					"Engineer",
+					"Grade",
+					"Status",
+					"Region",
+					"Hourly",
+					"Mileage",
+					"Meal cap",
+				]}
+				description="Engineer profiles with live status, service region, and billing rate configuration."
+				filterLabels={["Status", "Region"]}
+				rows={engineers.map((engineer) => ({
+					detailAriaLabel: `View ${engineer.name} details`,
+					cells: [
+						<button
+							className="font-medium text-primary hover:underline"
+							key={`${engineer.id}-name`}
+							onClick={() => setSelectedEngineerId(engineer.id)}
+							type="button"
+						>
+							{engineer.name}
+						</button>,
+						engineer.grade,
+						<div
+							className="flex items-center gap-2"
+							key={`${engineer.id}-status`}
+						>
+							<span
+								className={`size-2 rounded-full ${engineerStatusStyles[engineer.status]}`}
+							/>
+							{engineer.status}
+						</div>,
+						engineer.region,
+						`HK$${engineer.hourlyRate}`,
+						`HK$${engineer.mileageRate}/km`,
+						`HK$${engineer.mealCap}`,
+					],
+					actions: (
+						<div className="inline-flex items-center justify-end gap-1">
+							<Button
+								aria-label={`View ${engineer.name} details`}
+								className={compactButtonClass}
+								onClick={() => setSelectedEngineerId(engineer.id)}
+								size="icon-sm"
+								type="button"
+								variant="ghost"
+							>
+								<EyeIcon className="size-4" />
+							</Button>
+							<RowActions
+								canWrite={canWrite}
+								entity="engineer"
+								id={engineer.id}
+								onEdit={() => onEdit(engineer)}
+								tenantId={tenantId}
+							/>
+						</div>
+					),
+					id: engineer.id,
+					onClick: () => setSelectedEngineerId(engineer.id),
+				}))}
+				title={`${engineers.length} Engineers`}
+			/>
+		</PageFrame>
+	);
+}
+
+function EngineerDetailView({
+	canWrite,
+	engineer,
+	jobs,
+	onBack,
+	onEdit,
+	onOpenJob,
+	tenantId,
+}: {
+	canWrite: boolean;
+	engineer: ServiceOpsSnapshot["engineers"][number];
+	jobs: ServiceOpsSnapshot["jobs"];
+	onBack: () => void;
+	onEdit: () => void;
+	onOpenJob: (jobId: string) => void;
+	tenantId: string;
+}) {
+	const stats = getEngineerJobStats(jobs);
+	const breakdown = getEngineerJobBreakdown(jobs);
+	const recentJobs = [...jobs]
+		.sort((first, second) => second.id.localeCompare(first.id))
+		.slice(0, 4);
+	const hasLocation = engineer.lat !== null && engineer.lng !== null;
+
+	return (
+		<PageFrame
+			description="Engineer job history, contact profile, and current location signal."
+			eyebrow="F-01 Engineer Management"
+			hideHeader
+			title={`${engineer.name} detail`}
+			width="full"
+		>
+			<div className="flex flex-col gap-6">
+				<div className="flex flex-col gap-3">
+					<button
+						className="inline-flex w-fit items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
+						onClick={onBack}
+						type="button"
+					>
+						<ArrowLeftIcon className="size-4" />
+						Back
+					</button>
+					<div className="text-muted-foreground text-sm">
+						<button
+							className="font-medium transition-colors hover:text-foreground"
+							onClick={onBack}
+							type="button"
+						>
+							Engineers
+						</button>
+						<span className="mx-2">/</span>
+						<span className="font-medium text-foreground">{engineer.name}</span>
+					</div>
+				</div>
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+					<div className="min-w-0">
+						<h2 className="truncate font-semibold text-3xl tracking-tight">
+							{engineer.name}
+						</h2>
+						<p className="mt-1 text-muted-foreground">{engineer.grade}</p>
+					</div>
+					<div className="flex shrink-0 flex-wrap items-center gap-2">
+						<StatusPill className={engineerStatusPillStyles[engineer.status]}>
+							{engineer.status}
+						</StatusPill>
+						<RowActions
+							canWrite={canWrite}
+							entity="engineer"
+							id={engineer.id}
+							onEdit={onEdit}
+							tenantId={tenantId}
+						/>
+					</div>
+				</div>
+				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+					<EngineerStatCard label="Total Jobs" value={stats.total} />
+					<EngineerStatCard
+						className="text-emerald-700"
+						label="Completed"
+						value={stats.completed}
+					/>
+					<EngineerStatCard label="Cancelled" value={stats.cancelled} />
+					<EngineerStatCard
+						className="text-primary"
+						label="Avg Duration"
+						value={formatDuration(stats.averageMinutes)}
+					/>
+				</div>
+				<div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.95fr)]">
+					<Card className={panelClass}>
+						<CardHeader>
+							<CardTitle>Recent Jobs</CardTitle>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-3">
+							{recentJobs.length > 0 ? (
+								recentJobs.map((job) => (
+									<div className={`${mutedPanelClass} p-4`} key={job.recordId}>
+										<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+											<div className="min-w-0">
+												<p className="truncate font-semibold text-base">
+													{job.description}
+												</p>
+												<p className="mt-1 truncate text-muted-foreground text-sm">
+													{job.typeValue} · {job.hospital} · {job.asset}
+												</p>
+											</div>
+											<div className="flex shrink-0 items-center gap-3">
+												<StatusPill className={statusStyles[job.status]}>
+													{job.status}
+												</StatusPill>
+												<button
+													className="inline-flex items-center gap-1 font-medium text-primary text-sm hover:underline"
+													onClick={() => onOpenJob(job.id)}
+													type="button"
+												>
+													View
+													<ArrowUpRightIcon className="size-3.5" />
+												</button>
+											</div>
+										</div>
+									</div>
+								))
+							) : (
+								<EmptyInline message="No jobs assigned to this engineer yet." />
+							)}
+						</CardContent>
+					</Card>
+					<div className="flex flex-col gap-6">
+						<Card className={panelClass}>
+							<CardHeader>
+								<CardTitle>Contact</CardTitle>
+							</CardHeader>
+							<CardContent className="flex flex-col gap-4">
+								<Metric label="Email" value={engineer.email ?? "Not set"} />
+								<Metric label="Phone" value={engineer.phone ?? "Not set"} />
+								<Metric label="Region" value={engineer.region} />
+							</CardContent>
+						</Card>
+						<Card className={panelClass}>
+							<CardHeader>
+								<CardTitle>GPS Location</CardTitle>
+							</CardHeader>
+							<CardContent>
+								{hasLocation ? (
+									<div className="flex flex-col gap-3">
+										<HospitalLocationCell
+											address={engineer.locationRecordedAt}
+											lat={engineer.lat ?? 0}
+											lng={engineer.lng ?? 0}
+										/>
+										<p className="text-muted-foreground text-xs">
+											Updated {engineer.locationRecordedAt ?? "recently"}
+										</p>
+									</div>
+								) : (
+									<p className="text-muted-foreground">
+										Location not available
+									</p>
+								)}
+							</CardContent>
+						</Card>
+					</div>
+				</div>
+				<Card className={cn(panelClass, "max-w-[820px]")}>
+					<CardHeader>
+						<CardTitle>Job Breakdown</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="grid gap-4 md:grid-cols-3">
+							{breakdown.map((item) => (
+								<div
+									className={cn(
+										"rounded-lg px-4 py-5 text-center",
+										item.className
+									)}
+									key={item.label}
+								>
+									<p className="font-semibold text-2xl">{item.count}</p>
+									<p className="mt-2 text-muted-foreground text-sm">
+										{item.label}
+									</p>
+								</div>
+							))}
+						</div>
+					</CardContent>
+				</Card>
+			</div>
+		</PageFrame>
+	);
+}
+
+function EngineerStatCard({
+	className,
+	label,
+	value,
+}: {
+	className?: string;
+	label: string;
+	value: ReactNode;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardContent className="flex min-h-28 flex-col items-center justify-center gap-3 p-4 text-center">
+				<p className={cn("font-semibold text-3xl leading-none", className)}>
+					{value}
+				</p>
+				<p className="text-muted-foreground text-sm">{label}</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+function getEngineerJobStats(jobs: Job[]) {
+	const total = jobs.length;
+	const completedJobs = jobs.filter((job) => job.status === "Completed");
+	const cancelled = jobs.filter((job) => job.status === "Cancelled").length;
+	const totalCompletedMinutes = completedJobs.reduce(
+		(sum, job) => sum + job.timerMinutes,
+		0
+	);
+	const averageMinutes =
+		completedJobs.length > 0
+			? Math.round(totalCompletedMinutes / completedJobs.length)
+			: 0;
+
+	return {
+		averageMinutes,
+		cancelled,
+		completed: completedJobs.length,
+		total,
+	};
+}
+
+function getEngineerJobBreakdown(jobs: Job[]) {
+	return [
+		{
+			className: "bg-violet-50 text-violet-700",
+			count: jobs.filter((job) => job.type === "Installation").length,
+			label: "Installation",
+		},
+		{
+			className: "bg-amber-50 text-amber-700",
+			count: jobs.filter((job) => job.type === "Repair").length,
+			label: "Repair",
+		},
+		{
+			className: "bg-sky-50 text-sky-700",
+			count: jobs.filter((job) => job.type === "Preventive Maintenance").length,
+			label: "Maintenance",
+		},
+	];
+}
+
+function formatDuration(totalMinutes: number) {
+	const hours = Math.floor(totalMinutes / 60);
+	const minutes = totalMinutes % 60;
+
+	if (hours === 0) {
+		return `${minutes}m`;
+	}
+
+	if (minutes === 0) {
+		return `${hours}h`;
+	}
+
+	return `${hours}h ${minutes}m`;
+}
+
 function PartsView({
 	canWrite,
 	onCreate,
 	onEdit,
 	mutations,
 	parts,
+	products,
 	shortages,
 	tenantId,
 }: {
@@ -1610,9 +2553,44 @@ function PartsView({
 	onCreate: () => void;
 	onEdit: (part: ServiceOpsSnapshot["parts"][number]) => void;
 	parts: ServiceOpsSnapshot["parts"];
+	products: ServiceOpsSnapshot["products"];
 	shortages: ServiceOpsSnapshot["shortages"];
 	tenantId: string;
 }) {
+	const [selectedPartId, setSelectedPartId] = useState("");
+	const selectedPart =
+		parts.find((part) => part.recordId === selectedPartId) ?? null;
+
+	useEffect(() => {
+		if (
+			!selectedPartId ||
+			parts.some((part) => part.recordId === selectedPartId)
+		) {
+			return;
+		}
+
+		setSelectedPartId("");
+	}, [parts, selectedPartId]);
+
+	if (selectedPart) {
+		return (
+			<PartDetailView
+				canWrite={canWrite}
+				mutations={mutations}
+				onBack={() => setSelectedPartId("")}
+				onEdit={() => onEdit(selectedPart)}
+				part={selectedPart}
+				products={products.filter((product) =>
+					product.partIds.includes(selectedPart.recordId)
+				)}
+				shortages={shortages.filter(
+					(shortage) => shortage.partId === selectedPart.recordId
+				)}
+				tenantId={tenantId}
+			/>
+		);
+	}
+
 	return (
 		<PageFrame
 			action={
@@ -1625,114 +2603,453 @@ function PartsView({
 			}
 			description="Parts stock levels, minimum thresholds, supplier records, and shortage handoffs."
 			eyebrow="H. Parts & Inventory"
+			hideHeader
 			title="Inventory and shortage queue"
+			width="full"
 		>
-			<div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-				<DataTable
-					columns={[
-						"Part",
-						"Name",
-						"Supplier",
-						"Stock",
-						"Minimum",
-						"Unit cost",
-					]}
-					description="Parts stock levels, minimum thresholds, supplier records, and unit cost controls."
-					filterLabels={["Stock status", "Supplier"]}
-					rows={parts.map((part) => ({
+			<DataTable
+				columnAlignments={{
+					Stock: "right",
+					"Unit cost (HKD)": "right",
+				}}
+				columns={[
+					"Part",
+					"Name",
+					"Supplier",
+					"Stock",
+					"Stock status",
+					"Unit cost (HKD)",
+				]}
+				description="Parts stock levels, minimum thresholds, supplier records, and unit cost controls."
+				filterLabels={["Stock status", "Supplier"]}
+				hideTitleCount
+				rows={parts.map((part) => {
+					const stockStatus = getPartStockStatus(part);
+
+					return {
+						detailAriaLabel: `View ${part.name} details`,
 						cells: [
-							<span className="font-medium" key={`${part.id}-label`}>
+							<button
+								className="font-medium text-primary hover:underline"
+								key={`${part.id}-label`}
+								onClick={() => setSelectedPartId(part.recordId)}
+								type="button"
+							>
 								{part.id}
-							</span>,
+							</button>,
 							part.name,
 							part.supplier,
-							<span
-								className={part.stock < part.minimum ? "text-rose-600" : ""}
-								key={`${part.id}-stock`}
+							<PartStockSummary key={`${part.id}-stock`} part={part} />,
+							<StatusPill
+								className={stockStatus.className}
+								key={`${part.id}-stock-status`}
 							>
-								{part.stock}
-							</span>,
-							part.minimum,
-							`HK$${part.unitCost}`,
+								{stockStatus.label}
+							</StatusPill>,
+							<PartUnitCost
+								key={`${part.id}-unit-cost`}
+								value={part.unitCost}
+							/>,
 						],
 						actions: (
-							<RowActions
-								canWrite={canWrite}
-								entity="part"
-								id={part.recordId}
-								onEdit={() => onEdit(part)}
-								tenantId={tenantId}
-							/>
-						),
-						id: part.id,
-					}))}
-					title={`${parts.length} Parts`}
-				/>
-				<Card className={panelClass}>
-					<CardHeader>
-						<CardTitle>Shortage queue</CardTitle>
-					</CardHeader>
-					<CardContent className="flex flex-col gap-3">
-						{shortages.length > 0 ? (
-							shortages.map((shortage) => (
-								<div
-									className={`${mutedPanelClass} p-3 text-sm`}
-									key={shortage.id}
+							<div className="inline-flex items-center justify-end gap-4">
+								<Button
+									aria-label={`View ${part.name} details`}
+									className={compactButtonClass}
+									onClick={() => setSelectedPartId(part.recordId)}
+									size="icon-sm"
+									type="button"
+									variant="ghost"
 								>
-									<div className="flex items-center justify-between gap-3">
-										<p className="font-medium">{shortage.job}</p>
-										<StatusPill className="border-amber-200 bg-amber-50 text-amber-700">
-											{shortage.status}
-										</StatusPill>
-									</div>
-									<p className="mt-1 text-muted-foreground">
-										{shortage.part} requested by {shortage.engineer}
-									</p>
-									{canWrite ? (
-										<div className="mt-3 flex flex-wrap gap-2">
-											<Button
-												className={actionButtonClass}
-												disabled={mutations.confirmPartsArrived.isPending}
-												onClick={() =>
-													mutations.confirmPartsArrived.mutate({
-														id: shortage.recordId,
-														tenantId,
-													})
-												}
-												size="sm"
-												type="button"
-												variant="outline"
-											>
-												Mark arrived
-											</Button>
-											<Button
-												className={actionButtonClass}
-												disabled={mutations.resumeShortageJob.isPending}
-												onClick={() =>
-													mutations.resumeShortageJob.mutate({
-														data: { scheduledStartAt: null },
-														id: shortage.recordId,
-														tenantId,
-													})
-												}
-												size="sm"
-												type="button"
-												variant="outline"
-											>
-												Resume job
-											</Button>
-										</div>
-									) : null}
-								</div>
-							))
-						) : (
-							<EmptyInline message="No shortage requests yet." />
-						)}
-					</CardContent>
-				</Card>
+									<EyeIcon className="size-4" />
+								</Button>
+								<RowActions
+									canWrite={canWrite}
+									entity="part"
+									id={part.recordId}
+									onEdit={() => onEdit(part)}
+									tenantId={tenantId}
+								/>
+							</div>
+						),
+						columnValues: {
+							"Stock status": stockStatus.label,
+							"Unit cost (HKD)": currencyValueFormatter.format(part.unitCost),
+						},
+						id: part.id,
+						onClick: () => setSelectedPartId(part.recordId),
+					};
+				})}
+				title={`${parts.length} Parts`}
+			/>
+		</PageFrame>
+	);
+}
+
+function getPartStockStatus(part: Part) {
+	const isLow = part.stock < part.minimum;
+
+	if (isLow) {
+		return {
+			className: "border-rose-300 bg-rose-50 text-rose-700",
+			isLow,
+			label: "Low stock",
+		};
+	}
+
+	return {
+		className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+		isLow,
+		label: "In stock",
+	};
+}
+
+function PartStockSummary({ part }: { part: Part }) {
+	const isLowStock = part.stock < part.minimum;
+	const fillPercentage =
+		part.minimum > 0 ? Math.min((part.stock / part.minimum) * 100, 100) : 100;
+	const progressColorClass = isLowStock ? "bg-rose-500" : "bg-emerald-500";
+
+	return (
+		<div className="ml-auto flex w-24 flex-col items-end gap-1.5">
+			<div className="flex items-baseline gap-1.5 text-right tabular-nums">
+				<span
+					className={cn(
+						"font-semibold text-sm",
+						isLowStock ? "text-rose-600" : "text-foreground"
+					)}
+				>
+					{part.stock}
+				</span>
+				<span className="text-muted-foreground text-xs">
+					min {part.minimum}
+				</span>
+			</div>
+			<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+				<div
+					className={cn("h-full rounded-full", progressColorClass)}
+					style={{ width: `${fillPercentage}%` }}
+				/>
+			</div>
+		</div>
+	);
+}
+
+function PartUnitCost({ value }: { value: number }) {
+	return (
+		<span className="block text-right font-medium tabular-nums">
+			{currencyValueFormatter.format(value)}
+		</span>
+	);
+}
+
+function PartDetailView({
+	canWrite,
+	mutations,
+	onBack,
+	onEdit,
+	part,
+	products,
+	shortages,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	onBack: () => void;
+	onEdit: () => void;
+	part: Part;
+	products: ProductModel[];
+	shortages: ServiceOpsSnapshot["shortages"];
+	tenantId: string;
+}) {
+	const stockStatus = getPartStockStatus(part);
+
+	return (
+		<PageFrame
+			description="Part detail, product usage, stock adjustment, and shortage records."
+			eyebrow="H. Parts & Inventory"
+			hideHeader
+			title={`${part.name} detail`}
+			width="full"
+		>
+			<div className="flex flex-col gap-6">
+				<div className="flex flex-col gap-3">
+					<button
+						className="inline-flex w-fit items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
+						onClick={onBack}
+						type="button"
+					>
+						<ArrowLeftIcon className="size-4" />
+						Back
+					</button>
+					<div className="text-muted-foreground text-sm">
+						<button
+							className="font-medium transition-colors hover:text-foreground"
+							onClick={onBack}
+							type="button"
+						>
+							Parts & Stock
+						</button>
+						<span className="mx-2">/</span>
+						<span className="font-medium text-foreground">{part.name}</span>
+					</div>
+				</div>
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+					<div className="min-w-0">
+						<h2 className="truncate font-semibold text-3xl tracking-tight">
+							{part.name}
+						</h2>
+						<p className="mt-1 text-muted-foreground">{part.id}</p>
+					</div>
+					<div className="flex shrink-0 flex-wrap items-center gap-2">
+						<StatusPill className={stockStatus.className}>
+							{stockStatus.label}
+						</StatusPill>
+						<RowActions
+							canWrite={canWrite}
+							entity="part"
+							id={part.recordId}
+							onEdit={onEdit}
+							tenantId={tenantId}
+						/>
+					</div>
+				</div>
+				<div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.95fr)]">
+					<div className="flex min-w-0 flex-col gap-6">
+						<PartDetailsCard part={part} />
+						<PartStockAdjustmentCard
+							canWrite={canWrite}
+							mutations={mutations}
+							part={part}
+							tenantId={tenantId}
+						/>
+						<PartUsageHistoryCard products={products} shortages={shortages} />
+					</div>
+					<PartProductsCard products={products} />
+				</div>
 			</div>
 		</PageFrame>
 	);
+}
+
+function PartDetailsCard({ part }: { part: Part }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Part Details</CardTitle>
+			</CardHeader>
+			<CardContent className="grid gap-5 sm:grid-cols-2">
+				<PartDetailField
+					label="Unit cost"
+					value={currencyValueFormatter.format(part.unitCost)}
+				/>
+				<PartDetailField label="Supplier" value={part.supplier || "Not set"} />
+				<PartDetailField label="Stock quantity" value={`${part.stock} units`} />
+				<PartDetailField
+					label="Reorder threshold"
+					value={`${part.minimum} units`}
+				/>
+				<PartDetailField
+					className="sm:col-span-2"
+					label="Description"
+					value={part.description ?? part.name}
+				/>
+			</CardContent>
+		</Card>
+	);
+}
+
+function PartDetailField({
+	className,
+	label,
+	value,
+}: {
+	className?: string;
+	label: string;
+	value: ReactNode;
+}) {
+	return (
+		<div className={className}>
+			<p className="text-muted-foreground text-sm">{label}</p>
+			<p className="mt-1 break-words font-medium text-base">{value}</p>
+		</div>
+	);
+}
+
+function PartProductsCard({ products }: { products: ProductModel[] }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Used In Products</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{products.length > 0 ? (
+					products.map((product) => (
+						<div className={`${mutedPanelClass} p-4`} key={product.id}>
+							<p className="font-semibold text-base">{product.modelName}</p>
+							<p className="mt-1 text-muted-foreground text-sm">
+								{product.code}
+							</p>
+							<p className="mt-2 font-medium text-primary text-sm">
+								{product.category}
+							</p>
+						</div>
+					))
+				) : (
+					<EmptyInline message="No products use this part yet." />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function PartStockAdjustmentCard({
+	canWrite,
+	mutations,
+	part,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	part: Part;
+	tenantId: string;
+}) {
+	const [deltaValue, setDeltaValue] = useState("0");
+	const [reason, setReason] = useState("");
+	const delta = Number(deltaValue);
+	const isValidDelta = Number.isInteger(delta);
+	const nextStock = isValidDelta ? part.stock + delta : part.stock;
+	const canSubmit =
+		canWrite &&
+		isValidDelta &&
+		delta !== 0 &&
+		nextStock >= 0 &&
+		!mutations.updatePartStock.isPending;
+
+	const updateStock = () => {
+		if (!canSubmit) {
+			return;
+		}
+
+		mutations.updatePartStock.mutate({
+			data: buildPartStockAdjustmentPayload(part, nextStock),
+			id: part.recordId,
+			tenantId,
+		});
+		setDeltaValue("0");
+		setReason("");
+	};
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Stock Adjustment</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				<div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
+					<div className={formFieldClass}>
+						<Label
+							className={formLabelClass}
+							htmlFor={`${part.recordId}-delta`}
+						>
+							Delta (+ for arrival, - for reduction)
+						</Label>
+						<Input
+							className={formControlClass}
+							disabled={!canWrite}
+							id={`${part.recordId}-delta`}
+							onChange={(event) => setDeltaValue(event.target.value)}
+							type="number"
+							value={deltaValue}
+						/>
+					</div>
+					<div className={formFieldClass}>
+						<Label
+							className={formLabelClass}
+							htmlFor={`${part.recordId}-reason`}
+						>
+							Reason (optional)
+						</Label>
+						<Input
+							className={formControlClass}
+							disabled={!canWrite}
+							id={`${part.recordId}-reason`}
+							onChange={(event) => setReason(event.target.value)}
+							placeholder="e.g. Stock delivery from supplier"
+							value={reason}
+						/>
+					</div>
+					<Button
+						className={primaryActionClass}
+						disabled={!canSubmit}
+						onClick={updateStock}
+						type="button"
+					>
+						{mutations.updatePartStock.isPending ? (
+							<Loader2Icon className="size-4 animate-spin" />
+						) : null}
+						Update Stock
+					</Button>
+				</div>
+				<p className="text-muted-foreground text-sm">
+					Current: {part.stock} {"->"} New: {nextStock}
+					{reason.trim() ? ` · ${reason.trim()}` : ""}
+				</p>
+			</CardContent>
+		</Card>
+	);
+}
+
+function PartUsageHistoryCard({
+	shortages,
+}: {
+	shortages: ServiceOpsSnapshot["shortages"];
+}) {
+	const totalUsageRecords = shortages.length;
+
+	return (
+		<Card className={panelClass}>
+			<CardHeader className="flex-row items-start justify-between gap-3">
+				<CardTitle>Usage History</CardTitle>
+				<p className="text-muted-foreground text-sm">
+					{totalUsageRecords} recent record
+					{totalUsageRecords === 1 ? "" : "s"}
+				</p>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{shortages.length > 0 ? (
+					shortages.map((shortage) => (
+						<div className={`${mutedPanelClass} p-3 text-sm`} key={shortage.id}>
+							<div className="flex items-center justify-between gap-3">
+								<p className="font-medium">{shortage.job}</p>
+								<StatusPill className="border-amber-200 bg-amber-50 text-amber-700">
+									{shortage.status}
+								</StatusPill>
+							</div>
+							<p className="mt-1 text-muted-foreground">
+								Requested by {shortage.engineer}
+							</p>
+						</div>
+					))
+				) : (
+					<EmptyInline message="No usage records found." />
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function buildPartStockAdjustmentPayload(part: Part, stockOnHand: number) {
+	return {
+		description: part.description,
+		minimumStock: part.minimum,
+		name: part.name,
+		partNumber: part.id,
+		productModelIds: part.productModelIds,
+		stockOnHand,
+		supplier: part.supplier,
+		unitCost: part.unitCost,
+	};
 }
 
 function ReportsView({
@@ -1777,6 +3094,7 @@ function ReportsView({
 			description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
 			eyebrow="I. Reports"
 			title="Operational report and job-level cost view"
+			width="full"
 		>
 			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 				{reportMetrics.length > 0 ? (
@@ -1845,6 +3163,7 @@ function ConfigView({
 			description="Tenant-level controls for operational thresholds, roles, and notification parameters."
 			eyebrow="J. System Configuration"
 			title="Parameters, roles and notifications"
+			width="full"
 		>
 			<div className="grid gap-4 lg:grid-cols-[1fr_380px]">
 				<Card className={panelClass}>
@@ -1982,6 +3301,7 @@ function TenantsView({
 			description="Manage SaaS workspaces that isolate data, users, configuration, and service operations."
 			eyebrow="Tenant Administration"
 			title="Tenant management"
+			width="full"
 		>
 			<DataTable
 				columns={[
@@ -2103,6 +3423,7 @@ function TenantUsersView({
 				description="Manage users and tenant-scoped roles for this workspace."
 				eyebrow="User Administration"
 				title="Users and permissions"
+				width="full"
 			>
 				<DataTable
 					columns={["User", "Email", "Role", "Status", "Created"]}
@@ -3183,6 +4504,408 @@ function ProductInlineActions({
 	);
 }
 
+type ProductCatalogueMode = "grid" | "list";
+
+function ProductCatalogue({
+	canWrite,
+	mutations,
+	onCreate,
+	onEdit,
+	parts,
+	products,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	onCreate: () => void;
+	onEdit: (product: ProductModel) => void;
+	parts: Part[];
+	products: ProductModel[];
+	tenantId: string;
+}) {
+	const [mode, setMode] = useState<ProductCatalogueMode>("list");
+	const groupedProducts = useMemo(
+		() => getProductCatalogueGroups(products),
+		[products]
+	);
+
+	return (
+		<PageFrame
+			action={
+				<div className="flex flex-wrap items-center gap-2">
+					<div className="inline-flex h-8 overflow-hidden rounded-lg border bg-background shadow-xs">
+						<CatalogueModeButton
+							active={mode === "list"}
+							icon={<LayoutListIcon className="size-4" />}
+							label="List"
+							onClick={() => setMode("list")}
+						/>
+						<CatalogueModeButton
+							active={mode === "grid"}
+							icon={<LayoutGridIcon className="size-4" />}
+							label="Grid"
+							onClick={() => setMode("grid")}
+						/>
+					</div>
+					{canWrite ? (
+						<Button className={primaryActionClass} onClick={onCreate}>
+							<PlusIcon className="size-4" />
+							Add product
+						</Button>
+					) : null}
+				</div>
+			}
+			description="Equipment models, PM intervals, manufacturer records, and service documentation."
+			eyebrow="B-05 Product Catalogue"
+			hideHeader
+			title="Product catalogue"
+			width="full"
+		>
+			{groupedProducts.length > 0 ? (
+				<div className="flex flex-col gap-6">
+					{groupedProducts.map((group) => (
+						<ProductCatalogueGroup
+							canWrite={canWrite}
+							group={group}
+							key={group.category}
+							mode={mode}
+							mutations={mutations}
+							onEdit={onEdit}
+							parts={parts}
+							tenantId={tenantId}
+						/>
+					))}
+				</div>
+			) : (
+				<EmptyInline message="Add product models to build the catalogue." />
+			)}
+		</PageFrame>
+	);
+}
+
+function CatalogueModeButton({
+	active,
+	icon,
+	label,
+	onClick,
+}: {
+	active: boolean;
+	icon: ReactNode;
+	label: string;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			aria-pressed={active}
+			className={cn(
+				"inline-flex items-center gap-1.5 px-2.5 font-medium text-sm transition-colors",
+				active
+					? "bg-primary text-primary-foreground"
+					: "bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+			)}
+			onClick={onClick}
+			type="button"
+		>
+			{icon}
+			{label}
+		</button>
+	);
+}
+
+interface ProductCatalogueGroupModel {
+	category: string;
+	products: ProductModel[];
+}
+
+function ProductCatalogueGroup({
+	canWrite,
+	group,
+	mode,
+	mutations,
+	onEdit,
+	parts,
+	tenantId,
+}: {
+	canWrite: boolean;
+	group: ProductCatalogueGroupModel;
+	mode: ProductCatalogueMode;
+	mutations: ActionMutations;
+	onEdit: (product: ProductModel) => void;
+	parts: Part[];
+	tenantId: string;
+}) {
+	return (
+		<section className="min-w-0">
+			<div className="mb-3 flex items-center gap-3">
+				<span className={iconTileClass}>
+					<BoxIcon className="size-4" />
+				</span>
+				<div className="flex shrink-0 items-baseline gap-3">
+					<h3 className="font-medium text-lg">{group.category}</h3>
+					<p className="text-muted-foreground text-sm">
+						{group.products.length}{" "}
+						{group.products.length === 1 ? "model" : "models"}
+					</p>
+				</div>
+				<div className="h-px min-w-8 flex-1 bg-border" />
+			</div>
+			{mode === "list" ? (
+				<ProductCatalogueTable
+					canWrite={canWrite}
+					mutations={mutations}
+					onEdit={onEdit}
+					parts={parts}
+					products={group.products}
+					tenantId={tenantId}
+				/>
+			) : (
+				<ProductCatalogueGrid
+					canWrite={canWrite}
+					mutations={mutations}
+					onEdit={onEdit}
+					parts={parts}
+					products={group.products}
+					tenantId={tenantId}
+				/>
+			)}
+		</section>
+	);
+}
+
+function ProductCatalogueTable({
+	canWrite,
+	mutations,
+	onEdit,
+	parts,
+	products,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	onEdit: (product: ProductModel) => void;
+	parts: Part[];
+	products: ProductModel[];
+	tenantId: string;
+}) {
+	return (
+		<div className={`${panelClass} overflow-hidden`}>
+			<div className="overflow-x-auto">
+				<div className="grid min-w-[1040px] grid-cols-[1.15fr_1fr_1fr_.9fr_1.1fr_1fr_132px] border-b bg-muted/30 px-4 py-3 font-medium text-muted-foreground text-sm">
+					<p>Model name</p>
+					<p>Model number</p>
+					<p>Manufacturer</p>
+					<p>PM interval</p>
+					<p>Standard parts</p>
+					<p>Manual</p>
+					<p className="text-right">Actions</p>
+				</div>
+				<div>
+					{products.map((product) => (
+						<div
+							className="grid min-w-[1040px] grid-cols-[1.15fr_1fr_1fr_.9fr_1.1fr_1fr_132px] items-center border-b px-4 py-4 text-sm last:border-b-0"
+							key={product.id}
+						>
+							<p className="font-medium">{product.modelName}</p>
+							<p className="font-mono text-muted-foreground">{product.code}</p>
+							<p className="text-muted-foreground">{product.manufacturer}</p>
+							<p className="text-muted-foreground">
+								{formatPmInterval(product.defaultPmCycleMonths)}
+							</p>
+							<p className="truncate text-muted-foreground">
+								{formatPartsSummary(product)}
+							</p>
+							<ProductManualLink product={product} />
+							<ProductCatalogueActions
+								canWrite={canWrite}
+								mutations={mutations}
+								onEdit={() => onEdit(product)}
+								parts={parts}
+								product={product}
+								tenantId={tenantId}
+							/>
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function ProductCatalogueGrid({
+	canWrite,
+	mutations,
+	onEdit,
+	parts,
+	products,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	onEdit: (product: ProductModel) => void;
+	parts: Part[];
+	products: ProductModel[];
+	tenantId: string;
+}) {
+	return (
+		<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+			{products.map((product) => (
+				<div className={`${panelClass} p-4 text-sm`} key={product.id}>
+					<div className="flex items-start justify-between gap-4">
+						<div className="min-w-0">
+							<p className="truncate font-medium text-base">
+								{product.modelName}
+							</p>
+							<p className="mt-1 font-mono text-muted-foreground">
+								{product.code}
+							</p>
+						</div>
+						<span className="rounded-full bg-muted px-2 py-1 text-muted-foreground text-xs">
+							{formatPmInterval(product.defaultPmCycleMonths)}
+						</span>
+					</div>
+					<div className="mt-5 grid gap-3">
+						<Metric label="Manufacturer" value={product.manufacturer} />
+						<Metric
+							label="Standard parts"
+							value={formatPartsSummary(product)}
+						/>
+						<Metric label="Manual" value={product.manualFileName} />
+					</div>
+					<div className="mt-5 flex justify-end">
+						<ProductCatalogueActions
+							canWrite={canWrite}
+							mutations={mutations}
+							onEdit={() => onEdit(product)}
+							parts={parts}
+							product={product}
+							tenantId={tenantId}
+						/>
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
+function ProductCatalogueActions({
+	canWrite,
+	mutations,
+	onEdit,
+	parts,
+	product,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	onEdit: () => void;
+	parts: Part[];
+	product: ProductModel;
+	tenantId: string;
+}) {
+	return (
+		<div className="flex items-center justify-end gap-1">
+			<Button
+				className="rounded-lg text-primary"
+				onClick={onEdit}
+				size="sm"
+				variant="ghost"
+			>
+				View
+				<ArrowUpRightIcon className="size-4" />
+			</Button>
+			<ProductInlineActions
+				canWrite={canWrite}
+				mutations={mutations}
+				parts={parts}
+				product={product}
+				tenantId={tenantId}
+			/>
+			{product.assetCount > 0 ? (
+				<span className="rounded-md bg-muted px-2 py-1 text-muted-foreground text-xs">
+					{product.assetCount} assets
+				</span>
+			) : null}
+			{canWrite ? (
+				<RowActions
+					canWrite={canWrite}
+					deleteDisabled={product.assetCount > 0}
+					deleteDisabledReason={
+						product.assetCount > 0
+							? "Reassign or remove installed assets before deleting this catalogue item."
+							: undefined
+					}
+					entity="product"
+					id={product.id}
+					onEdit={onEdit}
+					tenantId={tenantId}
+				/>
+			) : null}
+		</div>
+	);
+}
+
+function ProductManualLink({ product }: { product: ProductModel }) {
+	if (!product.manualFileUrl) {
+		return <p className="text-muted-foreground">{product.manualFileName}</p>;
+	}
+
+	return (
+		<a
+			className="inline-flex min-w-0 items-center gap-1 font-medium text-primary text-sm hover:underline"
+			href={product.manualFileUrl}
+			rel="noopener"
+			target="_blank"
+		>
+			<span className="truncate">{product.manualFileName}</span>
+			<ExternalLinkIcon className="size-3.5 shrink-0" />
+		</a>
+	);
+}
+
+function formatPartsSummary(product: ProductModel) {
+	if (product.partsList.length === 0) {
+		return "No parts linked";
+	}
+
+	if (product.partsList.length === 1) {
+		return product.partsList[0];
+	}
+
+	return `${product.partsList.length} parts`;
+}
+
+function getProductCatalogueGroups(
+	products: ProductModel[]
+): ProductCatalogueGroupModel[] {
+	const groups = new Map<string, ProductModel[]>();
+
+	for (const product of products) {
+		const category = product.category.trim() || "Uncategorised";
+		const productsInCategory = groups.get(category);
+
+		if (productsInCategory) {
+			productsInCategory.push(product);
+		} else {
+			groups.set(category, [product]);
+		}
+	}
+
+	return Array.from(groups.entries())
+		.map(([category, groupProducts]) => ({
+			category,
+			products: groupProducts.toSorted((firstProduct, secondProduct) =>
+				firstProduct.modelName.localeCompare(secondProduct.modelName)
+			),
+		}))
+		.toSorted((firstGroup, secondGroup) =>
+			firstGroup.category.localeCompare(secondGroup.category)
+		);
+}
+
+function formatPmInterval(months: number) {
+	return `Every ${months} ${months === 1 ? "month" : "months"}`;
+}
+
 function ProductPartsForm({
 	mutations,
 	onDone,
@@ -3255,44 +4978,55 @@ function ProductManualForm({
 	product: ProductModel;
 	tenantId: string;
 }) {
-	const [fileName, setFileName] = useState(
-		product.manualFileName === "Not uploaded" ? "" : product.manualFileName
-	);
-	const [fileUrl, setFileUrl] = useState(product.manualFileUrl ?? "");
+	const [file, setFile] = useState<File | null>(null);
+	const [isUploadingManual, setIsUploadingManual] = useState(false);
+	const isSavingManual =
+		isUploadingManual || mutations.uploadServiceManual.isPending;
 
 	return (
 		<div className="flex flex-col gap-2">
 			<p className="font-medium text-sm">Service manual</p>
-			<Input
-				aria-label="Manual file name"
-				className={formControlClass}
-				onChange={(event) => setFileName(event.target.value)}
-				placeholder="manual.pdf"
-				value={fileName}
-			/>
-			<Input
-				aria-label="Manual URL"
-				className={formControlClass}
-				onChange={(event) => setFileUrl(event.target.value)}
-				placeholder="https://..."
-				value={fileUrl}
+			{product.manualFileName === "Not uploaded" ? null : (
+				<p className="text-muted-foreground text-xs">
+					Current file: {product.manualFileName}
+				</p>
+			)}
+			<ManualPdfPicker
+				accept="application/pdf,.pdf"
+				aria-label="Service manual PDF"
+				onChange={setFile}
 			/>
 			<Button
 				className={actionButtonClass}
-				disabled={
-					!(fileName && fileUrl) || mutations.uploadServiceManual.isPending
-				}
-				onClick={() => {
-					mutations.uploadServiceManual.mutate({
-						data: { fileName, fileUrl },
-						id: product.id,
-						tenantId,
-					});
-					onDone();
+				disabled={!file || isSavingManual}
+				onClick={async () => {
+					if (!file) {
+						return;
+					}
+
+					setIsUploadingManual(true);
+					try {
+						const uploadedManual = await uploadServiceManualFile(
+							file,
+							tenantId
+						);
+						mutations.uploadServiceManual.mutate({
+							data: uploadedManual,
+							id: product.id,
+							tenantId,
+						});
+						onDone();
+					} catch (error) {
+						toast.error(getManualUploadErrorMessage(error));
+					}
+					setIsUploadingManual(false);
 				}}
 				size="sm"
 				type="button"
 			>
+				{isSavingManual ? (
+					<Loader2Icon className="size-4 animate-spin" />
+				) : null}
 				Save manual
 			</Button>
 		</div>
@@ -3437,10 +5171,7 @@ function CrudDialog({
 		return null;
 	}
 
-	const title =
-		state.mode === "create"
-			? `New ${entityLabels[state.entity]}`
-			: `Edit ${entityLabels[state.entity]}`;
+	const title = getCrudDialogTitle(state);
 	const description =
 		state.entity === "tenant"
 			? "Creates or updates an isolated SaaS workspace."
@@ -3509,11 +5240,31 @@ function CrudForm({
 		() => getFormDefaults(state.entity, state.record),
 		[state.entity, state.record]
 	);
+	const [isUploadingManual, setIsUploadingManual] = useState(false);
 	const isSaving = isEntityMutationPending(mutations);
+	const isSubmitting = isSaving || isUploadingManual;
+	const submitLabel = getCrudSubmitLabel(
+		state,
+		isSubmitting,
+		isUploadingManual
+	);
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const formData = new FormData(event.currentTarget);
+
+		if (state.entity === "product") {
+			setIsUploadingManual(true);
+			try {
+				await attachUploadedServiceManual(formData, tenantId);
+			} catch (error) {
+				toast.error(getManualUploadErrorMessage(error));
+				setIsUploadingManual(false);
+				return;
+			}
+			setIsUploadingManual(false);
+		}
+
 		submitCrudForm({
 			formData,
 			mutations,
@@ -3527,7 +5278,7 @@ function CrudForm({
 			className="flex min-h-0 flex-1 flex-col bg-muted/20"
 			onSubmit={handleSubmit}
 		>
-			<div className="grid flex-1 auto-rows-min gap-4 overflow-y-auto px-5 py-5 md:grid-cols-2">
+			<div className="grid flex-1 auto-rows-min gap-y-4 overflow-y-auto px-6 py-5 md:grid-cols-2 md:gap-x-4">
 				{fields.map((field) => (
 					<FormField
 						defaultValue={defaults[field.name]}
@@ -3536,14 +5287,14 @@ function CrudForm({
 					/>
 				))}
 			</div>
-			<div className="flex flex-col items-stretch gap-3 border-t bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+			<div className="flex flex-col items-stretch gap-3 border-t bg-card px-6 py-4 shadow-[0_-1px_0_rgb(0_0_0_/_0.02)] sm:flex-row sm:items-center sm:justify-between">
 				<p className="hidden text-muted-foreground text-xs sm:block">
-					Required fields are marked by the browser.
+					Fields marked with an asterisk (*) are required.
 				</p>
 				<div className="flex shrink-0 justify-end gap-2">
 					<Button
 						className={compactButtonClass}
-						disabled={isSaving}
+						disabled={isSubmitting}
 						onClick={onClose}
 						type="button"
 						variant="outline"
@@ -3552,16 +5303,56 @@ function CrudForm({
 					</Button>
 					<Button
 						className={primaryActionClass}
-						disabled={isSaving}
+						disabled={isSubmitting}
 						type="submit"
 					>
-						{isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-						{isSaving ? "Saving" : "Save"}
+						{isSubmitting ? (
+							<Loader2Icon className="size-4 animate-spin" />
+						) : null}
+						{submitLabel}
 					</Button>
 				</div>
 			</div>
 		</form>
 	);
+}
+
+function getCrudDialogTitle(state: CrudState) {
+	if (state.entity === "hospital" && state.mode === "create") {
+		return "Add New Hospital";
+	}
+
+	if (state.entity === "part" && state.mode === "create") {
+		return "Add New Part";
+	}
+
+	return state.mode === "create"
+		? `New ${entityLabels[state.entity]}`
+		: `Edit ${entityLabels[state.entity]}`;
+}
+
+function getCrudSubmitLabel(
+	state: CrudState,
+	isSaving: boolean,
+	isUploadingManual = false
+) {
+	if (isUploadingManual) {
+		return "Uploading";
+	}
+
+	if (isSaving) {
+		return "Saving";
+	}
+
+	if (state.entity === "part" && state.mode === "create") {
+		return "Create Part";
+	}
+
+	if (state.entity === "hospital" && state.mode === "create") {
+		return "Create Hospital";
+	}
+
+	return "Save";
 }
 
 function isEntityMutationPending(mutations: EntityMutations) {
@@ -3572,11 +5363,139 @@ type EntityMutations = ReturnType<typeof useEntityMutations>;
 
 type ActionMutations = ReturnType<typeof useServiceOpsActionMutations>;
 
+interface UploadedServiceManualMetadata {
+	fileName: string;
+	fileUrl: string;
+	pageCount: null | number;
+	storageKey: string;
+	version: string;
+}
+
+const noopFileChange = () => undefined;
+
+function ManualPdfPicker({
+	accept = "application/pdf,.pdf",
+	"aria-label": ariaLabel,
+	id,
+	name,
+	onChange,
+	required,
+}: {
+	"aria-label": string;
+	accept?: string;
+	id?: string;
+	name?: string;
+	onChange: (file: File | null) => void;
+	required?: boolean;
+}) {
+	const [selectedFileName, setSelectedFileName] = useState("");
+	const inputId = id ?? `manual-pdf-${name ?? "upload"}`;
+
+	return (
+		<div className="flex min-w-0 items-center gap-2">
+			<Input
+				accept={accept}
+				aria-hidden="true"
+				aria-label={ariaLabel}
+				className="sr-only"
+				id={inputId}
+				name={name}
+				onChange={(event) => {
+					const nextFile = event.target.files?.[0] ?? null;
+					setSelectedFileName(nextFile?.name ?? "");
+					onChange(nextFile);
+				}}
+				required={required}
+				type="file"
+			/>
+			<label
+				className={cn(
+					compactButtonClass,
+					"inline-flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-input bg-background px-3 font-medium text-sm shadow-xs transition-colors hover:bg-muted/60"
+				)}
+				htmlFor={inputId}
+			>
+				Choose PDF
+			</label>
+			<span className="min-w-0 truncate text-muted-foreground text-sm">
+				{selectedFileName || "No file selected"}
+			</span>
+		</div>
+	);
+}
+
+function getManualFileFromFormData(formData: FormData) {
+	const file = formData.get("manualFile");
+
+	if (!(file instanceof File) || file.size === 0) {
+		return null;
+	}
+
+	return file;
+}
+
+async function uploadServiceManualFile(
+	file: File,
+	tenantId: string
+): Promise<UploadedServiceManualMetadata> {
+	const uploadFormData = new FormData();
+	uploadFormData.append("file", file);
+	uploadFormData.append("tenantId", tenantId);
+
+	const response = await fetch("/api/service-manual-upload", {
+		body: uploadFormData,
+		method: "POST",
+	});
+
+	const responseBody = await response.json();
+
+	if (!response.ok) {
+		throw new Error(
+			typeof responseBody.error === "string"
+				? responseBody.error
+				: "Manual upload failed."
+		);
+	}
+
+	return responseBody as UploadedServiceManualMetadata;
+}
+
+async function attachUploadedServiceManual(
+	formData: FormData,
+	tenantId: string
+) {
+	const file = getManualFileFromFormData(formData);
+
+	if (!file) {
+		return;
+	}
+
+	const uploadedManual = await uploadServiceManualFile(file, tenantId);
+	formData.set("manualFileName", uploadedManual.fileName);
+	formData.set("manualFileUrl", uploadedManual.fileUrl);
+	formData.set("manualStorageKey", uploadedManual.storageKey);
+	formData.set("manualVersion", uploadedManual.version);
+
+	if (uploadedManual.pageCount) {
+		formData.set("manualPageCount", String(uploadedManual.pageCount));
+	}
+}
+
+function getManualUploadErrorMessage(error: unknown) {
+	return error instanceof Error ? error.message : "Manual upload failed.";
+}
+
 function useServiceOpsActionMutations(tenantId: string) {
 	const actionResult = useMutationResult(
 		tenantId,
 		"Operation completed.",
 		"operation",
+		"save"
+	);
+	const stockUpdateResult = useMutationResult(
+		tenantId,
+		"Stock updated.",
+		"part",
 		"save"
 	);
 
@@ -3629,6 +5548,9 @@ function useServiceOpsActionMutations(tenantId: string) {
 		updateProductParts: useMutation(
 			trpc.serviceOps.updateProductParts.mutationOptions(actionResult)
 		),
+		updatePartStock: useMutation(
+			trpc.serviceOps.updatePart.mutationOptions(stockUpdateResult)
+		),
 		updateSystemParameter: useMutation(
 			trpc.serviceOps.updateSystemParameter.mutationOptions(actionResult)
 		),
@@ -3645,6 +5567,21 @@ function FormField({
 	defaultValue?: FormDefaultValue;
 	field: FieldConfig;
 }) {
+	const fieldClassName = cn(
+		formFieldClass,
+		field.span === "full" ? "md:col-span-2" : ""
+	);
+
+	if (field.type === "section") {
+		return (
+			<div className={cn("pt-2 md:col-span-2", fieldClassName)}>
+				<h3 className="font-semibold text-base text-foreground">
+					{field.label}
+				</h3>
+			</div>
+		);
+	}
+
 	if (field.type === "checkbox") {
 		return (
 			<label className="flex min-h-9 items-center gap-3 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-xs transition-colors hover:bg-muted/30">
@@ -3659,6 +5596,46 @@ function FormField({
 		);
 	}
 
+	if (field.type === "checkbox-list") {
+		const selectedValues = new Set(getCheckboxListDefaultValues(defaultValue));
+		const options = field.options ?? [];
+
+		return (
+			<fieldset className={fieldClassName}>
+				<legend className={formLabelClass}>
+					<FormLabelText field={field} />
+				</legend>
+				<div className="flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-input bg-background px-3 py-2 shadow-xs">
+					{options.length > 0 ? (
+						options.map((option) => (
+							<CheckboxListOption
+								checked={selectedValues.has(option.value)}
+								key={option.value}
+								name={field.name}
+								option={option}
+							/>
+						))
+					) : (
+						<p className="py-1 text-muted-foreground text-sm">
+							No options available.
+						</p>
+					)}
+				</div>
+				<FieldDescription description={field.description} />
+			</fieldset>
+		);
+	}
+
+	if (field.type === "part-picker") {
+		return (
+			<ProductPartPickerField
+				defaultValue={defaultValue}
+				field={field}
+				fieldClassName={fieldClassName}
+			/>
+		);
+	}
+
 	if (field.type === "select") {
 		const selectDefaultValue = getSelectDefaultValue(
 			defaultValue,
@@ -3666,9 +5643,9 @@ function FormField({
 		);
 
 		return (
-			<div className={formFieldClass}>
+			<div className={fieldClassName}>
 				<Label className={formLabelClass} htmlFor={field.name}>
-					{field.label}
+					<FormLabelText field={field} />
 				</Label>
 				<div className="relative">
 					<select
@@ -3694,31 +5671,63 @@ function FormField({
 						<ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
 					)}
 				</div>
+				<FieldDescription description={field.description} />
 			</div>
+		);
+	}
+
+	if (field.type === "phone") {
+		return (
+			<InternationalPhoneField
+				defaultValue={getInputDefaultValue(defaultValue)}
+				field={field}
+				fieldClassName={fieldClassName}
+			/>
 		);
 	}
 
 	if (field.type === "textarea") {
 		return (
-			<div className={`${formFieldClass} md:col-span-2`}>
+			<div className={fieldClassName}>
 				<Label className={formLabelClass} htmlFor={field.name}>
-					{field.label}
+					<FormLabelText field={field} />
 				</Label>
 				<textarea
 					className={cn(formControlClass, "min-h-28 resize-y py-2")}
 					defaultValue={getInputDefaultValue(defaultValue)}
 					id={field.name}
 					name={field.name}
+					placeholder={field.placeholder}
 					required={field.required}
 				/>
+				<FieldDescription description={field.description} />
+			</div>
+		);
+	}
+
+	if (field.type === "file") {
+		return (
+			<div className={fieldClassName}>
+				<Label className={formLabelClass} htmlFor={field.name}>
+					<FormLabelText field={field} />
+				</Label>
+				<ManualPdfPicker
+					accept={field.accept}
+					aria-label={field.label}
+					id={field.name}
+					name={field.name}
+					onChange={noopFileChange}
+					required={field.required}
+				/>
+				<FieldDescription description={field.description} />
 			</div>
 		);
 	}
 
 	return (
-		<div className={formFieldClass}>
+		<div className={fieldClassName}>
 			<Label className={formLabelClass} htmlFor={field.name}>
-				{field.label}
+				<FormLabelText field={field} />
 			</Label>
 			<Input
 				className={formControlClass}
@@ -3727,12 +5736,460 @@ function FormField({
 				max={field.max}
 				min={field.min}
 				name={field.name}
+				placeholder={field.placeholder}
 				required={field.required}
 				step={field.type === "number" ? "any" : undefined}
 				type={field.type ?? "text"}
 			/>
+			<FieldDescription description={field.description} />
 		</div>
 	);
+}
+
+function CheckboxListOption({
+	checked,
+	name,
+	option,
+}: {
+	checked: boolean;
+	name: string;
+	option: FieldOption;
+}) {
+	const detail =
+		option.description && option.description !== option.label
+			? option.description
+			: undefined;
+
+	return (
+		<label className="group inline-flex min-h-7 cursor-pointer items-center gap-2 text-sm">
+			<input
+				className="size-4 shrink-0 rounded border border-input bg-background accent-primary"
+				defaultChecked={checked}
+				name={name}
+				type="checkbox"
+				value={option.value}
+			/>
+			<span className="flex min-w-0 items-baseline gap-1.5">
+				<span className="font-medium text-foreground leading-none">
+					{option.label}
+				</span>
+				{detail ? (
+					<span className="text-muted-foreground text-xs leading-none">
+						{detail}
+					</span>
+				) : null}
+			</span>
+		</label>
+	);
+}
+
+function InternationalPhoneField({
+	defaultValue,
+	field,
+	fieldClassName,
+}: {
+	defaultValue: string;
+	field: FieldConfig;
+	fieldClassName: string;
+}) {
+	const parsedPhone = parseInternationalPhone(defaultValue);
+	const [isDialCodeOpen, setIsDialCodeOpen] = useState(false);
+	const [searchValue, setSearchValue] = useState("");
+	const [selectedDialCode, setSelectedDialCode] = useState(
+		parsedPhone.dialCode
+	);
+	const [selectedIso, setSelectedIso] = useState(parsedPhone.iso);
+	const fieldRef = useRef<HTMLDivElement | null>(null);
+	const localNumberId = `${field.name}-local`;
+	const selectedCountry =
+		internationalDialCodes.find(
+			(option) =>
+				option.dialCode === selectedDialCode && option.iso === selectedIso
+		) ??
+		internationalDialCodes.find(
+			(option) => option.dialCode === selectedDialCode
+		) ??
+		internationalDialCodes[0];
+	const normalizedSearchValue = searchValue.trim().toLowerCase();
+	const filteredDialCodes = normalizedSearchValue
+		? internationalDialCodes.filter((option) => {
+				const searchableText =
+					`${option.iso} ${option.dialCode} ${option.country}`.toLowerCase();
+
+				return searchableText.includes(normalizedSearchValue);
+			})
+		: internationalDialCodes;
+
+	useEffect(() => {
+		if (!isDialCodeOpen) {
+			return;
+		}
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+
+			if (!(target instanceof Node)) {
+				return;
+			}
+
+			if (fieldRef.current?.contains(target)) {
+				return;
+			}
+
+			setIsDialCodeOpen(false);
+		};
+
+		window.addEventListener("pointerdown", handlePointerDown);
+
+		return () => {
+			window.removeEventListener("pointerdown", handlePointerDown);
+		};
+	}, [isDialCodeOpen]);
+
+	return (
+		<div className={fieldClassName} ref={fieldRef}>
+			<Label className={formLabelClass} htmlFor={localNumberId}>
+				<FormLabelText field={field} />
+			</Label>
+			<div className="grid grid-cols-[96px_minmax(0,1fr)] rounded-lg border border-input bg-background shadow-xs transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+				<div className="relative rounded-l-lg border-border border-r bg-muted/25">
+					<button
+						aria-expanded={isDialCodeOpen}
+						aria-label={`${field.label} country code`}
+						className="flex h-9 w-full items-center justify-between gap-1 px-2.5 font-medium text-foreground text-sm outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50"
+						onClick={() => setIsDialCodeOpen((current) => !current)}
+						type="button"
+					>
+						<span className="min-w-0 truncate">
+							{selectedCountry.iso} {selectedCountry.dialCode}
+						</span>
+						<ChevronDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+					</button>
+					{isDialCodeOpen ? (
+						<div className="absolute top-[calc(100%+0.25rem)] left-0 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg">
+							<Input
+								aria-label="Search country or region"
+								className="h-8 rounded-md text-sm"
+								onChange={(event) => setSearchValue(event.target.value)}
+								placeholder="Search country, ISO, or code"
+								value={searchValue}
+							/>
+							<div className="mt-2 max-h-64 overflow-y-auto">
+								{filteredDialCodes.length > 0 ? (
+									filteredDialCodes.map((option) => (
+										<button
+											className={cn(
+												"flex min-h-9 w-full items-center justify-between gap-3 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
+												selectedCountry.iso === option.iso &&
+													selectedCountry.dialCode === option.dialCode
+													? "bg-muted font-medium"
+													: ""
+											)}
+											key={`${option.iso}-${option.dialCode}`}
+											onClick={() => {
+												setSelectedDialCode(option.dialCode);
+												setSelectedIso(option.iso);
+												setIsDialCodeOpen(false);
+												setSearchValue("");
+											}}
+											type="button"
+										>
+											<span className="min-w-0 truncate">{option.country}</span>
+											<span className="shrink-0 text-muted-foreground">
+												{option.iso} {option.dialCode}
+											</span>
+										</button>
+									))
+								) : (
+									<p className="px-2.5 py-3 text-muted-foreground text-sm">
+										No matching country code.
+									</p>
+								)}
+							</div>
+						</div>
+					) : null}
+					<input
+						name={`${field.name}DialCode`}
+						type="hidden"
+						value={selectedDialCode}
+					/>
+				</div>
+				<Input
+					className="h-9 rounded-none border-0 bg-transparent px-3 text-sm shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+					defaultValue={parsedPhone.localNumber}
+					id={localNumberId}
+					name={`${field.name}LocalNumber`}
+					placeholder={field.placeholder ?? "Phone number"}
+					required={field.required}
+					type="tel"
+				/>
+			</div>
+			<FieldDescription description={field.description} />
+		</div>
+	);
+}
+
+function parseInternationalPhone(value: string) {
+	const trimmedValue = value.trim();
+	const matchingCode = internationalDialCodesByPrefix.find((option) =>
+		trimmedValue.startsWith(option.dialCode)
+	);
+	const dialCode = matchingCode?.dialCode ?? defaultDialCode;
+	const iso = matchingCode?.iso ?? "CN";
+	const localNumber = matchingCode
+		? trimmedValue.slice(matchingCode.dialCode.length).trim()
+		: trimmedValue;
+
+	return { dialCode, iso, localNumber };
+}
+
+function ProductPartPickerField({
+	defaultValue,
+	field,
+	fieldClassName,
+}: {
+	defaultValue?: FormDefaultValue;
+	field: FieldConfig;
+	fieldClassName: string;
+}) {
+	const options = field.options ?? [];
+	const [selectedValues, setSelectedValues] = useState(() =>
+		getCheckboxListDefaultValues(defaultValue)
+	);
+	const [isOpen, setIsOpen] = useState(false);
+	const selectedOptions = getSelectedOptions(options, selectedValues);
+	const selectedSummary = getSelectedPartsSummary(selectedOptions);
+
+	return (
+		<div className={fieldClassName}>
+			<Label className={formLabelClass} htmlFor={`${field.name}-picker`}>
+				<FormLabelText field={field} />
+			</Label>
+			<input name={field.name} type="hidden" value="" />
+			{selectedValues.map((value) => (
+				<input key={value} name={field.name} type="hidden" value={value} />
+			))}
+			<Button
+				className="min-h-24 w-full justify-start rounded-lg border border-input bg-background px-3 py-3 text-left shadow-xs hover:bg-background"
+				id={`${field.name}-picker`}
+				onClick={() => setIsOpen(true)}
+				type="button"
+				variant="outline"
+			>
+				<span className="flex min-w-0 flex-col gap-1">
+					<span className="font-medium text-sm">
+						{selectedValues.length > 0
+							? `${selectedValues.length} selected`
+							: "Search existing parts"}
+					</span>
+					<span className="line-clamp-2 text-muted-foreground text-xs">
+						{selectedSummary}
+					</span>
+				</span>
+			</Button>
+			<FieldDescription description={field.description} />
+			{isOpen ? (
+				<ProductPartPickerDialog
+					field={field}
+					onApplyParts={setSelectedValues}
+					onClose={() => setIsOpen(false)}
+					options={options}
+					selectedValues={selectedValues}
+				/>
+			) : null}
+		</div>
+	);
+}
+
+function ProductPartPickerDialog({
+	field,
+	onApplyParts,
+	onClose,
+	options,
+	selectedValues,
+}: {
+	field: FieldConfig;
+	onApplyParts: (partIds: string[]) => void;
+	onClose: () => void;
+	options: FieldOption[];
+	selectedValues: string[];
+}) {
+	const [searchQuery, setSearchQuery] = useState("");
+	const [draftSelectedValues, setDraftSelectedValues] =
+		useState(selectedValues);
+	const selectedValueSet = new Set(draftSelectedValues);
+	const normalizedQuery = searchQuery.trim().toLowerCase();
+	const filteredOptions =
+		normalizedQuery.length > 0
+			? options.filter((option) =>
+					`${option.label} ${option.description ?? ""}`
+						.toLowerCase()
+						.includes(normalizedQuery)
+				)
+			: options;
+
+	useEffect(() => {
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				event.stopPropagation();
+				onClose();
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown, { capture: true });
+
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown, { capture: true });
+		};
+	}, [onClose]);
+
+	const toggleDraftPart = (partId: string) => {
+		setDraftSelectedValues((currentValues) =>
+			currentValues.includes(partId)
+				? currentValues.filter((currentValue) => currentValue !== partId)
+				: [...currentValues, partId]
+		);
+	};
+
+	return (
+		<div
+			aria-modal="true"
+			className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/45 px-4 py-6"
+			role="dialog"
+		>
+			<div className="flex max-h-[calc(100vh-3rem)] w-full max-w-[440px] flex-col rounded-xl bg-card p-5 shadow-2xl">
+				<div className="flex items-start justify-between gap-4">
+					<div>
+						<h3 className="font-semibold text-lg">Add Part to Product</h3>
+						<div className="mt-4 border-border border-b">
+							<p className="w-fit border-primary border-b-2 px-3 pb-2 font-medium text-primary text-sm">
+								Search Existing
+							</p>
+						</div>
+					</div>
+					<Button
+						aria-label={`Close ${field.label} picker`}
+						className={compactButtonClass}
+						onClick={onClose}
+						size="icon-sm"
+						type="button"
+						variant="ghost"
+					>
+						<XIcon className="size-4" />
+					</Button>
+				</div>
+				<Input
+					aria-label={`Search ${field.label}`}
+					className={cn(formControlClass, "mt-4 h-10")}
+					onChange={(event) => setSearchQuery(event.target.value)}
+					placeholder="Search parts by name or number..."
+					value={searchQuery}
+				/>
+				<div className="mt-3 max-h-64 overflow-y-auto rounded-lg border bg-background">
+					{filteredOptions.length > 0 ? (
+						filteredOptions.map((option) => {
+							const isSelected = selectedValueSet.has(option.value);
+
+							return (
+								<button
+									aria-pressed={isSelected}
+									className={cn(
+										"flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-b-0 hover:bg-muted/60",
+										isSelected ? "bg-primary/10" : ""
+									)}
+									key={option.value}
+									onClick={() => toggleDraftPart(option.value)}
+									type="button"
+								>
+									<span className="min-w-0">
+										<span className="block truncate font-medium text-sm">
+											{option.label}
+										</span>
+										{option.description ? (
+											<span className="mt-1 block truncate font-mono text-muted-foreground text-xs">
+												{option.description}
+											</span>
+										) : null}
+									</span>
+									<span className="shrink-0 text-muted-foreground text-sm">
+										{option.meta}
+									</span>
+								</button>
+							);
+						})
+					) : (
+						<div className="px-4 py-8">
+							<EmptyInline message="No matching parts." />
+						</div>
+					)}
+				</div>
+				<div className="mt-5 flex justify-between border-t pt-4">
+					<Button
+						className={compactButtonClass}
+						onClick={onClose}
+						type="button"
+						variant="outline"
+					>
+						Cancel
+					</Button>
+					<Button
+						className={primaryActionClass}
+						onClick={() => {
+							onApplyParts(draftSelectedValues);
+							onClose();
+						}}
+						type="button"
+					>
+						Done
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function getSelectedOptions(options: FieldOption[], values: string[]) {
+	const optionByValue = new Map(
+		options.map((option) => [option.value, option] as const)
+	);
+
+	return values.flatMap((value) => {
+		const option = optionByValue.get(value);
+
+		return option ? [option] : [];
+	});
+}
+
+function getSelectedPartsSummary(options: FieldOption[]) {
+	if (options.length === 0) {
+		return "No standard parts selected.";
+	}
+
+	return options
+		.map((option) =>
+			option.description
+				? `${option.description} · ${option.label}`
+				: option.label
+		)
+		.join(", ");
+}
+
+function FormLabelText({ field }: { field: FieldConfig }) {
+	return (
+		<>
+			{field.label}
+			{field.required ? <span aria-hidden="true"> *</span> : null}
+		</>
+	);
+}
+
+function FieldDescription({ description }: { description?: string }) {
+	if (!description) {
+		return null;
+	}
+
+	return <p className="mt-1 text-muted-foreground text-xs">{description}</p>;
 }
 
 function getInputDefaultValue(defaultValue: FormDefaultValue | undefined) {
@@ -3752,6 +6209,12 @@ function getSelectDefaultValue(
 	}
 
 	return getInputDefaultValue(defaultValue);
+}
+
+function getCheckboxListDefaultValues(
+	defaultValue: FormDefaultValue | undefined
+) {
+	return Array.isArray(defaultValue) ? defaultValue.map(String) : [];
 }
 
 function useEntityMutations(tenantId: string, onDone: () => void) {
@@ -4123,6 +6586,7 @@ function submitTenantUserForm({
 function RowActions({
 	canWrite,
 	deleteDisabled,
+	deleteDisabledReason,
 	entity,
 	id,
 	onEdit,
@@ -4130,6 +6594,7 @@ function RowActions({
 }: {
 	canWrite: boolean;
 	deleteDisabled?: boolean;
+	deleteDisabledReason?: string;
 	entity: CrudEntity;
 	id: string;
 	onEdit: () => void;
@@ -4181,7 +6646,7 @@ function RowActions({
 	}
 
 	return (
-		<div className="inline-flex items-center justify-end gap-1">
+		<div className="inline-flex items-center justify-end gap-4">
 			<Button
 				aria-label={`Edit ${entityLabels[entity]}`}
 				className={compactButtonClass}
@@ -4199,12 +6664,13 @@ function RowActions({
 				}
 				className={cn(
 					compactButtonClass,
-					isConfirmingDelete ? "w-auto px-2" : ""
+					isConfirmingDelete ? "w-auto px-2" : "text-muted-foreground"
 				)}
 				disabled={deleteDisabled || isDeleting}
 				onBlur={() => setIsConfirmingDelete(false)}
 				onClick={handleDelete}
 				size={isConfirmingDelete ? "sm" : "icon-sm"}
+				title={deleteDisabled ? deleteDisabledReason : undefined}
 				variant="ghost"
 			>
 				{deleteButtonContent}
@@ -4349,20 +6815,41 @@ function PageFrame({
 	children,
 	description,
 	eyebrow,
+	hideHeader = false,
 	title,
+	width = "contained",
 }: {
 	action?: ReactNode;
 	children: ReactNode;
 	description?: string;
 	eyebrow: string;
+	hideHeader?: boolean;
 	title: string;
+	width?: "contained" | "full";
 }) {
-	return (
-		<div className="mx-auto flex max-w-[1320px] flex-col gap-4 md:gap-6">
+	let frameHeader: ReactNode = null;
+
+	if (hideHeader) {
+		frameHeader = action ? (
+			<div className="flex justify-end">{action}</div>
+		) : null;
+	} else {
+		frameHeader = (
 			<div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 				<PageHeader description={description} eyebrow={eyebrow} title={title} />
 				{action ? <div className="flex shrink-0">{action}</div> : null}
 			</div>
+		);
+	}
+
+	return (
+		<div
+			className={cn(
+				"flex w-full min-w-0 flex-col gap-4 md:gap-6",
+				width === "contained" ? "mx-auto max-w-[1320px]" : ""
+			)}
+		>
+			{frameHeader}
 			{children}
 		</div>
 	);
@@ -4404,6 +6891,71 @@ function StatusPill({
 			{children}
 		</span>
 	);
+}
+
+function HospitalLocationCell({
+	address,
+	lat,
+	lng,
+}: {
+	address: null | string;
+	lat: number;
+	lng: number;
+}) {
+	const hasCoordinates = lat !== 0 || lng !== 0;
+
+	if (!hasCoordinates) {
+		return (
+			<div className="inline-flex min-w-[140px] items-center gap-2 rounded-md border border-border border-dashed bg-muted/20 px-2 py-1.5 text-muted-foreground">
+				<span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-background">
+					<MapPinOffIcon className="size-3.5" />
+				</span>
+				<div className="min-w-0">
+					<p className="font-medium text-foreground text-xs">Not pinned</p>
+					<p className="text-[11px] leading-tight">Add coordinates</p>
+				</div>
+			</div>
+		);
+	}
+
+	const latitudeLabel = formatCoordinate(lat, "lat");
+	const longitudeLabel = formatCoordinate(lng, "lng");
+	const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+		`${lat},${lng}`
+	)}`;
+
+	return (
+		<a
+			aria-label={`Open ${latitudeLabel}, ${longitudeLabel} in Google Maps`}
+			className="group relative inline-flex min-w-[150px] max-w-[180px] items-center gap-2 rounded-md border border-sky-200 bg-sky-50/70 px-2 py-1.5 text-left transition-colors hover:border-sky-300 hover:bg-sky-100/70 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-sky-200"
+			href={mapUrl}
+			rel="noopener"
+			target="_blank"
+			title={address ?? `${latitudeLabel}, ${longitudeLabel}`}
+		>
+			<span className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-white text-sky-700 shadow-xs ring-1 ring-sky-200">
+				<MapPinIcon className="size-3.5" />
+			</span>
+			<span className="min-w-0 flex-1">
+				<span className="block truncate font-medium text-[11px] text-sky-950 tabular-nums leading-tight">
+					{latitudeLabel}, {longitudeLabel}
+				</span>
+			</span>
+			<ExternalLinkIcon className="pointer-events-none absolute top-1.5 right-1.5 size-3 text-sky-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+		</a>
+	);
+}
+
+function formatCoordinate(value: number, axis: "lat" | "lng") {
+	if (axis === "lat") {
+		return `${coordinateFormatter.format(Math.abs(value))} ${
+			value >= 0 ? "N" : "S"
+		}`;
+	}
+
+	return `${coordinateFormatter.format(Math.abs(value))} ${
+		value >= 0 ? "E" : "W"
+	}`;
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {

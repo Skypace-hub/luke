@@ -93,7 +93,7 @@ stop_database() {
 }
 
 start_dev_servers() {
-	echo "Starting development servers..."
+	echo "Starting all development servers..."
 	npm run dev
 }
 
@@ -113,7 +113,7 @@ build_ios_dev_client() {
 	set +e
 	(
 		cd "$ROOT_DIR/apps/native"
-		npx expo run:ios --device
+		npx expo run:ios --device --no-bundler --port 8082
 	)
 	local build_status="$?"
 	set -e

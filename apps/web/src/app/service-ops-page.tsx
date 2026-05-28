@@ -9,7 +9,11 @@ import { redirect } from "next/navigation";
 
 import ServiceOpsPlatform from "@/components/service-ops-platform";
 
-export default async function ServiceOpsPage() {
+export default async function ServiceOpsPage({
+	initialHospitalId,
+}: {
+	initialHospitalId?: string;
+}) {
 	const session = await auth.api.getSession({
 		headers: await headers(),
 	});
@@ -31,6 +35,7 @@ export default async function ServiceOpsPage() {
 				name: session.user.name,
 			}}
 			initialData={initialData}
+			initialHospitalId={initialHospitalId}
 		/>
 	);
 }

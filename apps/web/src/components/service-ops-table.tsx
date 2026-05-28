@@ -34,6 +34,7 @@ import {
 	useReactTable,
 } from "@tanstack/react-table";
 import {
+	ChevronDownIcon,
 	ChevronLeftIcon,
 	ChevronRightIcon,
 	CircleXIcon,
@@ -44,6 +45,8 @@ import {
 import {
 	type ComponentPropsWithoutRef,
 	isValidElement,
+	type KeyboardEvent,
+	type MouseEvent,
 	type ReactNode,
 	useEffect,
 	useMemo,
@@ -55,14 +58,19 @@ import { toast } from "sonner";
 export interface DataTableRow {
 	actions?: ReactNode;
 	cells: ReactNode[];
+	columnValues?: Partial<Record<string, string>>;
+	detailAriaLabel?: string;
 	id: string;
+	onClick?: () => void;
 	searchText?: string;
 }
 
 interface ServiceTableRow {
 	actions?: ReactNode;
 	cells: ReactNode[];
+	detailAriaLabel?: string;
 	id: string;
+	onClick?: () => void;
 	search: string;
 	values: string[];
 }
@@ -73,28 +81,46 @@ interface ServiceTableFilterConfig {
 	options: string[];
 }
 
+type TableColumnAlignment = "center" | "left" | "right";
+
 interface DataTableProps {
+	columnAlignments?: Partial<Record<string, TableColumnAlignment>>;
 	columns: string[];
 	description?: string;
 	filterLabels?: string[];
+	hideTitleCount?: boolean;
+	onSelectedRowIdChange?: (rowId: string) => void;
 	rows: DataTableRow[];
+	selectedRowId?: string;
 	title?: string;
 }
 
 const compactButtonClass = "rounded-lg";
 const panelClass =
 	"rounded-xl bg-card text-card-foreground shadow-none ring-1 ring-foreground/10";
+const selectionColumnClass = "w-12 min-w-12 max-w-12 text-center align-middle";
 
 const nonFileNameCharactersPattern = /[^a-z0-9]+/gi;
 const edgeDashPattern = /^-|-$/g;
 const csvEscapingPattern = /[",\n\r]/;
 const filterLabelSeparatorPattern = /[^a-z0-9]+/g;
+const serviceTableColumnIdPattern = /^column-(\d+)$/;
+const serviceTableColumnAlignmentClasses: Record<TableColumnAlignment, string> =
+	{
+		center: "text-center",
+		left: "text-left",
+		right: "text-right",
+	};
 
 export function DataTable({
+	columnAlignments = {},
 	columns,
 	description,
 	filterLabels = ["Status", "Date"],
+	hideTitleCount = false,
+	onSelectedRowIdChange,
 	rows,
+	selectedRowId = "",
 	title,
 }: DataTableProps) {
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -110,20 +136,34 @@ export function DataTable({
 		() => [title ?? "", ...columns, ...filterLabels].join("::"),
 		[columns, filterLabels, title]
 	);
+	const isSingleRowSelection = onSelectedRowIdChange !== undefined;
+	const rowIds = useMemo(() => new Set(rows.map((row) => row.id)), [rows]);
+	let activeRowSelection = rowSelection;
+
+	if (isSingleRowSelection) {
+		activeRowSelection =
+			selectedRowId && rowIds.has(selectedRowId)
+				? { [selectedRowId]: true }
+				: {};
+	}
 	const hasRowActions = rows.some((row) => row.actions !== undefined);
-	const tableRows = useMemo(() => toServiceTableRows(rows), [rows]);
+	const tableRows = useMemo(
+		() => toServiceTableRows({ columns, rows }),
+		[columns, rows]
+	);
 	const filterConfigs = useMemo(
 		() =>
 			getServiceTableFilterConfigs({ columns, filterLabels, rows: tableRows }),
 		[columns, filterLabels, tableRows]
 	);
 	const tableColumns = useMemo(
-		() => getServiceTableColumns(columns, hasRowActions),
-		[columns, hasRowActions]
+		() => getServiceTableColumns(columns, hasRowActions, isSingleRowSelection),
+		[columns, hasRowActions, isSingleRowSelection]
 	);
 	const table = useReactTable({
 		columns: tableColumns,
 		data: tableRows,
+		enableMultiRowSelection: !isSingleRowSelection,
 		enableRowSelection: true,
 		getCoreRowModel: getCoreRowModel(),
 		getFilteredRowModel: getFilteredRowModel(),
@@ -134,13 +174,26 @@ export function DataTable({
 		onColumnFiltersChange: setColumnFilters,
 		onGlobalFilterChange: setGlobalFilter,
 		onPaginationChange: setPagination,
-		onRowSelectionChange: setRowSelection,
+		onRowSelectionChange: (updater) => {
+			const nextSelection =
+				typeof updater === "function" ? updater(activeRowSelection) : updater;
+
+			if (!isSingleRowSelection) {
+				setRowSelection(nextSelection);
+				return;
+			}
+
+			const nextSelectedRowId =
+				Object.keys(nextSelection).find((rowId) => nextSelection[rowId]) ?? "";
+
+			onSelectedRowIdChange(nextSelectedRowId);
+		},
 		onSortingChange: setSorting,
 		state: {
 			columnFilters,
 			globalFilter,
 			pagination,
-			rowSelection,
+			rowSelection: activeRowSelection,
 			sorting,
 		},
 	});
@@ -156,9 +209,11 @@ export function DataTable({
 		setExportFeedback("");
 		setGlobalFilter("");
 		setPagination({ pageIndex: 0, pageSize: 10 });
-		setRowSelection({});
+		if (!isSingleRowSelection) {
+			setRowSelection({});
+		}
 		setSorting([]);
-	}, [tableIdentity]);
+	}, [isSingleRowSelection, tableIdentity]);
 
 	const filteredRowCount = table.getFilteredRowModel().rows.length;
 	const selectedRowCount = table.getFilteredSelectedRowModel().rows.length;
@@ -170,6 +225,8 @@ export function DataTable({
 	const primarySort = sorting.find((sort) => sort.id === "column-0");
 	const sortValue = getSortMenuValue(primarySort);
 	const normalizedSearchQuery = globalFilter.trim();
+	const recordCountLabel =
+		title ?? `${rows.length} ${rows.length === 1 ? "record" : "records"}`;
 
 	const exportVisibleRows = () => {
 		const visibleRows = table
@@ -185,13 +242,26 @@ export function DataTable({
 
 	return (
 		<div className={`${panelClass} overflow-hidden`}>
-			<div className="flex flex-col gap-4 p-4">
+			<div className="flex flex-col gap-4 px-6 py-4">
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-					<div>
-						<p className="font-medium text-base leading-none">
-							{title ?? `${rows.length} Records`}
-						</p>
-						<p className="mt-1 text-muted-foreground text-sm">
+					<div className="min-w-0">
+						{hideTitleCount ? (
+							<div className="mb-1 flex items-center gap-2">
+								<span className="rounded-md border border-border bg-muted/35 px-2 py-0.5 font-medium text-foreground text-xs">
+									{recordCountLabel}
+								</span>
+							</div>
+						) : (
+							<p className="font-medium text-base leading-none">
+								{title ?? `${rows.length} Records`}
+							</p>
+						)}
+						<p
+							className={cn(
+								"text-muted-foreground text-sm",
+								hideTitleCount ? "" : "mt-1"
+							)}
+						>
 							{description ??
 								"Recent service records with status, ownership, and schedule activity."}
 						</p>
@@ -271,15 +341,20 @@ export function DataTable({
 				</div>
 			</div>
 			<div className="overflow-x-auto overflow-y-hidden border-t">
-				<Table className="min-w-[820px] **:data-[slot=table-cell]:px-4 **:data-[slot=table-head]:px-4 **:data-[slot=table-cell]:py-4">
+				<Table className="min-w-[820px] **:data-[slot=table-cell]:px-6 **:data-[slot=table-head]:px-6 **:data-[slot=table-cell]:py-4">
 					<TableHeader className="**:data-[slot=table-head]:h-11 **:data-[slot=table-head]:font-medium **:data-[slot=table-head]:text-foreground **:data-[slot=table-head]:text-sm">
 						{table.getHeaderGroups().map((headerGroup) => (
 							<UiTableRow key={headerGroup.id}>
 								{headerGroup.headers.map((header) => (
 									<TableHead
 										className={cn(
-											"h-11 px-4 font-medium",
-											header.column.id === "actions" ? "text-right" : ""
+											"h-11 px-6 font-medium",
+											header.column.id === "select" ? selectionColumnClass : "",
+											getServiceTableColumnAlignmentClass({
+												columnAlignments,
+												columnId: header.column.id,
+												columns,
+											})
 										)}
 										colSpan={header.colSpan}
 										key={header.id}
@@ -295,18 +370,42 @@ export function DataTable({
 							</UiTableRow>
 						))}
 					</TableHeader>
-					<TableBody className="**:data-[slot=table-row]:border-border/50 **:data-[slot=table-row]:hover:bg-transparent">
+					<TableBody className="**:data-[slot=table-row]:border-border/50">
 						{table.getRowModel().rows.length ? (
 							table.getRowModel().rows.map((row) => (
 								<UiTableRow
+									aria-label={row.original.detailAriaLabel}
+									className={cn(
+										row.original.onClick
+											? "cursor-pointer hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+											: "hover:bg-transparent"
+									)}
 									data-state={row.getIsSelected() ? "selected" : undefined}
 									key={row.id}
+									onClick={
+										row.original.onClick
+											? (event) =>
+													handleClickableRowPointerEvent(event, row.original)
+											: undefined
+									}
+									onKeyDown={
+										row.original.onClick
+											? (event) =>
+													handleClickableRowKeyboardEvent(event, row.original)
+											: undefined
+									}
+									tabIndex={row.original.onClick ? 0 : undefined}
 								>
 									{row.getVisibleCells().map((cell) => (
 										<TableCell
 											className={cn(
-												"px-4 py-4",
-												cell.column.id === "actions" ? "text-right" : ""
+												"px-6 py-4",
+												cell.column.id === "select" ? selectionColumnClass : "",
+												getServiceTableColumnAlignmentClass({
+													columnAlignments,
+													columnId: cell.column.id,
+													columns,
+												})
 											)}
 											key={cell.id}
 										>
@@ -331,7 +430,7 @@ export function DataTable({
 					</TableBody>
 				</Table>
 			</div>
-			<div className="flex flex-col gap-3 px-4 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
+			<div className="flex flex-col gap-3 px-6 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
 				<div className="flex flex-col gap-1">
 					<p>
 						{selectedRowCount} of {filteredRowCount} row(s) selected.
@@ -419,6 +518,7 @@ function FilterMenu({
 				}
 			>
 				{config.label}
+				<ChevronDownIcon data-icon="inline-end" />
 				{value === "all" ? null : (
 					<span className="ml-1 text-muted-foreground">· {activeOption}</span>
 				)}
@@ -521,11 +621,47 @@ function TableSelectionCheckbox({
 
 	return (
 		<input
-			className="size-4 rounded border bg-background accent-primary disabled:cursor-not-allowed disabled:opacity-40"
+			className="block size-4 rounded border bg-background accent-primary disabled:cursor-not-allowed disabled:opacity-40"
 			ref={checkboxRef}
 			type="checkbox"
 			{...props}
 		/>
+	);
+}
+
+function handleClickableRowPointerEvent(
+	event: MouseEvent<HTMLTableRowElement>,
+	row: ServiceTableRow
+) {
+	if (isInteractiveRowEventTarget(event.target)) {
+		return;
+	}
+
+	row.onClick?.();
+}
+
+function handleClickableRowKeyboardEvent(
+	event: KeyboardEvent<HTMLTableRowElement>,
+	row: ServiceTableRow
+) {
+	if (event.key !== "Enter" && event.key !== " ") {
+		return;
+	}
+
+	if (isInteractiveRowEventTarget(event.target)) {
+		return;
+	}
+
+	event.preventDefault();
+	row.onClick?.();
+}
+
+function isInteractiveRowEventTarget(target: EventTarget | null) {
+	return (
+		target instanceof Element &&
+		target.closest(
+			"a, button, input, select, textarea, summary, [role='button'], [role='checkbox'], [data-row-action]"
+		) !== null
 	);
 }
 
@@ -551,20 +687,48 @@ function getNodeText(node: ReactNode): string {
 	return "";
 }
 
-function getRowSearchText(row: DataTableRow) {
-	return [row.id, row.searchText ?? "", ...row.cells.map(getNodeText)]
-		.join(" ")
-		.toLowerCase();
+function getDataTableRowValues({
+	columns,
+	row,
+}: {
+	columns: string[];
+	row: DataTableRow;
+}) {
+	return row.cells.map((cell, index) => {
+		const column = columns[index];
+
+		if (!column) {
+			return getNodeText(cell);
+		}
+
+		return row.columnValues?.[column] ?? getNodeText(cell);
+	});
 }
 
-function toServiceTableRows(rows: DataTableRow[]): ServiceTableRow[] {
-	return rows.map((row) => ({
-		actions: row.actions,
-		cells: row.cells,
-		id: row.id,
-		search: getRowSearchText(row),
-		values: row.cells.map(getNodeText),
-	}));
+function getRowSearchText(row: DataTableRow, values: string[]) {
+	return [row.id, row.searchText ?? "", ...values].join(" ").toLowerCase();
+}
+
+function toServiceTableRows({
+	columns,
+	rows,
+}: {
+	columns: string[];
+	rows: DataTableRow[];
+}): ServiceTableRow[] {
+	return rows.map((row) => {
+		const values = getDataTableRowValues({ columns, row });
+
+		return {
+			actions: row.actions,
+			cells: row.cells,
+			detailAriaLabel: row.detailAriaLabel,
+			id: row.id,
+			onClick: row.onClick,
+			search: getRowSearchText(row, values),
+			values,
+		};
+	});
 }
 
 function serviceTableGlobalFilter(
@@ -647,6 +811,9 @@ function getFilterColumnIndex({
 	label: string;
 }) {
 	const normalizedLabel = normalizeFilterLabel(label);
+	const normalizedLabelWithoutJobPrefix = normalizedLabel.startsWith("job")
+		? normalizedLabel.slice(3)
+		: normalizedLabel;
 	const exactMatchIndex = columns.findIndex(
 		(column) => normalizeFilterLabel(column) === normalizedLabel
 	);
@@ -655,12 +822,24 @@ function getFilterColumnIndex({
 		return exactMatchIndex;
 	}
 
+	if (normalizedLabelWithoutJobPrefix) {
+		const contextualExactMatchIndex = columns.findIndex(
+			(column) =>
+				normalizeFilterLabel(column) === normalizedLabelWithoutJobPrefix
+		);
+
+		if (contextualExactMatchIndex !== -1) {
+			return contextualExactMatchIndex;
+		}
+	}
+
 	const includedMatchIndex = columns.findIndex((column) => {
 		const normalizedColumn = normalizeFilterLabel(column);
 
 		return (
 			normalizedColumn.includes(normalizedLabel) ||
-			normalizedLabel.includes(normalizedColumn)
+			(normalizedColumn.length > 2 &&
+				normalizedLabel.includes(normalizedColumn))
 		);
 	});
 
@@ -686,33 +865,79 @@ function getFilterTokens(value: string) {
 		.filter((token) => token.length > 2);
 }
 
+function getServiceTableColumnAlignmentClass({
+	columnAlignments,
+	columnId,
+	columns,
+}: {
+	columnAlignments: Partial<Record<string, TableColumnAlignment>>;
+	columnId: string;
+	columns: string[];
+}) {
+	if (columnId === "actions") {
+		return serviceTableColumnAlignmentClasses.right;
+	}
+
+	const dataColumnIndex = getServiceTableDataColumnIndex(columnId);
+
+	if (dataColumnIndex === null) {
+		return "";
+	}
+
+	const column = columns[dataColumnIndex];
+
+	if (!column) {
+		return "";
+	}
+
+	const alignment = columnAlignments[column];
+
+	return alignment ? serviceTableColumnAlignmentClasses[alignment] : "";
+}
+
+function getServiceTableDataColumnIndex(columnId: string) {
+	const match = serviceTableColumnIdPattern.exec(columnId);
+
+	if (!match?.[1]) {
+		return null;
+	}
+
+	return Number(match[1]);
+}
+
 function getServiceTableColumns(
 	columns: string[],
-	hasActions: boolean
+	hasActions: boolean,
+	isSingleRowSelection = false
 ): ColumnDef<ServiceTableRow>[] {
 	const tableColumns: ColumnDef<ServiceTableRow>[] = [
 		{
 			cell: ({ row }) => (
-				<TableSelectionCheckbox
-					aria-label={`Select ${row.original.id}`}
-					checked={row.getIsSelected()}
-					disabled={!row.getCanSelect()}
-					onChange={row.getToggleSelectedHandler()}
-				/>
+				<div className="flex min-h-5 items-center justify-center">
+					<TableSelectionCheckbox
+						aria-label={`Select ${row.original.id}`}
+						checked={row.getIsSelected()}
+						disabled={!row.getCanSelect()}
+						onChange={row.getToggleSelectedHandler()}
+					/>
+				</div>
 			),
 			enableSorting: false,
-			header: ({ table }) => (
-				<TableSelectionCheckbox
-					aria-label="Select all visible rows"
-					checked={table.getIsAllPageRowsSelected()}
-					disabled={table.getRowModel().rows.length === 0}
-					indeterminate={
-						table.getIsSomePageRowsSelected() &&
-						!table.getIsAllPageRowsSelected()
-					}
-					onChange={table.getToggleAllPageRowsSelectedHandler()}
-				/>
-			),
+			header: ({ table }) =>
+				isSingleRowSelection ? null : (
+					<div className="flex min-h-5 items-center justify-center">
+						<TableSelectionCheckbox
+							aria-label="Select all visible rows"
+							checked={table.getIsAllPageRowsSelected()}
+							disabled={table.getRowModel().rows.length === 0}
+							indeterminate={
+								table.getIsSomePageRowsSelected() &&
+								!table.getIsAllPageRowsSelected()
+							}
+							onChange={table.getToggleAllPageRowsSelectedHandler()}
+						/>
+					</div>
+				),
 			id: "select",
 			size: 48,
 		},

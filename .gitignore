@@ -47,5 +47,6 @@ coverage
 .cache
 tmp
 temp
+tmp-files/
 
 .playwright-mcp

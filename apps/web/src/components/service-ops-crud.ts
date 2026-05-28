@@ -31,23 +31,34 @@ export type CrudState =
 export type FormDefaultValue = boolean | number | string | string[];
 
 export interface FieldOption {
+	description?: string;
 	label: string;
+	meta?: string;
 	value: string;
 }
 
 export interface FieldConfig {
+	accept?: string;
+	description?: string;
 	label: string;
 	max?: number;
 	min?: number;
 	multiple?: boolean;
 	name: string;
 	options?: FieldOption[];
+	placeholder?: string;
 	required?: boolean;
+	span?: "full";
 	type?:
 		| "checkbox"
+		| "checkbox-list"
 		| "date"
 		| "datetime-local"
+		| "file"
 		| "number"
+		| "part-picker"
+		| "phone"
+		| "section"
 		| "select"
 		| "textarea"
 		| "text";
@@ -163,6 +174,7 @@ interface HospitalPayload {
 	primaryContactEmail: null | string;
 	primaryContactName: null | string;
 	primaryContactPhone: null | string;
+	regionProvince: null | string;
 }
 
 interface JobPayload {
@@ -178,11 +190,13 @@ interface JobPayload {
 }
 
 interface PartPayload {
+	description: null | string;
 	minimumStock: number;
 	name: string;
-	partNumber: string;
+	partNumber: null | string;
+	productModelIds: string[];
 	stockOnHand: number;
-	supplier: string;
+	supplier: null | string;
 	unitCost: number;
 }
 
@@ -193,6 +207,14 @@ interface ProductPayload {
 	isEngineerReadOnly: boolean;
 	manufacturer: string;
 	modelName: string;
+	partIds: string[];
+	serviceManual: null | {
+		fileName: string;
+		fileUrl: string;
+		pageCount: null | number;
+		storageKey: null | string;
+		version: null | string;
+	};
 }
 
 export interface TenantPayload {
@@ -219,7 +241,7 @@ export const entityLabels: Record<CrudEntity, string> = {
 	hospital: "hospital",
 	job: "job",
 	part: "part",
-	product: "product",
+	product: "catalogue item",
 	tenant: "tenant",
 	tenantUser: "user",
 };
@@ -333,11 +355,18 @@ export function getFieldConfigs(
 		optionFromRecord(engineer)
 	);
 	const productOptions = data.products.map((product) => ({
+		description: product.code,
 		label: product.modelName,
 		value: product.id,
 	}));
 	const partOptions = data.parts.map((part) => ({
 		label: `${part.id} · ${part.name}`,
+		value: part.recordId,
+	}));
+	const productPartOptions = data.parts.map((part) => ({
+		description: part.id,
+		label: part.name,
+		meta: `Stock: ${part.stock}`,
 		value: part.recordId,
 	}));
 	const assetOptions = data.assets.map((asset) => ({
@@ -433,7 +462,7 @@ export function getFieldConfigs(
 			{ label: "Code", name: "code", required: true },
 			{ label: "Name", name: "name", required: true },
 			{ label: "Email", name: "email" },
-			{ label: "Phone", name: "phone" },
+			{ label: "Phone", name: "phone", type: "phone" },
 			{ label: "Grade", name: "grade", required: true },
 			{ label: "Region", name: "region", required: true },
 			{
@@ -496,15 +525,49 @@ export function getFieldConfigs(
 			},
 		],
 		hospital: [
-			{ label: "Code", name: "code", required: true },
-			{ label: "Name", name: "name", required: true },
-			{ label: "District", name: "district", required: true },
-			{ label: "Address", name: "address" },
+			{
+				label: "Hospital Information",
+				name: "hospitalInformation",
+				span: "full",
+				type: "section",
+			},
+			{
+				label: "Hospital Name",
+				name: "name",
+				placeholder: "e.g. Beijing General Hospital",
+				required: true,
+				span: "full",
+			},
+			{
+				description: "Unique short code for this hospital",
+				label: "Hospital Code",
+				name: "code",
+				placeholder: "e.g. SGH-001",
+				required: true,
+			},
+			{
+				label: "City",
+				name: "district",
+				placeholder: "e.g. Beijing",
+				required: true,
+			},
+			{
+				label: "Region / Province",
+				name: "regionProvince",
+				placeholder: "e.g. Beijing Municipality",
+			},
+			{
+				label: "Address",
+				name: "address",
+				placeholder: "e.g. 123 Hospital Street",
+				span: "full",
+			},
 			{
 				label: "Latitude",
 				max: 90,
 				min: -90,
 				name: "latitude",
+				placeholder: "e.g. 39.9042",
 				type: "number",
 			},
 			{
@@ -512,11 +575,32 @@ export function getFieldConfigs(
 				max: 180,
 				min: -180,
 				name: "longitude",
+				placeholder: "e.g. 116.4074",
 				type: "number",
 			},
-			{ label: "Contact name", name: "primaryContactName" },
-			{ label: "Contact email", name: "primaryContactEmail" },
-			{ label: "Contact phone", name: "primaryContactPhone" },
+			{
+				label: "Primary Contact",
+				name: "primaryContact",
+				span: "full",
+				type: "section",
+			},
+			{
+				label: "Contact Name",
+				name: "primaryContactName",
+				placeholder: "e.g. Dr. Wang Lei",
+				span: "full",
+			},
+			{
+				label: "Phone",
+				name: "primaryContactPhone",
+				placeholder: "10 1234 5678",
+				type: "phone",
+			},
+			{
+				label: "Email",
+				name: "primaryContactEmail",
+				placeholder: "e.g. contact@hospital.com",
+			},
 		],
 		job: [
 			{ label: "Job number", name: "jobNumber", required: true },
@@ -574,22 +658,56 @@ export function getFieldConfigs(
 			},
 		],
 		part: [
-			{ label: "Part number", name: "partNumber", required: true },
-			{ label: "Name", name: "name", required: true },
-			{ label: "Supplier", name: "supplier", required: true },
 			{
-				label: "Stock on hand",
+				label: "Part Name",
+				name: "name",
+				placeholder: "e.g. HEPA Filter Type A",
+				required: true,
+				span: "full",
+			},
+			{
+				label: "Part Number",
+				name: "partNumber",
+				placeholder: "e.g. HF-001-A",
+			},
+			{ label: "Supplier", name: "supplier" },
+			{
+				label: "Unit Cost (HKD)",
+				name: "unitCost",
+				placeholder: "e.g. 0.00",
+				required: true,
+				type: "number",
+			},
+			{
+				label: "Initial Stock",
 				name: "stockOnHand",
+				placeholder: "e.g. 0",
 				required: true,
 				type: "number",
 			},
 			{
-				label: "Minimum stock",
+				description: "Alert when stock drops to this level",
+				label: "Reorder Threshold",
 				name: "minimumStock",
+				placeholder: "e.g. 0",
 				required: true,
+				span: "full",
 				type: "number",
 			},
-			{ label: "Unit cost", name: "unitCost", required: true, type: "number" },
+			{
+				label: "Associate with product models",
+				multiple: true,
+				name: "productModelIds",
+				options: productOptions,
+				span: "full",
+				type: "checkbox-list",
+			},
+			{
+				label: "Description",
+				name: "description",
+				span: "full",
+				type: "textarea",
+			},
 		],
 		product: [
 			{ label: "Code", name: "code", required: true },
@@ -606,6 +724,22 @@ export function getFieldConfigs(
 				label: "Engineer read only",
 				name: "isEngineerReadOnly",
 				type: "checkbox",
+			},
+			{
+				label: "Standard parts",
+				multiple: true,
+				name: "partIds",
+				options: productPartOptions,
+				type: "part-picker",
+			},
+			{
+				accept: "application/pdf,.pdf",
+				description:
+					"Upload a PDF service manual. Files are stored in tmp-files for now.",
+				label: "Service manual PDF",
+				name: "manualFile",
+				span: "full",
+				type: "file",
 			},
 		],
 		tenant: [
@@ -654,6 +788,22 @@ function nullableValueFromForm(formData: FormData, name: string) {
 	const value = valueFromForm(formData, name);
 
 	return value || null;
+}
+
+function phoneValueFromForm(formData: FormData, name: string) {
+	const localNumber = valueFromForm(formData, `${name}LocalNumber`);
+
+	if (!localNumber) {
+		return null;
+	}
+
+	if (localNumber.startsWith("+")) {
+		return localNumber;
+	}
+
+	const dialCode = valueFromForm(formData, `${name}DialCode`);
+
+	return `${dialCode} ${localNumber}`.trim();
 }
 
 function numberFromForm(formData: FormData, name: string) {
@@ -905,6 +1055,7 @@ function getHospitalDefaults(
 			primaryContactEmail: record.primaryContactEmail ?? "",
 			primaryContactName: record.primaryContactName ?? "",
 			primaryContactPhone: record.primaryContactPhone ?? "",
+			regionProvince: record.regionProvince ?? "",
 		};
 	}
 
@@ -936,9 +1087,11 @@ function getPartDefaults(
 ): Record<string, FormDefaultValue> | null {
 	if (isPartRecord(record)) {
 		return {
+			description: record.description ?? "",
 			minimumStock: record.minimum,
 			name: record.name,
 			partNumber: record.id,
+			productModelIds: record.productModelIds,
 			stockOnHand: record.stock,
 			supplier: record.supplier,
 			unitCost: record.unitCost,
@@ -957,8 +1110,15 @@ function getProductDefaults(
 			code: record.code,
 			defaultPmCycleMonths: record.defaultPmCycleMonths,
 			isEngineerReadOnly: record.isEngineerReadOnly,
+			manualFileName:
+				record.manualFileName === "Not uploaded" ? "" : record.manualFileName,
+			manualFileUrl: record.manualFileUrl ?? "",
+			manualPageCount: "",
+			manualStorageKey: "",
+			manualVersion: "",
 			manufacturer: record.manufacturer,
 			modelName: record.modelName,
+			partIds: record.partIds,
 		};
 	}
 
@@ -1020,9 +1180,7 @@ function getCreateDefaults(entity: CrudEntity) {
 
 	if (entity === "part") {
 		defaults.partNumber = `P-${suffix}`;
-		defaults.minimumStock = 0;
-		defaults.stockOnHand = 0;
-		defaults.unitCost = 0;
+		defaults.productModelIds = [];
 	}
 
 	if (entity === "asset") {
@@ -1122,7 +1280,7 @@ export function buildEngineerPayload(formData: FormData): EngineerPayload {
 		mealCap: numberFromForm(formData, "mealCap"),
 		mileageRate: numberFromForm(formData, "mileageRate"),
 		name: valueFromForm(formData, "name"),
-		phone: nullableValueFromForm(formData, "phone"),
+		phone: phoneValueFromForm(formData, "phone"),
 		region: valueFromForm(formData, "region"),
 		status: enumFromForm(formData, "status", engineerStatusValues),
 	};
@@ -1151,7 +1309,8 @@ export function buildHospitalPayload(formData: FormData): HospitalPayload {
 		name: valueFromForm(formData, "name"),
 		primaryContactEmail: nullableValueFromForm(formData, "primaryContactEmail"),
 		primaryContactName: nullableValueFromForm(formData, "primaryContactName"),
-		primaryContactPhone: nullableValueFromForm(formData, "primaryContactPhone"),
+		primaryContactPhone: phoneValueFromForm(formData, "primaryContactPhone"),
+		regionProvince: nullableValueFromForm(formData, "regionProvince"),
 	};
 }
 
@@ -1171,16 +1330,25 @@ export function buildJobPayload(formData: FormData): JobPayload {
 
 export function buildPartPayload(formData: FormData): PartPayload {
 	return {
+		description: nullableValueFromForm(formData, "description"),
 		minimumStock: numberFromForm(formData, "minimumStock"),
 		name: valueFromForm(formData, "name"),
-		partNumber: valueFromForm(formData, "partNumber"),
+		partNumber: nullableValueFromForm(formData, "partNumber"),
+		productModelIds: valuesFromForm(formData, "productModelIds"),
 		stockOnHand: numberFromForm(formData, "stockOnHand"),
-		supplier: valueFromForm(formData, "supplier"),
+		supplier: nullableValueFromForm(formData, "supplier"),
 		unitCost: numberFromForm(formData, "unitCost"),
 	};
 }
 
 export function buildProductPayload(formData: FormData): ProductPayload {
+	const manualFileName = nullableValueFromForm(formData, "manualFileName");
+	const manualFileUrl = nullableValueFromForm(formData, "manualFileUrl");
+	const manualPageCount = optionalNumberFromForm(formData, "manualPageCount");
+	const manualStorageKey = nullableValueFromForm(formData, "manualStorageKey");
+	const manualVersion = nullableValueFromForm(formData, "manualVersion");
+	const hasManualInput = Boolean(manualFileName && manualFileUrl);
+
 	return {
 		category: valueFromForm(formData, "category"),
 		code: valueFromForm(formData, "code"),
@@ -1188,6 +1356,16 @@ export function buildProductPayload(formData: FormData): ProductPayload {
 		isEngineerReadOnly: boolFromForm(formData, "isEngineerReadOnly"),
 		manufacturer: valueFromForm(formData, "manufacturer"),
 		modelName: valueFromForm(formData, "modelName"),
+		partIds: valuesFromForm(formData, "partIds"),
+		serviceManual: hasManualInput
+			? {
+					fileName: manualFileName ?? "",
+					fileUrl: manualFileUrl ?? "",
+					pageCount: manualPageCount,
+					storageKey: manualStorageKey,
+					version: manualVersion,
+				}
+			: null,
 	};
 }
 

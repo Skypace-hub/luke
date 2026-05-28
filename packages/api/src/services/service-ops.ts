@@ -126,6 +126,7 @@ export interface HospitalMutationInput {
 	primaryContactEmail?: null | string;
 	primaryContactName?: null | string;
 	primaryContactPhone?: null | string;
+	regionProvince?: null | string;
 }
 
 export interface EngineerMutationInput {
@@ -148,14 +149,18 @@ export interface ProductMutationInput {
 	isEngineerReadOnly: boolean;
 	manufacturer: string;
 	modelName: string;
+	partIds: string[];
+	serviceManual?: null | ServiceManualMutationInput;
 }
 
 export interface PartMutationInput {
+	description?: null | string;
 	minimumStock: number;
 	name: string;
-	partNumber: string;
+	partNumber?: null | string;
+	productModelIds: string[];
 	stockOnHand: number;
-	supplier: string;
+	supplier?: null | string;
 	unitCost: number;
 }
 
@@ -1104,6 +1109,15 @@ const getTenantProductRecord = (tenantId: string, id: string) =>
 		})
 	);
 
+const ensureTenantProductRecords = async (
+	tenantId: string,
+	productModelIds: string[]
+) => {
+	for (const productModelId of productModelIds) {
+		await getTenantProductRecord(tenantId, productModelId);
+	}
+};
+
 const getTenantPartRecord = (tenantId: string, id: string) =>
 	ensureRecordBelongsToTenant(
 		"Part",
@@ -1111,6 +1125,12 @@ const getTenantPartRecord = (tenantId: string, id: string) =>
 			where: and(eq(parts.id, id), eq(parts.tenantId, tenantId)),
 		})
 	);
+
+const ensureTenantPartRecords = async (tenantId: string, partIds: string[]) => {
+	for (const partId of partIds) {
+		await getTenantPartRecord(tenantId, partId);
+	}
+};
 
 const getTenantAssetRecord = (tenantId: string, id: string) =>
 	ensureRecordBelongsToTenant(
@@ -1197,6 +1217,7 @@ const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 			primaryContactEmail: hospitals.primaryContactEmail,
 			primaryContactName: hospitals.primaryContactName,
 			primaryContactPhone: hospitals.primaryContactPhone,
+			regionProvince: hospitals.regionProvince,
 		})
 		.from(hospitals)
 		.leftJoin(
@@ -1225,7 +1246,8 @@ const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 			hospitals.longitude,
 			hospitals.primaryContactName,
 			hospitals.primaryContactEmail,
-			hospitals.primaryContactPhone
+			hospitals.primaryContactPhone,
+			hospitals.regionProvince
 		)
 		.orderBy(asc(hospitals.name));
 
@@ -1245,6 +1267,7 @@ const getHospitals = async (tenantId: string): Promise<Hospital[]> => {
 		primaryContactEmail: row.primaryContactEmail,
 		primaryContactName: row.primaryContactName,
 		primaryContactPhone: row.primaryContactPhone,
+		regionProvince: row.regionProvince,
 	}));
 };
 
@@ -1549,6 +1572,17 @@ const mapJobRowToJob = (row: {
 });
 
 const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
+	const assetCountRows = await db
+		.select({
+			assetCount: sql<number>`count(*)::int`,
+			productModelId: assets.productModelId,
+		})
+		.from(assets)
+		.where(eq(assets.tenantId, tenantId))
+		.groupBy(assets.productModelId);
+	const assetCounts = new Map(
+		assetCountRows.map((row) => [row.productModelId, Number(row.assetCount)])
+	);
 	const rows = await db
 		.select({
 			category: productModels.category,
@@ -1593,6 +1627,7 @@ const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
 		}
 
 		byModel.set(row.productModelId, {
+			assetCount: assetCounts.get(row.productModelId) ?? 0,
 			category: row.category,
 			code: row.code,
 			defaultPmCycleMonths: row.defaultPmCycleMonths,
@@ -1760,9 +1795,11 @@ const getFaultReports = async (tenantId: string): Promise<FaultReport[]> => {
 const getParts = async (tenantId: string): Promise<Part[]> => {
 	const rows = await db
 		.select({
+			description: parts.description,
 			minimumStock: partInventory.minimumStock,
 			name: parts.name,
 			partNumber: parts.partNumber,
+			productModelId: productModelParts.productModelId,
 			recordId: parts.id,
 			stockOnHand: partInventory.stockOnHand,
 			supplier: parts.supplier,
@@ -1770,18 +1807,34 @@ const getParts = async (tenantId: string): Promise<Part[]> => {
 		})
 		.from(parts)
 		.leftJoin(partInventory, eq(partInventory.partId, parts.id))
+		.leftJoin(productModelParts, eq(productModelParts.partId, parts.id))
 		.where(and(eq(parts.tenantId, tenantId), eq(parts.isActive, true)))
 		.orderBy(asc(parts.partNumber));
 
-	return rows.map((row) => ({
-		id: row.partNumber,
-		minimum: row.minimumStock ?? 0,
-		name: row.name,
-		recordId: row.recordId,
-		stock: row.stockOnHand ?? 0,
-		supplier: row.supplier,
-		unitCost: numberFrom(row.unitCostHkd),
-	}));
+	const byPart = new Map<string, Part>();
+
+	for (const row of rows) {
+		const existing = byPart.get(row.recordId);
+
+		if (existing) {
+			appendUnique(existing.productModelIds, row.productModelId);
+			continue;
+		}
+
+		byPart.set(row.recordId, {
+			description: row.description,
+			id: row.partNumber,
+			minimum: row.minimumStock ?? 0,
+			name: row.name,
+			productModelIds: row.productModelId ? [row.productModelId] : [],
+			recordId: row.recordId,
+			stock: row.stockOnHand ?? 0,
+			supplier: row.supplier,
+			unitCost: numberFrom(row.unitCostHkd),
+		});
+	}
+
+	return Array.from(byPart.values());
 };
 
 const mapShortageStatus = (
@@ -2206,6 +2259,7 @@ export async function getNfcDeviceInfo(
 		lastServiceRecords,
 		manualFileUrl: manual?.fileUrl ?? null,
 		productModel: {
+			assetCount: 1,
 			category: assetRow.productCategory,
 			code: assetRow.productCode,
 			defaultPmCycleMonths: assetRow.productDefaultPmCycleMonths,
@@ -2818,6 +2872,7 @@ export async function createHospital(
 		primaryContactEmail: toNullableString(input.primaryContactEmail),
 		primaryContactName: toNullableString(input.primaryContactName),
 		primaryContactPhone: toNullableString(input.primaryContactPhone),
+		regionProvince: toNullableString(input.regionProvince),
 		tenantId,
 	} satisfies HospitalInsert);
 }
@@ -2840,6 +2895,7 @@ export async function updateHospital(
 			primaryContactEmail: toNullableString(input.primaryContactEmail),
 			primaryContactName: toNullableString(input.primaryContactName),
 			primaryContactPhone: toNullableString(input.primaryContactPhone),
+			regionProvince: toNullableString(input.regionProvince),
 		})
 		.where(and(eq(hospitals.id, id), eq(hospitals.tenantId, tenantId)));
 }
@@ -2906,15 +2962,51 @@ export async function createProduct(
 	tenantId: string,
 	input: ProductMutationInput
 ) {
-	await db.insert(productModels).values({
-		category: input.category,
-		code: input.code,
-		defaultPmCycleMonths: input.defaultPmCycleMonths,
-		isEngineerReadOnly: input.isEngineerReadOnly,
-		manufacturer: input.manufacturer,
-		modelName: input.modelName,
-		tenantId,
-	} satisfies ProductInsert);
+	await ensureTenantPartRecords(tenantId, input.partIds);
+
+	await db.transaction(async (tx) => {
+		const [product] = await tx
+			.insert(productModels)
+			.values({
+				category: input.category,
+				code: input.code,
+				defaultPmCycleMonths: input.defaultPmCycleMonths,
+				isEngineerReadOnly: input.isEngineerReadOnly,
+				manufacturer: input.manufacturer,
+				modelName: input.modelName,
+				tenantId,
+			} satisfies ProductInsert)
+			.returning({ id: productModels.id });
+
+		if (!product) {
+			throw new Error("Unable to create product");
+		}
+
+		if (input.partIds.length > 0) {
+			await tx.insert(productModelParts).values(
+				input.partIds.map((partId) => ({
+					partId,
+					productModelId: product.id,
+					tenantId,
+				}))
+			);
+		}
+
+		if (input.serviceManual) {
+			await tx.insert(serviceManuals).values({
+				fileName: input.serviceManual.fileName,
+				fileUrl: input.serviceManual.fileUrl,
+				pageCount: input.serviceManual.pageCount ?? null,
+				productModelId: product.id,
+				status: "uploaded",
+				storageKey:
+					input.serviceManual.storageKey ??
+					`manuals/${tenantId}/${product.id}/${input.serviceManual.fileName}`,
+				tenantId,
+				version: input.serviceManual.version?.trim() || "1",
+			});
+		}
+	});
 }
 
 export async function updateProduct(
@@ -2923,21 +3015,90 @@ export async function updateProduct(
 	input: ProductMutationInput
 ) {
 	await getTenantProductRecord(tenantId, id);
-	await db
-		.update(productModels)
-		.set({
-			category: input.category,
-			code: input.code,
-			defaultPmCycleMonths: input.defaultPmCycleMonths,
-			isEngineerReadOnly: input.isEngineerReadOnly,
-			manufacturer: input.manufacturer,
-			modelName: input.modelName,
-		})
-		.where(and(eq(productModels.id, id), eq(productModels.tenantId, tenantId)));
+	await ensureTenantPartRecords(tenantId, input.partIds);
+
+	await db.transaction(async (tx) => {
+		await tx
+			.update(productModels)
+			.set({
+				category: input.category,
+				code: input.code,
+				defaultPmCycleMonths: input.defaultPmCycleMonths,
+				isEngineerReadOnly: input.isEngineerReadOnly,
+				manufacturer: input.manufacturer,
+				modelName: input.modelName,
+			})
+			.where(
+				and(eq(productModels.id, id), eq(productModels.tenantId, tenantId))
+			);
+
+		await tx
+			.delete(productModelParts)
+			.where(
+				and(
+					eq(productModelParts.productModelId, id),
+					eq(productModelParts.tenantId, tenantId)
+				)
+			);
+
+		if (input.partIds.length > 0) {
+			await tx.insert(productModelParts).values(
+				input.partIds.map((partId) => ({
+					partId,
+					productModelId: id,
+					tenantId,
+				}))
+			);
+		}
+
+		if (input.serviceManual) {
+			const version = input.serviceManual.version?.trim() || "1";
+
+			await tx
+				.insert(serviceManuals)
+				.values({
+					fileName: input.serviceManual.fileName,
+					fileUrl: input.serviceManual.fileUrl,
+					pageCount: input.serviceManual.pageCount ?? null,
+					productModelId: id,
+					status: "uploaded",
+					storageKey:
+						input.serviceManual.storageKey ??
+						`manuals/${tenantId}/${id}/${input.serviceManual.fileName}`,
+					tenantId,
+					version,
+				})
+				.onConflictDoUpdate({
+					set: {
+						fileName: input.serviceManual.fileName,
+						fileUrl: input.serviceManual.fileUrl,
+						pageCount: input.serviceManual.pageCount ?? null,
+						status: "uploaded",
+						storageKey:
+							input.serviceManual.storageKey ??
+							`manuals/${tenantId}/${id}/${input.serviceManual.fileName}`,
+						uploadedAt: new Date(),
+					},
+					target: [serviceManuals.productModelId, serviceManuals.version],
+				});
+		}
+	});
 }
 
 export async function deleteProduct(tenantId: string, id: string) {
 	await getTenantProductRecord(tenantId, id);
+	const linkedAssets = await db
+		.select({ id: assets.id })
+		.from(assets)
+		.where(and(eq(assets.productModelId, id), eq(assets.tenantId, tenantId)))
+		.limit(1);
+
+	if (linkedAssets.length > 0) {
+		throw new Error(
+			"This catalogue item is linked to installed assets. Reassign or remove those assets before deleting it."
+		);
+	}
+
 	await db.transaction(async (tx) => {
 		const manualRows = await tx
 			.select({ id: serviceManuals.id })
@@ -2994,13 +3155,16 @@ export async function deleteProduct(tenantId: string, id: string) {
 }
 
 export async function createPart(tenantId: string, input: PartMutationInput) {
+	await ensureTenantProductRecords(tenantId, input.productModelIds);
+
 	await db.transaction(async (tx) => {
 		const [part] = await tx
 			.insert(parts)
 			.values({
+				description: input.description,
 				name: input.name,
-				partNumber: input.partNumber,
-				supplier: input.supplier,
+				partNumber: input.partNumber || input.name,
+				supplier: input.supplier ?? "",
 				tenantId,
 				unitCostHkd: toMoneyValue(input.unitCost),
 			} satisfies PartInsert)
@@ -3016,6 +3180,16 @@ export async function createPart(tenantId: string, input: PartMutationInput) {
 			stockOnHand: input.stockOnHand,
 			tenantId,
 		});
+
+		if (input.productModelIds.length > 0) {
+			await tx.insert(productModelParts).values(
+				input.productModelIds.map((productModelId) => ({
+					partId: part.id,
+					productModelId,
+					tenantId,
+				}))
+			);
+		}
 	});
 }
 
@@ -3025,13 +3199,16 @@ export async function updatePart(
 	input: PartMutationInput
 ) {
 	await getTenantPartRecord(tenantId, id);
+	await ensureTenantProductRecords(tenantId, input.productModelIds);
+
 	await db.transaction(async (tx) => {
 		await tx
 			.update(parts)
 			.set({
+				description: input.description,
 				name: input.name,
-				partNumber: input.partNumber,
-				supplier: input.supplier,
+				partNumber: input.partNumber || input.name,
+				supplier: input.supplier ?? "",
 				unitCostHkd: toMoneyValue(input.unitCost),
 			})
 			.where(and(eq(parts.id, id), eq(parts.tenantId, tenantId)));
@@ -3052,15 +3229,33 @@ export async function updatePart(
 					stockOnHand: input.stockOnHand,
 				})
 				.where(eq(partInventory.id, inventory.id));
-			return;
+		} else {
+			await tx.insert(partInventory).values({
+				minimumStock: input.minimumStock,
+				partId: id,
+				stockOnHand: input.stockOnHand,
+				tenantId,
+			});
 		}
 
-		await tx.insert(partInventory).values({
-			minimumStock: input.minimumStock,
-			partId: id,
-			stockOnHand: input.stockOnHand,
-			tenantId,
-		});
+		await tx
+			.delete(productModelParts)
+			.where(
+				and(
+					eq(productModelParts.partId, id),
+					eq(productModelParts.tenantId, tenantId)
+				)
+			);
+
+		if (input.productModelIds.length > 0) {
+			await tx.insert(productModelParts).values(
+				input.productModelIds.map((productModelId) => ({
+					partId: id,
+					productModelId,
+					tenantId,
+				}))
+			);
+		}
 	});
 }
 

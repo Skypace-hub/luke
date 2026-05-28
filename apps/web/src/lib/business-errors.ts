@@ -43,6 +43,13 @@ function getServiceOpsDescription(message?: string) {
 	}
 
 	if (
+		normalizedMessage.includes("catalogue item") &&
+		normalizedMessage.includes("installed assets")
+	) {
+		return "This catalogue item is linked to installed assets. Reassign or remove those assets before deleting it.";
+	}
+
+	if (
 		normalizedMessage.includes("foreign key") ||
 		normalizedMessage.includes("restrict")
 	) {

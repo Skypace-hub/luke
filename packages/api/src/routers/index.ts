@@ -104,6 +104,7 @@ const hospitalSchema = z.object({
 	primaryContactEmail: optionalTextSchema,
 	primaryContactName: optionalTextSchema,
 	primaryContactPhone: optionalTextSchema,
+	regionProvince: optionalTextSchema,
 });
 
 const engineerSchema = z.object({
@@ -125,6 +126,14 @@ const engineerSchema = z.object({
 	]),
 });
 
+const serviceManualSchema = z.object({
+	fileName: z.string().trim().min(1),
+	fileUrl: z.string().trim().min(1),
+	pageCount: z.number().int().min(1).nullable().optional(),
+	storageKey: optionalTextSchema,
+	version: optionalTextSchema,
+});
+
 const productSchema = z.object({
 	category: z.string().trim().min(1),
 	code: z.string().trim().min(1),
@@ -132,14 +141,18 @@ const productSchema = z.object({
 	isEngineerReadOnly: z.boolean(),
 	manufacturer: z.string().trim().min(1),
 	modelName: z.string().trim().min(1),
+	partIds: z.array(z.string().min(1)).default([]),
+	serviceManual: serviceManualSchema.nullable().optional(),
 });
 
 const partSchema = z.object({
+	description: optionalTextSchema,
 	minimumStock: z.number().int().min(0),
 	name: z.string().trim().min(1),
-	partNumber: z.string().trim().min(1),
+	partNumber: optionalTextSchema,
+	productModelIds: z.array(z.string().min(1)),
 	stockOnHand: z.number().int().min(0),
-	supplier: z.string().trim().min(1),
+	supplier: optionalTextSchema,
 	unitCost: z.number().min(0),
 });
 
@@ -255,14 +268,6 @@ const systemParameterSchema = z.object({
 	key: z.string().trim().min(1),
 	value: z.union([z.string(), z.number(), z.boolean()]),
 	valueType: z.enum(["number", "string", "secret", "boolean"]),
-});
-
-const serviceManualSchema = z.object({
-	fileName: z.string().trim().min(1),
-	fileUrl: z.url(),
-	pageCount: z.number().int().min(1).nullable().optional(),
-	storageKey: optionalTextSchema,
-	version: optionalTextSchema,
 });
 
 const faultSchema = z.object({

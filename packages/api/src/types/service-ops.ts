@@ -92,6 +92,7 @@ export interface Hospital {
 	primaryContactEmail: null | string;
 	primaryContactName: null | string;
 	primaryContactPhone: null | string;
+	regionProvince: null | string;
 }
 
 export interface Engineer {
@@ -161,6 +162,7 @@ export interface Job {
 }
 
 export interface ProductModel {
+	assetCount: number;
 	category: string;
 	code: string;
 	defaultPmCycleMonths: number;
@@ -212,9 +214,11 @@ export interface FaultReport {
 }
 
 export interface Part {
+	description: null | string;
 	id: string;
 	minimum: number;
 	name: string;
+	productModelIds: string[];
 	recordId: string;
 	stock: number;
 	supplier: string;

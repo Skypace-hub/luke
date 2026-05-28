@@ -22,6 +22,20 @@
       "when": 1779790001000,
       "tag": "0002_role_membership_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779790002000,
+      "tag": "0003_part_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779790003000,
+      "tag": "0004_hospital_region_province",
+      "breakpoints": true
     }
   ]
 }
