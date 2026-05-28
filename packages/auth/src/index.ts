@@ -29,6 +29,31 @@ const authSchema = {
 	verification,
 };
 
+const developmentTrustedOrigins = [
+	"http://localhost:27099",
+	"http://127.0.0.1:27099",
+] as const;
+
+function getOrigin(url: string) {
+	return new URL(url).origin;
+}
+
+function getTrustedOrigins() {
+	const origins = [
+		getOrigin(env.CORS_ORIGIN),
+		getOrigin(env.BETTER_AUTH_URL),
+		"luke://",
+		"exp://",
+		"http://localhost:8081",
+	];
+
+	if (env.NODE_ENV === "development") {
+		origins.push(...developmentTrustedOrigins);
+	}
+
+	return Array.from(new Set(origins));
+}
+
 export async function ensureDefaultSuperAdmin() {
 	const db = createDb();
 	const now = new Date();
@@ -121,12 +146,7 @@ export function createAuth() {
 
 			schema: authSchema,
 		}),
-		trustedOrigins: [
-			env.CORS_ORIGIN,
-			"luke://",
-			"exp://",
-			"http://localhost:8081",
-		],
+		trustedOrigins: getTrustedOrigins(),
 		emailAndPassword: {
 			enabled: true,
 		},
