@@ -41,14 +41,15 @@ export interface FieldConfig {
 	accept?: string;
 	description?: string;
 	label: string;
-	max?: number;
-	min?: number;
+	max?: number | string;
+	min?: number | string;
 	multiple?: boolean;
 	name: string;
 	options?: FieldOption[];
 	placeholder?: string;
 	required?: boolean;
 	span?: "full";
+	suffix?: string;
 	type?:
 		| "checkbox"
 		| "checkbox-list"
@@ -344,13 +345,43 @@ function optionFromRecord(
 	};
 }
 
+function capitalizeLowercaseName(value: string) {
+	const trimmedValue = value.trim();
+
+	if (!trimmedValue || trimmedValue !== trimmedValue.toLowerCase()) {
+		return trimmedValue;
+	}
+
+	return trimmedValue.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function formatPartOptionLabel(part: Part) {
+	const partNumber = part.id.trim();
+	const partName = part.name.trim();
+
+	if (!partNumber) {
+		return partName;
+	}
+
+	if (!partName || partNumber.toLowerCase() === partName.toLowerCase()) {
+		return partNumber;
+	}
+
+	return `${partNumber} - ${partName}`;
+}
+
 export function getFieldConfigs(
 	entity: CrudEntity,
 	data: ServiceOpsSnapshot
 ): FieldConfig[] {
-	const hospitalOptions = data.hospitals.map((hospital) =>
-		optionFromRecord(hospital)
-	);
+	const hospitalOptions = data.hospitals.map((hospital) => {
+		const option = optionFromRecord(hospital);
+
+		return {
+			...option,
+			label: capitalizeLowercaseName(option.label),
+		};
+	});
 	const engineerOptions = data.engineers.map((engineer) =>
 		optionFromRecord(engineer)
 	);
@@ -360,7 +391,7 @@ export function getFieldConfigs(
 		value: product.id,
 	}));
 	const partOptions = data.parts.map((part) => ({
-		label: `${part.id} · ${part.name}`,
+		label: formatPartOptionLabel(part),
 		value: part.recordId,
 	}));
 	const productPartOptions = data.parts.map((part) => ({
@@ -437,17 +468,24 @@ export function getFieldConfigs(
 			{ label: "Start date", name: "startDate", required: true, type: "date" },
 			{ label: "End date", name: "endDate", required: true, type: "date" },
 			{
-				label: "Response SLA hours",
+				label: "Response SLA",
 				name: "responseSlaHours",
 				required: true,
+				suffix: "hours",
 				type: "number",
 			},
-			{ label: "Account manager", name: "accountManagerName", required: true },
+			{
+				label: "Account manager",
+				name: "accountManagerName",
+				placeholder: "Please enter account manager",
+				required: true,
+			},
 			{
 				label: "Covered models",
 				multiple: true,
 				name: "coveredModelIds",
 				options: productOptions,
+				placeholder: "Select covered models...",
 				type: "select",
 			},
 			{
@@ -455,6 +493,7 @@ export function getFieldConfigs(
 				multiple: true,
 				name: "coveredPartIds",
 				options: partOptions,
+				placeholder: "Select covered parts...",
 				type: "select",
 			},
 		],
@@ -715,9 +754,10 @@ export function getFieldConfigs(
 			{ label: "Manufacturer", name: "manufacturer", required: true },
 			{ label: "Category", name: "category", required: true },
 			{
-				label: "Default PM cycle months",
+				label: "Default PM cycle",
 				name: "defaultPmCycleMonths",
 				required: true,
+				suffix: "months",
 				type: "number",
 			},
 			{
@@ -730,12 +770,12 @@ export function getFieldConfigs(
 				multiple: true,
 				name: "partIds",
 				options: productPartOptions,
+				span: "full",
 				type: "part-picker",
 			},
 			{
 				accept: "application/pdf,.pdf",
-				description:
-					"Upload a PDF service manual. Files are stored in tmp-files for now.",
+				description: "Upload a PDF service manual. Max file size: 25MB.",
 				label: "Service manual PDF",
 				name: "manualFile",
 				span: "full",

@@ -40,6 +40,7 @@ import {
 	ExternalLinkIcon,
 	EyeIcon,
 	FileQuestionIcon,
+	FileTextIcon,
 	LayoutGridIcon,
 	LayoutListIcon,
 	Loader2Icon,
@@ -51,16 +52,18 @@ import {
 	PowerOffIcon,
 	ReceiptTextIcon,
 	RefreshCwIcon,
+	SearchIcon,
 	ShieldCheckIcon,
 	Trash2Icon,
 	TrendingUpIcon,
+	UploadIcon,
 	UserXIcon,
 	WrenchIcon,
 	XIcon,
 } from "lucide-react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import type { FormEvent, ReactNode, RefObject } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -205,12 +208,12 @@ const iconTileClass =
 
 const compactButtonClass = "rounded-lg";
 
-const formFieldClass = "flex min-w-0 flex-col gap-1.5";
+const formFieldClass = "flex min-w-0 flex-col gap-2";
 
 const formLabelClass = "font-medium text-foreground text-xs";
 
 const formControlClass =
-	"h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50";
+	"h-10 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:ring-3 focus:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50";
 
 const actionButtonClass = "rounded-lg";
 
@@ -234,6 +237,17 @@ const currencyValueFormatter = new Intl.NumberFormat("en-HK", {
 	minimumFractionDigits: 2,
 });
 
+const hongKongDollarFormatter = new Intl.NumberFormat("en-HK", {
+	currency: "HKD",
+	maximumFractionDigits: 2,
+	minimumFractionDigits: 2,
+	style: "currency",
+});
+
+const wordBoundaryRegex = /\b\w/g;
+
+const whitespaceRegex = /\s+/;
+
 const hongKongBounds = {
 	maxLat: 22.56,
 	maxLng: 114.35,
@@ -242,7 +256,17 @@ const hongKongBounds = {
 } as const;
 
 const titleCase = (value: string) =>
-	value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+	value
+		.replaceAll("_", " ")
+		.replace(wordBoundaryRegex, (letter) => letter.toUpperCase());
+
+const formatProperName = (value: string) =>
+	value
+		.trim()
+		.split(whitespaceRegex)
+		.filter(Boolean)
+		.map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
+		.join(" ");
 
 const toPastTense = (value: string) => {
 	if (value === "deactivate") {
@@ -284,6 +308,20 @@ const roleDisplayNames: Record<(typeof roleLabels)[number], string> = {
 	observer: "Observer",
 	super_admin: "Super administrator",
 	tenant_admin: "Tenant administrator",
+};
+
+const roleDescriptions: Record<(typeof roleLabels)[number], string> = {
+	operator: "Create and manage service operations.",
+	observer: "View records without changing tenant data.",
+	super_admin: "Full platform and tenant administration.",
+	tenant_admin: "Manage tenant users, settings, and workflow data.",
+};
+
+const roleBadgeStyles: Record<(typeof roleLabels)[number], string> = {
+	operator: "border-emerald-200 bg-emerald-50 text-emerald-700",
+	observer: "border-zinc-200 bg-zinc-50 text-zinc-600",
+	super_admin: "border-blue-200 bg-blue-50 text-blue-700",
+	tenant_admin: "border-violet-200 bg-violet-50 text-violet-700",
 };
 
 const alertIconByType = {
@@ -427,6 +465,7 @@ export default function ServiceOpsPlatform({
 		initialHospitalId ? "hospitals" : "dashboard"
 	);
 	const [selectedJobId, setSelectedJobId] = useState("");
+	const [selectedProductId, setSelectedProductId] = useState("");
 	const [selectedHospitalId, setSelectedHospitalId] =
 		useState(initialHospitalId);
 	const [crudState, setCrudState] = useState<CrudState | null>(null);
@@ -518,6 +557,9 @@ export default function ServiceOpsPlatform({
 	const selectBackOfficeView = (view: BackOfficeView) => {
 		setActiveView(view);
 		setSelectedHospitalId("");
+		if (view !== "products") {
+			setSelectedProductId("");
+		}
 
 		const currentPath = window.location.pathname;
 		const nextPath = currentPath.startsWith("/hospitals/") ? "/" : currentPath;
@@ -534,6 +576,11 @@ export default function ServiceOpsPlatform({
 					?.scrollIntoView({ behavior: "smooth", block: "start" });
 			});
 		}
+	};
+
+	const openProductDetail = (productId: string) => {
+		setSelectedProductId(productId);
+		selectBackOfficeView("products");
 	};
 
 	const switchTenant = (tenantId: string) => {
@@ -700,10 +747,13 @@ export default function ServiceOpsPlatform({
 										setSelectedJobId(jobId);
 										selectBackOfficeView("jobs");
 									}}
+									onOpenProduct={openProductDetail}
 									selectedHospitalId={selectedHospitalId}
 									selectedJob={selectedJob}
 									selectedJobId={selectedJobId}
+									selectedProductId={selectedProductId}
 									setSelectedJobId={setSelectedJobId}
+									setSelectedProductId={setSelectedProductId}
 								/>
 							) : (
 								<TenantSnapshotLoading tenantName={tenant.name} />
@@ -870,10 +920,13 @@ function BackOfficeViewPanel({
 	onEdit,
 	onOpenHospital,
 	onOpenJob,
+	onOpenProduct,
 	selectedHospitalId,
 	selectedJob,
 	selectedJobId,
+	selectedProductId,
 	setSelectedJobId,
+	setSelectedProductId,
 }: {
 	activeView: BackOfficeView;
 	data: ServiceOpsSnapshot;
@@ -882,10 +935,13 @@ function BackOfficeViewPanel({
 	onEdit: (entity: CrudEntity, record: unknown) => void;
 	onOpenHospital: (hospitalId: string) => void;
 	onOpenJob: (jobId: string) => void;
+	onOpenProduct: (productId: string) => void;
 	selectedHospitalId: string;
 	selectedJob?: Job;
 	selectedJobId: string;
+	selectedProductId: string;
 	setSelectedJobId: (jobId: string) => void;
+	setSelectedProductId: (productId: string) => void;
 }) {
 	const {
 		assets,
@@ -1090,12 +1146,17 @@ function BackOfficeViewPanel({
 	if (activeView === "products") {
 		return (
 			<ProductCatalogue
+				assets={assets}
 				canWrite={canWrite}
+				jobs={jobs}
 				mutations={actionMutations}
 				onCreate={() => onCreate("product")}
+				onCreateAsset={() => onCreate("asset")}
 				onEdit={(product) => onEdit("product", product)}
 				parts={parts}
 				products={products}
+				selectedProductId={selectedProductId}
+				setSelectedProductId={setSelectedProductId}
 				tenantId={data.tenant.id}
 			/>
 		);
@@ -1179,9 +1240,9 @@ function BackOfficeViewPanel({
 						Manual fault
 					</Button>
 				)}
-				description="Fault reports submitted from hospital web forms and converted into repair workflow."
 				eyebrow="G. Fault Reporting"
-				title="Fault intake and status tracking"
+				hideHeader
+				title="Fault Reports"
 				width="full"
 			>
 				<DataTable
@@ -1193,7 +1254,7 @@ function BackOfficeViewPanel({
 						"Status",
 						"Description",
 					]}
-					description="Fault reports submitted from hospital web forms and converted into repair workflow."
+					description={null}
 					filterLabels={["Severity", "Status"]}
 					rows={faultReports.map((fault) => ({
 						cells: [
@@ -1252,6 +1313,7 @@ function BackOfficeViewPanel({
 				mutations={actionMutations}
 				onCreate={() => onCreate("part")}
 				onEdit={(part) => onEdit("part", part)}
+				onOpenProduct={onOpenProduct}
 				parts={parts}
 				products={products}
 				shortages={shortages}
@@ -1279,13 +1341,9 @@ function BackOfficeViewPanel({
 		return (
 			<ConfigView
 				canWrite={canWrite}
-				onUpdateParameter={(parameter) =>
-					actionMutations.updateSystemParameter.mutate({
-						data: parameter,
-						tenantId: data.tenant.id,
-					})
-				}
+				mutations={actionMutations}
 				systemParameters={systemParameters}
+				tenantId={data.tenant.id}
 			/>
 		);
 	}
@@ -2293,13 +2351,15 @@ function EngineerDetailView({
 		.sort((first, second) => second.id.localeCompare(first.id))
 		.slice(0, 4);
 	const hasLocation = engineer.lat !== null && engineer.lng !== null;
+	const engineerName = formatProperName(engineer.name);
+	const engineerRegion = formatProperName(engineer.region);
 
 	return (
 		<PageFrame
 			description="Engineer job history, contact profile, and current location signal."
 			eyebrow="F-01 Engineer Management"
 			hideHeader
-			title={`${engineer.name} detail`}
+			title={`${engineerName} detail`}
 			width="full"
 		>
 			<div className="flex flex-col gap-6">
@@ -2321,17 +2381,17 @@ function EngineerDetailView({
 							Engineers
 						</button>
 						<span className="mx-2">/</span>
-						<span className="font-medium text-foreground">{engineer.name}</span>
+						<span className="font-medium text-foreground">{engineerName}</span>
 					</div>
 				</div>
-				<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0">
 						<h2 className="truncate font-semibold text-3xl tracking-tight">
-							{engineer.name}
+							{engineerName}
 						</h2>
 						<p className="mt-1 text-muted-foreground">{engineer.grade}</p>
 					</div>
-					<div className="flex shrink-0 flex-wrap items-center gap-2">
+					<div className="flex shrink-0 flex-wrap items-center gap-3">
 						<StatusPill className={engineerStatusPillStyles[engineer.status]}>
 							{engineer.status}
 						</StatusPill>
@@ -2345,15 +2405,23 @@ function EngineerDetailView({
 					</div>
 				</div>
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-					<EngineerStatCard label="Total Jobs" value={stats.total} />
 					<EngineerStatCard
-						className="text-emerald-700"
+						className={getMetricValueClass(stats.total)}
+						label="Total Jobs"
+						value={stats.total}
+					/>
+					<EngineerStatCard
+						className={getMetricValueClass(stats.completed, "text-emerald-700")}
 						label="Completed"
 						value={stats.completed}
 					/>
-					<EngineerStatCard label="Cancelled" value={stats.cancelled} />
 					<EngineerStatCard
-						className="text-primary"
+						className={getMetricValueClass(stats.cancelled, "text-destructive")}
+						label="Cancelled"
+						value={stats.cancelled}
+					/>
+					<EngineerStatCard
+						className={getMetricValueClass(stats.averageMinutes)}
 						label="Avg Duration"
 						value={formatDuration(stats.averageMinutes)}
 					/>
@@ -2402,10 +2470,16 @@ function EngineerDetailView({
 							<CardHeader>
 								<CardTitle>Contact</CardTitle>
 							</CardHeader>
-							<CardContent className="flex flex-col gap-4">
-								<Metric label="Email" value={engineer.email ?? "Not set"} />
-								<Metric label="Phone" value={engineer.phone ?? "Not set"} />
-								<Metric label="Region" value={engineer.region} />
+							<CardContent className="space-y-4">
+								<ContactInfoRow
+									label="Email"
+									value={engineer.email ?? "Not set"}
+								/>
+								<ContactInfoRow
+									label="Phone"
+									value={engineer.phone ?? "Not set"}
+								/>
+								<ContactInfoRow label="Region" value={engineerRegion} />
 							</CardContent>
 						</Card>
 						<Card className={panelClass}>
@@ -2425,9 +2499,12 @@ function EngineerDetailView({
 										</p>
 									</div>
 								) : (
-									<p className="text-muted-foreground">
-										Location not available
-									</p>
+									<div className="flex items-center gap-3 text-muted-foreground">
+										<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/40">
+											<MapPinOffIcon className="size-4" />
+										</span>
+										<p className="text-sm">Location not available</p>
+									</div>
 								)}
 							</CardContent>
 						</Card>
@@ -2473,13 +2550,28 @@ function EngineerStatCard({
 	return (
 		<Card className={panelClass}>
 			<CardContent className="flex min-h-28 flex-col items-center justify-center gap-3 p-4 text-center">
-				<p className={cn("font-semibold text-3xl leading-none", className)}>
+				<p className={cn("font-bold text-4xl leading-none", className)}>
 					{value}
 				</p>
 				<p className="text-muted-foreground text-sm">{label}</p>
 			</CardContent>
 		</Card>
 	);
+}
+
+function ContactInfoRow({ label, value }: { label: string; value: ReactNode }) {
+	return (
+		<div>
+			<p className="text-muted-foreground text-xs">{label}</p>
+			<p className="mt-1 break-words font-medium text-foreground text-sm">
+				{value}
+			</p>
+		</div>
+	);
+}
+
+function getMetricValueClass(value: number, activeClassName?: string) {
+	return value > 0 ? activeClassName : "text-foreground";
 }
 
 function getEngineerJobStats(jobs: Job[]) {
@@ -2542,6 +2634,7 @@ function PartsView({
 	canWrite,
 	onCreate,
 	onEdit,
+	onOpenProduct,
 	mutations,
 	parts,
 	products,
@@ -2552,6 +2645,7 @@ function PartsView({
 	mutations: ActionMutations;
 	onCreate: () => void;
 	onEdit: (part: ServiceOpsSnapshot["parts"][number]) => void;
+	onOpenProduct: (productId: string) => void;
 	parts: ServiceOpsSnapshot["parts"];
 	products: ServiceOpsSnapshot["products"];
 	shortages: ServiceOpsSnapshot["shortages"];
@@ -2579,6 +2673,7 @@ function PartsView({
 				mutations={mutations}
 				onBack={() => setSelectedPartId("")}
 				onEdit={() => onEdit(selectedPart)}
+				onOpenProduct={onOpenProduct}
 				part={selectedPart}
 				products={products.filter((product) =>
 					product.partIds.includes(selectedPart.recordId)
@@ -2748,6 +2843,7 @@ function PartDetailView({
 	mutations,
 	onBack,
 	onEdit,
+	onOpenProduct,
 	part,
 	products,
 	shortages,
@@ -2757,6 +2853,7 @@ function PartDetailView({
 	mutations: ActionMutations;
 	onBack: () => void;
 	onEdit: () => void;
+	onOpenProduct: (productId: string) => void;
 	part: Part;
 	products: ProductModel[];
 	shortages: ServiceOpsSnapshot["shortages"];
@@ -2773,16 +2870,16 @@ function PartDetailView({
 			width="full"
 		>
 			<div className="flex flex-col gap-6">
-				<div className="flex flex-col gap-3">
-					<button
-						className="inline-flex w-fit items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground"
-						onClick={onBack}
-						type="button"
-					>
-						<ArrowLeftIcon className="size-4" />
-						Back
-					</button>
-					<div className="text-muted-foreground text-sm">
+				<div className="flex flex-col gap-4">
+					<div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+						<button
+							aria-label="Back to Parts & Stock"
+							className="inline-flex size-7 items-center justify-center rounded-md transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+							onClick={onBack}
+							type="button"
+						>
+							<ArrowLeftIcon className="size-4" />
+						</button>
 						<button
 							className="font-medium transition-colors hover:text-foreground"
 							onClick={onBack}
@@ -2790,28 +2887,32 @@ function PartDetailView({
 						>
 							Parts & Stock
 						</button>
-						<span className="mx-2">/</span>
-						<span className="font-medium text-foreground">{part.name}</span>
+						<span aria-hidden="true">/</span>
+						<span className="font-medium text-foreground">{part.id}</span>
 					</div>
-				</div>
-				<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-					<div className="min-w-0">
-						<h2 className="truncate font-semibold text-3xl tracking-tight">
-							{part.name}
-						</h2>
-						<p className="mt-1 text-muted-foreground">{part.id}</p>
-					</div>
-					<div className="flex shrink-0 flex-wrap items-center gap-2">
-						<StatusPill className={stockStatus.className}>
-							{stockStatus.label}
-						</StatusPill>
-						<RowActions
-							canWrite={canWrite}
-							entity="part"
-							id={part.recordId}
-							onEdit={onEdit}
-							tenantId={tenantId}
-						/>
+					<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+						<div className="min-w-0">
+							<div className="flex min-w-0 flex-wrap items-center gap-3">
+								<h2 className="truncate font-semibold text-3xl tracking-tight">
+									{part.id}
+								</h2>
+								<StatusPill className={stockStatus.className}>
+									{stockStatus.label}
+								</StatusPill>
+							</div>
+							{part.name === part.id ? null : (
+								<p className="mt-1 text-muted-foreground">{part.name}</p>
+							)}
+						</div>
+						<div className="flex shrink-0 flex-wrap items-center gap-2">
+							<RowActions
+								canWrite={canWrite}
+								entity="part"
+								id={part.recordId}
+								onEdit={onEdit}
+								tenantId={tenantId}
+							/>
+						</div>
 					</div>
 				</div>
 				<div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,0.95fr)]">
@@ -2823,9 +2924,9 @@ function PartDetailView({
 							part={part}
 							tenantId={tenantId}
 						/>
-						<PartUsageHistoryCard products={products} shortages={shortages} />
+						<PartUsageHistoryCard shortages={shortages} />
 					</div>
-					<PartProductsCard products={products} />
+					<PartProductsCard onOpenProduct={onOpenProduct} products={products} />
 				</div>
 			</div>
 		</PageFrame>
@@ -2841,7 +2942,7 @@ function PartDetailsCard({ part }: { part: Part }) {
 			<CardContent className="grid gap-5 sm:grid-cols-2">
 				<PartDetailField
 					label="Unit cost"
-					value={currencyValueFormatter.format(part.unitCost)}
+					value={hongKongDollarFormatter.format(part.unitCost)}
 				/>
 				<PartDetailField label="Supplier" value={part.supplier || "Not set"} />
 				<PartDetailField label="Stock quantity" value={`${part.stock} units`} />
@@ -2876,7 +2977,13 @@ function PartDetailField({
 	);
 }
 
-function PartProductsCard({ products }: { products: ProductModel[] }) {
+function PartProductsCard({
+	onOpenProduct,
+	products,
+}: {
+	onOpenProduct: (productId: string) => void;
+	products: ProductModel[];
+}) {
 	return (
 		<Card className={panelClass}>
 			<CardHeader>
@@ -2885,15 +2992,20 @@ function PartProductsCard({ products }: { products: ProductModel[] }) {
 			<CardContent className="flex flex-col gap-3">
 				{products.length > 0 ? (
 					products.map((product) => (
-						<div className={`${mutedPanelClass} p-4`} key={product.id}>
+						<button
+							className="rounded-lg border border-border/60 bg-muted/25 p-4 text-left transition-colors hover:border-primary/30 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+							key={product.id}
+							onClick={() => onOpenProduct(product.id)}
+							type="button"
+						>
 							<p className="font-semibold text-base">{product.modelName}</p>
-							<p className="mt-1 text-muted-foreground text-sm">
+							<p className="mt-1 text-muted-foreground text-xs">
 								{product.code}
 							</p>
-							<p className="mt-2 font-medium text-primary text-sm">
+							<p className="mt-2 font-medium text-muted-foreground text-sm">
 								{product.category}
 							</p>
-						</div>
+						</button>
 					))
 				) : (
 					<EmptyInline message="No products use this part yet." />
@@ -2914,10 +3026,12 @@ function PartStockAdjustmentCard({
 	part: Part;
 	tenantId: string;
 }) {
-	const [deltaValue, setDeltaValue] = useState("0");
+	const [deltaValue, setDeltaValue] = useState("");
 	const [reason, setReason] = useState("");
-	const delta = Number(deltaValue);
-	const isValidDelta = Number.isInteger(delta);
+	const normalizedDeltaValue = deltaValue.trim();
+	const delta = Number(normalizedDeltaValue);
+	const hasDeltaValue = normalizedDeltaValue.length > 0;
+	const isValidDelta = hasDeltaValue && Number.isInteger(delta);
 	const nextStock = isValidDelta ? part.stock + delta : part.stock;
 	const canSubmit =
 		canWrite &&
@@ -2936,7 +3050,7 @@ function PartStockAdjustmentCard({
 			id: part.recordId,
 			tenantId,
 		});
-		setDeltaValue("0");
+		setDeltaValue("");
 		setReason("");
 	};
 
@@ -2946,7 +3060,7 @@ function PartStockAdjustmentCard({
 				<CardTitle>Stock Adjustment</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-3">
-				<div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
+				<div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_auto] md:items-end">
 					<div className={formFieldClass}>
 						<Label
 							className={formLabelClass}
@@ -2959,6 +3073,7 @@ function PartStockAdjustmentCard({
 							disabled={!canWrite}
 							id={`${part.recordId}-delta`}
 							onChange={(event) => setDeltaValue(event.target.value)}
+							placeholder="0"
 							type="number"
 							value={deltaValue}
 						/>
@@ -2980,7 +3095,7 @@ function PartStockAdjustmentCard({
 						/>
 					</div>
 					<Button
-						className={primaryActionClass}
+						className={cn(primaryActionClass, "h-10")}
 						disabled={!canSubmit}
 						onClick={updateStock}
 						type="button"
@@ -3032,7 +3147,14 @@ function PartUsageHistoryCard({
 						</div>
 					))
 				) : (
-					<EmptyInline message="No usage records found." />
+					<div className="flex min-h-28 flex-col items-center justify-center gap-3 py-6 text-center">
+						<span className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+							<FileTextIcon className="size-5" />
+						</span>
+						<p className="text-muted-foreground text-sm">
+							No usage records found.
+						</p>
+					</div>
 				)}
 			</CardContent>
 		</Card>
@@ -3091,9 +3213,9 @@ function ReportsView({
 					</Button>
 				</div>
 			}
-			description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
 			eyebrow="I. Reports"
-			title="Operational report and job-level cost view"
+			hideHeader
+			title="Reports"
 			width="full"
 		>
 			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -3125,7 +3247,7 @@ function ReportsView({
 						"Parts absorbed",
 						"Parts billable",
 					]}
-					description="Job-level cost lines across labour, travel, meal receipts, and parts billing."
+					description={null}
 					filterLabels={["Cost type", "Billing"]}
 					rows={costRecords.map((record) => ({
 						cells: [
@@ -3147,37 +3269,118 @@ function ReportsView({
 
 function ConfigView({
 	canWrite,
-	onUpdateParameter,
+	mutations,
 	systemParameters,
+	tenantId,
 }: {
 	canWrite: boolean;
-	onUpdateParameter: (parameter: {
-		key: string;
-		value: boolean | number | string;
-		valueType: "boolean" | "number" | "secret" | "string";
-	}) => void;
+	mutations: ActionMutations;
 	systemParameters: ServiceOpsSnapshot["systemParameters"];
+	tenantId: string;
 }) {
+	const initialValues = useMemo(
+		() => getSystemParameterValues(systemParameters),
+		[systemParameters]
+	);
+	const [draftValues, setDraftValues] = useState(initialValues);
+	const previousInitialValuesRef = useRef(initialValues);
+	const changedParameters = systemParameters.filter(
+		(parameter) => draftValues[parameter.id] !== initialValues[parameter.id]
+	);
+	const hasChanges = changedParameters.length > 0;
+	const isSaving = mutations.updateSystemParameter.isPending;
+
+	useEffect(() => {
+		setDraftValues((currentValues) => {
+			const previousInitialValues = previousInitialValuesRef.current;
+			const hasLocalChanges = hasSystemParameterChanges(
+				currentValues,
+				previousInitialValues
+			);
+
+			previousInitialValuesRef.current = initialValues;
+
+			return hasLocalChanges ? currentValues : initialValues;
+		});
+	}, [initialValues]);
+
+	const updateDraftValue = (key: string, value: string) => {
+		setDraftValues((currentValues) => ({ ...currentValues, [key]: value }));
+	};
+
+	const resetDraftValues = () => {
+		setDraftValues(initialValues);
+	};
+
+	const saveChanges = async () => {
+		if (!hasChanges) {
+			return;
+		}
+
+		try {
+			await Promise.all(
+				changedParameters.map((parameter) =>
+					mutations.updateSystemParameter.mutateAsync({
+						data: {
+							key: parameter.id,
+							value: parseSystemParameterValue(
+								draftValues[parameter.id] ?? "",
+								parameter.valueType
+							),
+							valueType: parameter.valueType,
+						},
+						tenantId,
+					})
+				)
+			);
+			toast.success("System parameters saved.");
+		} catch {
+			toast.error("Unable to save system parameters.");
+		}
+	};
+
+	const saveActions = canWrite ? (
+		<div className="flex shrink-0 items-center gap-2">
+			<Button
+				className={compactButtonClass}
+				disabled={!hasChanges || isSaving}
+				onClick={resetDraftValues}
+				type="button"
+				variant="outline"
+			>
+				Cancel
+			</Button>
+			<Button
+				className={primaryActionClass}
+				disabled={!hasChanges || isSaving}
+				onClick={saveChanges}
+				type="button"
+			>
+				{isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
+				Save Changes
+			</Button>
+		</div>
+	) : null;
+
 	return (
-		<PageFrame
-			description="Tenant-level controls for operational thresholds, roles, and notification parameters."
-			eyebrow="J. System Configuration"
-			title="Parameters, roles and notifications"
-			width="full"
-		>
+		<div className="flex w-full min-w-0 flex-col gap-4 md:gap-6">
+			{saveActions ? (
+				<div className="flex justify-end">{saveActions}</div>
+			) : null}
 			<div className="grid gap-4 lg:grid-cols-[1fr_380px]">
 				<Card className={panelClass}>
 					<CardHeader>
 						<CardTitle>System parameters</CardTitle>
 					</CardHeader>
-					<CardContent className="grid gap-3 md:grid-cols-2">
+					<CardContent className="grid gap-x-4 gap-y-5 md:grid-cols-2">
 						{systemParameters.length > 0 ? (
 							systemParameters.map((parameter) => (
 								<SystemParameterEditor
 									canWrite={canWrite}
 									key={parameter.id}
-									onUpdate={onUpdateParameter}
+									onChange={updateDraftValue}
 									parameter={parameter}
+									value={draftValues[parameter.id] ?? ""}
 								/>
 							))
 						) : (
@@ -3191,88 +3394,151 @@ function ConfigView({
 					<CardHeader>
 						<CardTitle>User roles</CardTitle>
 					</CardHeader>
-					<CardContent className="flex flex-col gap-3 text-sm">
+					<CardContent className="grid gap-3 text-sm">
 						{roleLabels.map((role) => (
 							<div
-								className="flex items-center justify-between border-b pb-2 last:border-b-0"
+								className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0"
 								key={role}
 							>
-								<span>{roleDisplayNames[role]}</span>
-								<ShieldCheckIcon className="size-4 text-primary" />
+								<div className="min-w-0">
+									<p className="font-medium text-foreground">
+										{roleDisplayNames[role]}
+									</p>
+									<p className="mt-1 text-muted-foreground text-xs">
+										{roleDescriptions[role]}
+									</p>
+								</div>
+								<span
+									className={cn(
+										"shrink-0 rounded-full border px-2 py-0.5 font-medium text-xs",
+										roleBadgeStyles[role]
+									)}
+								>
+									{role === "super_admin" ? "System" : "Tenant"}
+								</span>
 							</div>
 						))}
 					</CardContent>
 				</Card>
 			</div>
-		</PageFrame>
+		</div>
 	);
 }
 
 function SystemParameterEditor({
 	canWrite,
-	onUpdate,
+	onChange,
 	parameter,
+	value,
 }: {
 	canWrite: boolean;
-	onUpdate: (parameter: {
-		key: string;
-		value: boolean | number | string;
-		valueType: "boolean" | "number" | "secret" | "string";
-	}) => void;
+	onChange: (key: string, value: string) => void;
 	parameter: SystemParameter;
+	value: string;
 }) {
-	const [value, setValue] = useState(String(parameter.valueRaw ?? ""));
-
-	useEffect(() => {
-		setValue(String(parameter.valueRaw ?? ""));
-	}, [parameter.valueRaw]);
-
-	const submitValue = () => {
-		let parsedValue: boolean | number | string = value;
-
-		if (parameter.valueType === "number") {
-			parsedValue = Number(value);
-		}
-
-		if (parameter.valueType === "boolean") {
-			parsedValue = value === "true";
-		}
-
-		onUpdate({
-			key: parameter.id,
-			value: parsedValue,
-			valueType: parameter.valueType,
-		});
-	};
+	const suffix = getSystemParameterSuffix(parameter.id);
 
 	return (
-		<div className={`${mutedPanelClass} flex flex-col gap-2 p-3`}>
-			<div>
-				<p className="text-muted-foreground text-xs">{parameter.label}</p>
-				<p className="font-medium text-sm">{parameter.value}</p>
-			</div>
+		<div className="flex min-w-0 flex-col gap-1.5">
+			<Label className={formLabelClass} htmlFor={`parameter-${parameter.id}`}>
+				{parameter.label}
+			</Label>
 			{canWrite ? (
-				<div className="flex gap-2">
+				<div className="relative">
 					<Input
 						aria-label={`Edit ${parameter.label}`}
-						className={formControlClass}
-						onChange={(event) => setValue(event.target.value)}
+						className={cn(formControlClass, suffix ? "pr-20" : "")}
+						id={`parameter-${parameter.id}`}
+						onChange={(event) => onChange(parameter.id, event.target.value)}
+						placeholder={
+							parameter.valueType === "secret" ? "Not configured" : undefined
+						}
 						type={parameter.valueType === "number" ? "number" : "text"}
 						value={value}
 					/>
-					<Button
-						className={actionButtonClass}
-						onClick={submitValue}
-						size="sm"
-						type="button"
-						variant="outline"
-					>
-						Save
-					</Button>
+					{suffix ? (
+						<span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground text-xs">
+							{suffix}
+						</span>
+					) : null}
 				</div>
-			) : null}
+			) : (
+				<div className="flex h-9 items-center rounded-lg border border-input bg-muted/25 px-3 text-sm">
+					<span className="truncate">
+						{parameter.value || "Not configured"}
+					</span>
+				</div>
+			)}
 		</div>
 	);
+}
+
+function getSystemParameterValues(
+	parameters: ServiceOpsSnapshot["systemParameters"]
+) {
+	return Object.fromEntries(
+		parameters.map((parameter) => [
+			parameter.id,
+			String(parameter.valueRaw ?? ""),
+		])
+	);
+}
+
+function hasSystemParameterChanges(
+	currentValues: Record<string, string>,
+	initialValues: Record<string, string>
+) {
+	const keys = new Set([
+		...Object.keys(currentValues),
+		...Object.keys(initialValues),
+	]);
+
+	for (const key of keys) {
+		if (currentValues[key] !== initialValues[key]) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function parseSystemParameterValue(
+	value: string,
+	valueType: SystemParameter["valueType"]
+) {
+	if (valueType === "number") {
+		return Number(value);
+	}
+
+	if (valueType === "boolean") {
+		return value === "true";
+	}
+
+	return value;
+}
+
+function getSystemParameterSuffix(key: string) {
+	if (key.includes("mileage_rate")) {
+		return "HKD / km";
+	}
+
+	if (key.includes("meal_cap")) {
+		return "HKD / day";
+	}
+
+	if (key.includes("radius")) {
+		return "m";
+	}
+
+	if (key.includes("minutes")) {
+		return "min";
+	}
+
+	if (key.includes("days")) {
+		return "days";
+	}
+
+	return "";
 }
 
 function TenantsView({
@@ -3511,6 +3777,7 @@ function DashboardView({
 		<PageFrame
 			description={categoryMeta.description}
 			eyebrow={categoryMeta.eyebrow}
+			hideHeader={activeCategory === "overview"}
 			title={categoryMeta.title}
 		>
 			<DashboardCategoryTabs
@@ -4507,20 +4774,30 @@ function ProductInlineActions({
 type ProductCatalogueMode = "grid" | "list";
 
 function ProductCatalogue({
+	assets,
 	canWrite,
+	jobs,
 	mutations,
 	onCreate,
+	onCreateAsset,
 	onEdit,
 	parts,
 	products,
+	selectedProductId,
+	setSelectedProductId,
 	tenantId,
 }: {
+	assets: Asset[];
 	canWrite: boolean;
+	jobs: Job[];
 	mutations: ActionMutations;
 	onCreate: () => void;
+	onCreateAsset: () => void;
 	onEdit: (product: ProductModel) => void;
 	parts: Part[];
 	products: ProductModel[];
+	selectedProductId: string;
+	setSelectedProductId: (productId: string) => void;
 	tenantId: string;
 }) {
 	const [mode, setMode] = useState<ProductCatalogueMode>("list");
@@ -4528,6 +4805,46 @@ function ProductCatalogue({
 		() => getProductCatalogueGroups(products),
 		[products]
 	);
+	const selectedProduct =
+		products.find((product) => product.id === selectedProductId) ?? null;
+
+	useEffect(() => {
+		if (
+			!selectedProductId ||
+			products.some((product) => product.id === selectedProductId)
+		) {
+			return;
+		}
+
+		setSelectedProductId("");
+	}, [products, selectedProductId, setSelectedProductId]);
+
+	if (selectedProduct) {
+		return (
+			<ProductDetailView
+				assets={assets.filter(
+					(asset) => asset.productModelId === selectedProduct.id
+				)}
+				canWrite={canWrite}
+				jobs={jobs.filter((job) =>
+					assets.some(
+						(asset) =>
+							asset.productModelId === selectedProduct.id &&
+							asset.recordId === job.assetId
+					)
+				)}
+				mutations={mutations}
+				onBack={() => setSelectedProductId("")}
+				onCreateAsset={onCreateAsset}
+				onEdit={() => onEdit(selectedProduct)}
+				parts={parts.filter((part) =>
+					selectedProduct.partIds.includes(part.recordId)
+				)}
+				product={selectedProduct}
+				tenantId={tenantId}
+			/>
+		);
+	}
 
 	return (
 		<PageFrame
@@ -4571,6 +4888,7 @@ function ProductCatalogue({
 							mode={mode}
 							mutations={mutations}
 							onEdit={onEdit}
+							onOpenProduct={setSelectedProductId}
 							parts={parts}
 							tenantId={tenantId}
 						/>
@@ -4623,6 +4941,7 @@ function ProductCatalogueGroup({
 	mode,
 	mutations,
 	onEdit,
+	onOpenProduct,
 	parts,
 	tenantId,
 }: {
@@ -4631,6 +4950,7 @@ function ProductCatalogueGroup({
 	mode: ProductCatalogueMode;
 	mutations: ActionMutations;
 	onEdit: (product: ProductModel) => void;
+	onOpenProduct: (productId: string) => void;
 	parts: Part[];
 	tenantId: string;
 }) {
@@ -4654,6 +4974,7 @@ function ProductCatalogueGroup({
 					canWrite={canWrite}
 					mutations={mutations}
 					onEdit={onEdit}
+					onOpenProduct={onOpenProduct}
 					parts={parts}
 					products={group.products}
 					tenantId={tenantId}
@@ -4663,6 +4984,7 @@ function ProductCatalogueGroup({
 					canWrite={canWrite}
 					mutations={mutations}
 					onEdit={onEdit}
+					onOpenProduct={onOpenProduct}
 					parts={parts}
 					products={group.products}
 					tenantId={tenantId}
@@ -4676,6 +4998,7 @@ function ProductCatalogueTable({
 	canWrite,
 	mutations,
 	onEdit,
+	onOpenProduct,
 	parts,
 	products,
 	tenantId,
@@ -4683,6 +5006,7 @@ function ProductCatalogueTable({
 	canWrite: boolean;
 	mutations: ActionMutations;
 	onEdit: (product: ProductModel) => void;
+	onOpenProduct: (productId: string) => void;
 	parts: Part[];
 	products: ProductModel[];
 	tenantId: string;
@@ -4702,10 +5026,22 @@ function ProductCatalogueTable({
 				<div>
 					{products.map((product) => (
 						<div
-							className="grid min-w-[1040px] grid-cols-[1.15fr_1fr_1fr_.9fr_1.1fr_1fr_132px] items-center border-b px-4 py-4 text-sm last:border-b-0"
+							className="relative grid min-w-[1040px] grid-cols-[1.15fr_1fr_1fr_.9fr_1.1fr_1fr_132px] items-center border-b px-4 py-4 text-sm transition-colors last:border-b-0 hover:bg-muted/40"
 							key={product.id}
 						>
-							<p className="font-medium">{product.modelName}</p>
+							<button
+								aria-label={`View ${product.modelName} details`}
+								className="absolute inset-0 rounded-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+								onClick={() => onOpenProduct(product.id)}
+								type="button"
+							/>
+							<button
+								className="relative w-fit font-medium text-primary hover:underline"
+								onClick={() => onOpenProduct(product.id)}
+								type="button"
+							>
+								{product.modelName}
+							</button>
 							<p className="font-mono text-muted-foreground">{product.code}</p>
 							<p className="text-muted-foreground">{product.manufacturer}</p>
 							<p className="text-muted-foreground">
@@ -4714,15 +5050,20 @@ function ProductCatalogueTable({
 							<p className="truncate text-muted-foreground">
 								{formatPartsSummary(product)}
 							</p>
-							<ProductManualLink product={product} />
-							<ProductCatalogueActions
-								canWrite={canWrite}
-								mutations={mutations}
-								onEdit={() => onEdit(product)}
-								parts={parts}
-								product={product}
-								tenantId={tenantId}
-							/>
+							<div className="relative">
+								<ProductManualLink product={product} />
+							</div>
+							<div className="relative">
+								<ProductCatalogueActions
+									canWrite={canWrite}
+									mutations={mutations}
+									onEdit={() => onEdit(product)}
+									onOpen={() => onOpenProduct(product.id)}
+									parts={parts}
+									product={product}
+									tenantId={tenantId}
+								/>
+							</div>
 						</div>
 					))}
 				</div>
@@ -4735,6 +5076,7 @@ function ProductCatalogueGrid({
 	canWrite,
 	mutations,
 	onEdit,
+	onOpenProduct,
 	parts,
 	products,
 	tenantId,
@@ -4742,6 +5084,7 @@ function ProductCatalogueGrid({
 	canWrite: boolean;
 	mutations: ActionMutations;
 	onEdit: (product: ProductModel) => void;
+	onOpenProduct: (productId: string) => void;
 	parts: Part[];
 	products: ProductModel[];
 	tenantId: string;
@@ -4749,12 +5092,28 @@ function ProductCatalogueGrid({
 	return (
 		<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 			{products.map((product) => (
-				<div className={`${panelClass} p-4 text-sm`} key={product.id}>
+				<div
+					className={cn(
+						panelClass,
+						"relative p-4 text-sm transition-colors hover:bg-muted/25"
+					)}
+					key={product.id}
+				>
+					<button
+						aria-label={`View ${product.modelName} details`}
+						className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+						onClick={() => onOpenProduct(product.id)}
+						type="button"
+					/>
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0">
-							<p className="truncate font-medium text-base">
+							<button
+								className="relative block truncate font-medium text-base text-primary hover:underline"
+								onClick={() => onOpenProduct(product.id)}
+								type="button"
+							>
 								{product.modelName}
-							</p>
+							</button>
 							<p className="mt-1 font-mono text-muted-foreground">
 								{product.code}
 							</p>
@@ -4771,11 +5130,12 @@ function ProductCatalogueGrid({
 						/>
 						<Metric label="Manual" value={product.manualFileName} />
 					</div>
-					<div className="mt-5 flex justify-end">
+					<div className="relative mt-5 flex justify-end">
 						<ProductCatalogueActions
 							canWrite={canWrite}
 							mutations={mutations}
 							onEdit={() => onEdit(product)}
+							onOpen={() => onOpenProduct(product.id)}
 							parts={parts}
 							product={product}
 							tenantId={tenantId}
@@ -4791,6 +5151,7 @@ function ProductCatalogueActions({
 	canWrite,
 	mutations,
 	onEdit,
+	onOpen,
 	parts,
 	product,
 	tenantId,
@@ -4798,6 +5159,7 @@ function ProductCatalogueActions({
 	canWrite: boolean;
 	mutations: ActionMutations;
 	onEdit: () => void;
+	onOpen: () => void;
 	parts: Part[];
 	product: ProductModel;
 	tenantId: string;
@@ -4806,7 +5168,7 @@ function ProductCatalogueActions({
 		<div className="flex items-center justify-end gap-1">
 			<Button
 				className="rounded-lg text-primary"
-				onClick={onEdit}
+				onClick={onOpen}
 				size="sm"
 				variant="ghost"
 			>
@@ -4859,6 +5221,403 @@ function ProductManualLink({ product }: { product: ProductModel }) {
 			<span className="truncate">{product.manualFileName}</span>
 			<ExternalLinkIcon className="size-3.5 shrink-0" />
 		</a>
+	);
+}
+
+function ProductDetailView({
+	assets,
+	canWrite,
+	jobs,
+	mutations,
+	onBack,
+	onCreateAsset,
+	onEdit,
+	parts,
+	product,
+	tenantId,
+}: {
+	assets: Asset[];
+	canWrite: boolean;
+	jobs: Job[];
+	mutations: ActionMutations;
+	onBack: () => void;
+	onCreateAsset: () => void;
+	onEdit: () => void;
+	parts: Part[];
+	product: ProductModel;
+	tenantId: string;
+}) {
+	const repairJobCount = jobs.filter((job) => job.type === "Repair").length;
+
+	return (
+		<PageFrame
+			description="Product model detail, manual access, installed assets, and linked standard parts."
+			eyebrow="B-05 Product Catalogue"
+			hideHeader
+			title={`${product.modelName} detail`}
+			width="full"
+		>
+			<div className="flex flex-col gap-6">
+				<div className="flex flex-col gap-4">
+					<button
+						className="inline-flex w-fit items-center gap-2 text-base text-muted-foreground transition-colors hover:text-foreground"
+						onClick={onBack}
+						type="button"
+					>
+						<ArrowLeftIcon className="size-5" />
+						Back
+					</button>
+					<div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+						<div className="min-w-0">
+							<h2 className="truncate font-semibold text-4xl tracking-tight">
+								{product.modelName}
+							</h2>
+							<div className="mt-4 flex flex-wrap items-center gap-2 text-lg text-muted-foreground">
+								<span className="font-mono">{product.code}</span>
+								<span aria-hidden="true">·</span>
+								<span>{product.manufacturer}</span>
+								<span className="rounded-full bg-primary/10 px-3 py-1 font-medium text-base text-primary">
+									{product.category}
+								</span>
+							</div>
+						</div>
+						<div className="flex shrink-0 flex-wrap items-center gap-2">
+							<RowActions
+								canWrite={canWrite}
+								deleteDisabled={product.assetCount > 0}
+								deleteDisabledReason={
+									product.assetCount > 0
+										? "Reassign or remove installed assets before deleting this catalogue item."
+										: undefined
+								}
+								entity="product"
+								id={product.id}
+								onEdit={onEdit}
+								tenantId={tenantId}
+							/>
+						</div>
+					</div>
+				</div>
+				<div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(360px,0.95fr)]">
+					<div className="flex min-w-0 flex-col gap-6">
+						<ProductInformationCard
+							product={product}
+							repairJobCount={repairJobCount}
+						/>
+						<ProductManualCard
+							canWrite={canWrite}
+							mutations={mutations}
+							product={product}
+							tenantId={tenantId}
+						/>
+						<ProductDetailPartsCard parts={parts} />
+					</div>
+					<div className="flex min-w-0 flex-col gap-6">
+						<ProductOverviewCard
+							installedUnits={assets.length}
+							partsLinked={parts.length}
+							repairJobs={repairJobCount}
+						/>
+						<ProductInstalledAtCard
+							assets={assets}
+							canWrite={canWrite}
+							onCreateAsset={onCreateAsset}
+						/>
+					</div>
+				</div>
+			</div>
+		</PageFrame>
+	);
+}
+
+function ProductInformationCard({
+	product,
+	repairJobCount,
+}: {
+	product: ProductModel;
+	repairJobCount: number;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Product Information</CardTitle>
+			</CardHeader>
+			<CardContent className="grid gap-6 sm:grid-cols-2">
+				<PartDetailField label="Warranty" value="12 months" />
+				<PartDetailField
+					label="PM Interval"
+					value={formatPmInterval(product.defaultPmCycleMonths)}
+				/>
+				<PartDetailField label="List Price" value="-" />
+				<PartDetailField label="Repair Jobs" value={repairJobCount} />
+			</CardContent>
+		</Card>
+	);
+}
+
+function ProductManualCard({
+	canWrite,
+	mutations,
+	product,
+	tenantId,
+}: {
+	canWrite: boolean;
+	mutations: ActionMutations;
+	product: ProductModel;
+	tenantId: string;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader className="flex-row items-center justify-between gap-4">
+				<CardTitle>Product Manual</CardTitle>
+				{canWrite ? (
+					<ProductManualReplaceButton
+						mutations={mutations}
+						product={product}
+						tenantId={tenantId}
+					/>
+				) : null}
+			</CardHeader>
+			<CardContent>
+				<div className="flex flex-wrap items-center gap-3">
+					{product.manualFileUrl ? (
+						<a
+							className="inline-flex h-9 items-center gap-2 rounded-lg text-primary text-sm transition-colors hover:text-primary/80"
+							href={product.manualFileUrl}
+							rel="noopener"
+							target="_blank"
+						>
+							<FileTextIcon className="size-4" />
+							View Manual
+						</a>
+					) : (
+						<span className="inline-flex h-9 items-center gap-2 text-muted-foreground text-sm">
+							<FileTextIcon className="size-4" />
+							{product.manualFileName}
+						</span>
+					)}
+					<Button
+						className={compactButtonClass}
+						disabled={!product.manualFileUrl}
+						type="button"
+						variant="outline"
+					>
+						<SearchIcon className="size-4" />
+						Search Manual
+					</Button>
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function ProductManualReplaceButton({
+	mutations,
+	product,
+	tenantId,
+}: {
+	mutations: ActionMutations;
+	product: ProductModel;
+	tenantId: string;
+}) {
+	const [file, setFile] = useState<File | null>(null);
+	const [isUploadingManual, setIsUploadingManual] = useState(false);
+	const [isOpen, setIsOpen] = useState(false);
+	const isSavingManual =
+		isUploadingManual || mutations.uploadServiceManual.isPending;
+
+	const saveManual = async () => {
+		if (!file) {
+			setIsOpen(true);
+			return;
+		}
+
+		setIsUploadingManual(true);
+		try {
+			const uploadedManual = await uploadServiceManualFile(file, tenantId);
+			mutations.uploadServiceManual.mutate({
+				data: uploadedManual,
+				id: product.id,
+				tenantId,
+			});
+			setFile(null);
+			setIsOpen(false);
+		} catch (error) {
+			toast.error(getManualUploadErrorMessage(error));
+		}
+		setIsUploadingManual(false);
+	};
+
+	if (isOpen) {
+		return (
+			<div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+				<ManualPdfPicker
+					accept="application/pdf,.pdf"
+					aria-label="Replacement service manual PDF"
+					onChange={setFile}
+				/>
+				<Button
+					className={actionButtonClass}
+					disabled={!file || isSavingManual}
+					onClick={saveManual}
+					size="sm"
+					type="button"
+					variant="outline"
+				>
+					{isSavingManual ? (
+						<Loader2Icon className="size-4 animate-spin" />
+					) : (
+						<UploadIcon className="size-4" />
+					)}
+					Save
+				</Button>
+			</div>
+		);
+	}
+
+	return (
+		<Button
+			className={compactButtonClass}
+			onClick={() => setIsOpen(true)}
+			size="sm"
+			type="button"
+			variant="ghost"
+		>
+			<UploadIcon className="size-4" />
+			Replace
+		</Button>
+	);
+}
+
+function ProductDetailPartsCard({ parts }: { parts: Part[] }) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Parts ({parts.length})</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-3">
+				{parts.length > 0 ? (
+					parts.map((part) => (
+						<div
+							className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-sm"
+							key={part.recordId}
+						>
+							<div className="min-w-0">
+								<p className="truncate font-medium">{part.name}</p>
+								<p className="truncate text-muted-foreground text-xs">
+									{part.id}
+								</p>
+							</div>
+							<span className="shrink-0 text-muted-foreground">
+								{part.stock} on hand
+							</span>
+						</div>
+					))
+				) : (
+					<p className="text-muted-foreground text-sm">
+						No parts linked to this model
+					</p>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
+function ProductOverviewCard({
+	installedUnits,
+	partsLinked,
+	repairJobs,
+}: {
+	installedUnits: number;
+	partsLinked: number;
+	repairJobs: number;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader>
+				<CardTitle>Overview</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				<ProductOverviewMetric label="Installed units" value={installedUnits} />
+				<ProductOverviewMetric label="Repair jobs" value={repairJobs} />
+				<ProductOverviewMetric label="Parts linked" value={partsLinked} />
+			</CardContent>
+		</Card>
+	);
+}
+
+function ProductOverviewMetric({
+	label,
+	value,
+}: {
+	label: string;
+	value: number;
+}) {
+	return (
+		<div className="flex items-center justify-between gap-4 text-base">
+			<span className="text-muted-foreground">{label}</span>
+			<span className="font-semibold tabular-nums">{value}</span>
+		</div>
+	);
+}
+
+function ProductInstalledAtCard({
+	assets,
+	canWrite,
+	onCreateAsset,
+}: {
+	assets: Asset[];
+	canWrite: boolean;
+	onCreateAsset: () => void;
+}) {
+	return (
+		<Card className={panelClass}>
+			<CardHeader className="flex-row items-center justify-between gap-4">
+				<CardTitle>Installed At</CardTitle>
+				{canWrite ? (
+					<Button
+						className="rounded-lg text-primary"
+						onClick={onCreateAsset}
+						size="sm"
+						type="button"
+						variant="ghost"
+					>
+						<PlusIcon className="size-4" />
+						Install at Hospital
+					</Button>
+				) : null}
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				{assets.length > 0 ? (
+					assets.map((asset) => (
+						<div
+							className="rounded-lg border border-border/60 bg-muted/20 p-3"
+							key={asset.recordId}
+						>
+							<div className="flex items-start justify-between gap-3">
+								<div className="min-w-0">
+									<p className="truncate font-semibold text-sm">
+										{asset.hospital}
+									</p>
+									<p className="mt-3 font-mono text-muted-foreground text-sm">
+										{asset.id}
+									</p>
+								</div>
+								<StatusPill
+									className={coverageStatusStyles[asset.contractCoverage]}
+								>
+									{asset.contractCoverage}
+								</StatusPill>
+							</div>
+						</div>
+					))
+				) : (
+					<p className="text-muted-foreground text-sm">
+						No installed units for this model.
+					</p>
+				)}
+			</CardContent>
+		</Card>
 	);
 }
 
@@ -5124,7 +5883,7 @@ function useInlinePanelDismiss({
 
 			onDismiss();
 		};
-		const handleKeyDown = (event: KeyboardEvent) => {
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
 			if (event.key === "Escape") {
 				onDismiss();
 			}
@@ -5155,6 +5914,10 @@ function CrudDialog({
 		}
 
 		const handleDialogKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.defaultPrevented) {
+				return;
+			}
+
 			if (event.key === "Escape") {
 				onClose();
 			}
@@ -5248,6 +6011,27 @@ function CrudForm({
 		isSubmitting,
 		isUploadingManual
 	);
+	const [contractDateRange, setContractDateRange] = useState(() => ({
+		endDate: getInputDefaultValue(defaults.endDate),
+		startDate: getInputDefaultValue(defaults.startDate),
+	}));
+
+	const updateContractStartDate = (startDate: string) => {
+		setContractDateRange((currentRange) => ({
+			endDate:
+				currentRange.endDate && currentRange.endDate < startDate
+					? startDate
+					: currentRange.endDate,
+			startDate,
+		}));
+	};
+
+	const updateContractEndDate = (endDate: string) => {
+		setContractDateRange((currentRange) => ({
+			...currentRange,
+			endDate,
+		}));
+	};
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -5278,14 +6062,26 @@ function CrudForm({
 			className="flex min-h-0 flex-1 flex-col bg-muted/20"
 			onSubmit={handleSubmit}
 		>
-			<div className="grid flex-1 auto-rows-min gap-y-4 overflow-y-auto px-6 py-5 md:grid-cols-2 md:gap-x-4">
-				{fields.map((field) => (
-					<FormField
-						defaultValue={defaults[field.name]}
-						field={field}
-						key={field.name}
-					/>
-				))}
+			<div className="grid flex-1 auto-rows-min gap-y-5 overflow-y-auto px-6 py-5 md:grid-cols-2 md:gap-x-4">
+				{fields.map((field) => {
+					const contractDateField = getContractDateFieldState(
+						field,
+						state.entity,
+						contractDateRange,
+						updateContractStartDate,
+						updateContractEndDate
+					);
+
+					return (
+						<FormField
+							defaultValue={defaults[field.name]}
+							field={contractDateField.field}
+							key={field.name}
+							onValueChange={contractDateField.onValueChange}
+							value={contractDateField.value}
+						/>
+					);
+				})}
 			</div>
 			<div className="flex flex-col items-stretch gap-3 border-t bg-card px-6 py-4 shadow-[0_-1px_0_rgb(0_0_0_/_0.02)] sm:flex-row sm:items-center sm:justify-between">
 				<p className="hidden text-muted-foreground text-xs sm:block">
@@ -5373,6 +6169,47 @@ interface UploadedServiceManualMetadata {
 
 const noopFileChange = () => undefined;
 
+interface ContractDateRange {
+	endDate: string;
+	startDate: string;
+}
+
+function getContractDateFieldState(
+	field: FieldConfig,
+	entity: CrudEntity,
+	contractDateRange: ContractDateRange,
+	onStartDateChange: (value: string) => void,
+	onEndDateChange: (value: string) => void
+) {
+	if (entity !== "contract") {
+		return { field };
+	}
+
+	if (field.name === "startDate") {
+		return {
+			field: {
+				...field,
+				max: contractDateRange.endDate || field.max,
+			},
+			onValueChange: onStartDateChange,
+			value: contractDateRange.startDate,
+		};
+	}
+
+	if (field.name === "endDate") {
+		return {
+			field: {
+				...field,
+				min: contractDateRange.startDate || field.min,
+			},
+			onValueChange: onEndDateChange,
+			value: contractDateRange.endDate,
+		};
+	}
+
+	return { field };
+}
+
 function ManualPdfPicker({
 	accept = "application/pdf,.pdf",
 	"aria-label": ariaLabel,
@@ -5392,7 +6229,7 @@ function ManualPdfPicker({
 	const inputId = id ?? `manual-pdf-${name ?? "upload"}`;
 
 	return (
-		<div className="flex min-w-0 items-center gap-2">
+		<div className="min-w-0">
 			<Input
 				accept={accept}
 				aria-hidden="true"
@@ -5409,17 +6246,24 @@ function ManualPdfPicker({
 				type="file"
 			/>
 			<label
-				className={cn(
-					compactButtonClass,
-					"inline-flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-input bg-background px-3 font-medium text-sm shadow-xs transition-colors hover:bg-muted/60"
-				)}
+				className="flex min-h-20 cursor-pointer items-center gap-3 rounded-lg border border-input border-dashed bg-background px-4 py-3 shadow-xs transition-[border-color,box-shadow,background-color] hover:border-foreground/25 hover:bg-muted/30 has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/20"
 				htmlFor={inputId}
 			>
-				Choose PDF
+				<span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+					<UploadIcon className="size-4" />
+				</span>
+				<span className="min-w-0 flex-1">
+					<span className="block truncate font-medium text-sm">
+						{selectedFileName || "Select PDF manual"}
+					</span>
+					<span className="mt-1 block truncate text-muted-foreground text-xs">
+						Click to upload a PDF file
+					</span>
+				</span>
+				<span className="hidden shrink-0 rounded-md border border-border/70 bg-card px-2.5 py-1 font-medium text-xs sm:inline-flex">
+					Browse
+				</span>
 			</label>
-			<span className="min-w-0 truncate text-muted-foreground text-sm">
-				{selectedFileName || "No file selected"}
-			</span>
 		</div>
 	);
 }
@@ -5563,9 +6407,13 @@ function useServiceOpsActionMutations(tenantId: string) {
 function FormField({
 	defaultValue,
 	field,
+	onValueChange,
+	value,
 }: {
 	defaultValue?: FormDefaultValue;
 	field: FieldConfig;
+	onValueChange?: (value: string) => void;
+	value?: string;
 }) {
 	const fieldClassName = cn(
 		formFieldClass,
@@ -5584,15 +6432,24 @@ function FormField({
 
 	if (field.type === "checkbox") {
 		return (
-			<label className="flex min-h-9 items-center gap-3 rounded-lg border border-border/70 bg-background px-3 text-sm shadow-xs transition-colors hover:bg-muted/30">
-				<input
-					className="size-4 accent-primary"
-					defaultChecked={Boolean(defaultValue)}
-					name={field.name}
-					type="checkbox"
-				/>
-				<span className="font-medium text-xs">{field.label}</span>
-			</label>
+			<div
+				className={cn(
+					fieldClassName,
+					"min-h-10 cursor-pointer justify-end gap-2 pt-6 md:pt-6"
+				)}
+			>
+				<label className="flex items-center gap-2">
+					<input
+						className="size-4 shrink-0 accent-primary"
+						defaultChecked={Boolean(defaultValue)}
+						name={field.name}
+						type="checkbox"
+					/>
+					<span className="font-medium text-sm leading-none">
+						{field.label}
+					</span>
+				</label>
+			</div>
 		);
 	}
 
@@ -5637,6 +6494,16 @@ function FormField({
 	}
 
 	if (field.type === "select") {
+		if (field.multiple) {
+			return (
+				<MultiSelectFormField
+					defaultValue={defaultValue}
+					field={field}
+					fieldClassName={fieldClassName}
+				/>
+			);
+		}
+
 		const selectDefaultValue = getSelectDefaultValue(
 			defaultValue,
 			field.multiple
@@ -5649,27 +6516,20 @@ function FormField({
 				</Label>
 				<div className="relative">
 					<select
-						className={cn(
-							formControlClass,
-							"appearance-none pr-9",
-							field.multiple ? "min-h-28 py-2" : ""
-						)}
+						className={cn(formControlClass, "appearance-none pr-9")}
 						defaultValue={selectDefaultValue}
 						id={field.name}
-						multiple={field.multiple}
 						name={field.name}
 						required={field.required}
 					>
-						{field.multiple ? null : <option value="">Select...</option>}
+						<option value="">Select...</option>
 						{field.options?.map((option) => (
 							<option key={option.value} value={option.value}>
 								{option.label}
 							</option>
 						))}
 					</select>
-					{field.multiple ? null : (
-						<ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
-					)}
+					<ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
 				</div>
 				<FieldDescription description={field.description} />
 			</div>
@@ -5725,22 +6585,262 @@ function FormField({
 	}
 
 	return (
+		<TextFormField
+			defaultValue={defaultValue}
+			field={field}
+			fieldClassName={fieldClassName}
+			onValueChange={onValueChange}
+			value={value}
+		/>
+	);
+}
+
+function TextFormField({
+	defaultValue,
+	field,
+	fieldClassName,
+	onValueChange,
+	value,
+}: {
+	defaultValue?: FormDefaultValue;
+	field: FieldConfig;
+	fieldClassName: string;
+	onValueChange?: (value: string) => void;
+	value?: string;
+}) {
+	const hasSuffix = Boolean(field.suffix);
+	const isControlled = value !== undefined;
+
+	return (
 		<div className={fieldClassName}>
 			<Label className={formLabelClass} htmlFor={field.name}>
 				<FormLabelText field={field} />
 			</Label>
-			<Input
-				className={formControlClass}
-				defaultValue={getInputDefaultValue(defaultValue)}
-				id={field.name}
-				max={field.max}
-				min={field.min}
-				name={field.name}
-				placeholder={field.placeholder}
-				required={field.required}
-				step={field.type === "number" ? "any" : undefined}
-				type={field.type ?? "text"}
-			/>
+			<div className="relative">
+				<Input
+					className={cn(formControlClass, hasSuffix ? "pr-20" : "")}
+					defaultValue={
+						isControlled ? undefined : getInputDefaultValue(defaultValue)
+					}
+					id={field.name}
+					max={field.max}
+					min={field.min}
+					name={field.name}
+					onChange={(event) => onValueChange?.(event.target.value)}
+					placeholder={field.placeholder}
+					required={field.required}
+					step={field.type === "number" ? "any" : undefined}
+					type={field.type ?? "text"}
+					value={value}
+				/>
+				{field.suffix ? (
+					<span className="pointer-events-none absolute inset-y-0 right-3 inline-flex items-center text-muted-foreground text-sm">
+						{field.suffix}
+					</span>
+				) : null}
+			</div>
+			<FieldDescription description={field.description} />
+		</div>
+	);
+}
+
+function MultiSelectFormField({
+	defaultValue,
+	field,
+	fieldClassName,
+}: {
+	defaultValue?: FormDefaultValue;
+	field: FieldConfig;
+	fieldClassName: string;
+}) {
+	const options = field.options ?? [];
+	const [isOpen, setIsOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [selectedValues, setSelectedValues] = useState(() =>
+		getCheckboxListDefaultValues(defaultValue)
+	);
+	const fieldRef = useRef<HTMLDivElement | null>(null);
+	const selectedOptions = getSelectedOptions(options, selectedValues);
+	const selectedValueSet = new Set(selectedValues);
+	const normalizedQuery = searchQuery.trim().toLowerCase();
+	const filteredOptions =
+		normalizedQuery.length > 0
+			? options.filter((option) =>
+					`${option.label} ${option.description ?? ""} ${option.meta ?? ""}`
+						.toLowerCase()
+						.includes(normalizedQuery)
+				)
+			: options;
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+
+			if (!(target instanceof Node)) {
+				return;
+			}
+
+			if (fieldRef.current?.contains(target)) {
+				return;
+			}
+
+			setIsOpen(false);
+		};
+		const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				event.stopPropagation();
+				setIsOpen(false);
+			}
+		};
+
+		window.addEventListener("pointerdown", handlePointerDown);
+		window.addEventListener("keydown", handleKeyDown, { capture: true });
+
+		return () => {
+			window.removeEventListener("pointerdown", handlePointerDown);
+			window.removeEventListener("keydown", handleKeyDown, { capture: true });
+		};
+	}, [isOpen]);
+
+	const toggleValue = (value: string) => {
+		setSelectedValues((currentValues) =>
+			currentValues.includes(value)
+				? currentValues.filter((currentValue) => currentValue !== value)
+				: [...currentValues, value]
+		);
+	};
+
+	const removeValue = (value: string) => {
+		setSelectedValues((currentValues) =>
+			currentValues.filter((currentValue) => currentValue !== value)
+		);
+	};
+	const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+		if (event.key === "ArrowDown") {
+			event.preventDefault();
+			setIsOpen(true);
+		}
+	};
+
+	return (
+		<div className={fieldClassName} ref={fieldRef}>
+			<Label className={formLabelClass} htmlFor={`${field.name}-toggle`}>
+				<FormLabelText field={field} />
+			</Label>
+			{selectedValues.map((selectedValue) => (
+				<input
+					key={selectedValue}
+					name={field.name}
+					type="hidden"
+					value={selectedValue}
+				/>
+			))}
+			<div className="relative">
+				<div className="flex min-h-10 items-center gap-2 rounded-lg border border-input bg-background px-2.5 py-2 shadow-xs transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+						{selectedOptions.length > 0 ? (
+							selectedOptions.map((option) => (
+								<span
+									className="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/55 px-2 py-1 font-medium text-xs"
+									key={option.value}
+								>
+									<span className="truncate">{option.label}</span>
+									<button
+										aria-label={`Remove ${option.label}`}
+										className="rounded-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+										onClick={() => removeValue(option.value)}
+										type="button"
+									>
+										<XIcon className="size-3" />
+									</button>
+								</span>
+							))
+						) : (
+							<span className="px-0.5 text-muted-foreground text-sm">
+								{field.placeholder ?? "Select options..."}
+							</span>
+						)}
+					</div>
+					<button
+						aria-expanded={isOpen}
+						aria-haspopup="listbox"
+						className="inline-flex min-h-7 shrink-0 items-center justify-center gap-1 rounded-md px-2 font-medium text-muted-foreground text-xs transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+						id={`${field.name}-toggle`}
+						onClick={() => setIsOpen((currentValue) => !currentValue)}
+						onKeyDown={handleTriggerKeyDown}
+						type="button"
+					>
+						<span>Select</span>
+						<ChevronDownIcon className="size-4" />
+					</button>
+				</div>
+				{isOpen ? (
+					<div className="absolute top-[calc(100%+0.35rem)] left-0 z-50 w-full rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg">
+						<Input
+							aria-label={`Search ${field.label}`}
+							className="h-8 rounded-md text-sm"
+							onChange={(event) => setSearchQuery(event.target.value)}
+							placeholder={`Search ${field.label.toLowerCase()}...`}
+							value={searchQuery}
+						/>
+						<div
+							aria-multiselectable="true"
+							className="mt-2 max-h-56 overflow-y-auto"
+							role="listbox"
+						>
+							{filteredOptions.length > 0 ? (
+								filteredOptions.map((option) => {
+									const isSelected = selectedValueSet.has(option.value);
+
+									return (
+										<button
+											aria-selected={isSelected}
+											className={cn(
+												"flex min-h-9 w-full items-center justify-between gap-3 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
+												isSelected ? "bg-muted font-medium" : ""
+											)}
+											key={option.value}
+											onClick={() => toggleValue(option.value)}
+											role="option"
+											type="button"
+										>
+											<span className="min-w-0">
+												<span className="block truncate">{option.label}</span>
+												{option.description ? (
+													<span className="mt-0.5 block truncate text-muted-foreground text-xs">
+														{option.description}
+													</span>
+												) : null}
+											</span>
+											<span
+												className={cn(
+													"flex size-4 shrink-0 items-center justify-center rounded border border-input",
+													isSelected
+														? "border-primary bg-primary text-primary-foreground"
+														: "bg-background"
+												)}
+											>
+												{isSelected ? (
+													<CheckCircle2Icon className="size-3" />
+												) : null}
+											</span>
+										</button>
+									);
+								})
+							) : (
+								<p className="px-2.5 py-3 text-muted-foreground text-sm">
+									No matching options.
+								</p>
+							)}
+						</div>
+					</div>
+				) : null}
+			</div>
 			<FieldDescription description={field.description} />
 		</div>
 	);
@@ -5958,35 +7058,44 @@ function ProductPartPickerField({
 	);
 	const [isOpen, setIsOpen] = useState(false);
 	const selectedOptions = getSelectedOptions(options, selectedValues);
-	const selectedSummary = getSelectedPartsSummary(selectedOptions);
 
 	return (
 		<div className={fieldClassName}>
 			<Label className={formLabelClass} htmlFor={`${field.name}-picker`}>
 				<FormLabelText field={field} />
 			</Label>
-			<input name={field.name} type="hidden" value="" />
 			{selectedValues.map((value) => (
 				<input key={value} name={field.name} type="hidden" value={value} />
 			))}
-			<Button
-				className="min-h-24 w-full justify-start rounded-lg border border-input bg-background px-3 py-3 text-left shadow-xs hover:bg-background"
-				id={`${field.name}-picker`}
-				onClick={() => setIsOpen(true)}
-				type="button"
-				variant="outline"
-			>
-				<span className="flex min-w-0 flex-col gap-1">
-					<span className="font-medium text-sm">
-						{selectedValues.length > 0
-							? `${selectedValues.length} selected`
-							: "Search existing parts"}
-					</span>
-					<span className="line-clamp-2 text-muted-foreground text-xs">
-						{selectedSummary}
-					</span>
-				</span>
-			</Button>
+			<div className="flex min-h-10 items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 shadow-xs transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+				<SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+					{selectedOptions.length > 0 ? (
+						selectedOptions.map((option) => (
+							<span
+								className="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/50 px-2 py-1 font-medium text-xs"
+								key={option.value}
+							>
+								<span className="truncate">{option.label}</span>
+							</span>
+						))
+					) : (
+						<span className="text-muted-foreground text-sm">
+							Select standard parts...
+						</span>
+					)}
+				</div>
+				<button
+					aria-haspopup="dialog"
+					className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md px-2 font-medium text-muted-foreground text-xs hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+					id={`${field.name}-picker`}
+					onClick={() => setIsOpen(true)}
+					type="button"
+				>
+					<span>Select</span>
+					<ChevronDownIcon className="size-4 shrink-0" />
+				</button>
+			</div>
 			<FieldDescription description={field.description} />
 			{isOpen ? (
 				<ProductPartPickerDialog
@@ -6159,20 +7268,6 @@ function getSelectedOptions(options: FieldOption[], values: string[]) {
 
 		return option ? [option] : [];
 	});
-}
-
-function getSelectedPartsSummary(options: FieldOption[]) {
-	if (options.length === 0) {
-		return "No standard parts selected.";
-	}
-
-	return options
-		.map((option) =>
-			option.description
-				? `${option.description} · ${option.label}`
-				: option.label
-		)
-		.join(", ");
 }
 
 function FormLabelText({ field }: { field: FieldConfig }) {
@@ -6664,7 +7759,9 @@ function RowActions({
 				}
 				className={cn(
 					compactButtonClass,
-					isConfirmingDelete ? "w-auto px-2" : "text-muted-foreground"
+					isConfirmingDelete
+						? "w-auto px-2"
+						: "text-muted-foreground hover:text-destructive"
 				)}
 				disabled={deleteDisabled || isDeleting}
 				onBlur={() => setIsConfirmingDelete(false)}

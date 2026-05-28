@@ -86,7 +86,7 @@ type TableColumnAlignment = "center" | "left" | "right";
 interface DataTableProps {
 	columnAlignments?: Partial<Record<string, TableColumnAlignment>>;
 	columns: string[];
-	description?: string;
+	description?: null | string;
 	filterLabels?: string[];
 	hideTitleCount?: boolean;
 	onSelectedRowIdChange?: (rowId: string) => void;
@@ -227,6 +227,11 @@ export function DataTable({
 	const normalizedSearchQuery = globalFilter.trim();
 	const recordCountLabel =
 		title ?? `${rows.length} ${rows.length === 1 ? "record" : "records"}`;
+	const tableDescription =
+		description === null
+			? ""
+			: (description ??
+				"Recent service records with status, ownership, and schedule activity.");
 
 	const exportVisibleRows = () => {
 		const visibleRows = table
@@ -256,15 +261,16 @@ export function DataTable({
 								{title ?? `${rows.length} Records`}
 							</p>
 						)}
-						<p
-							className={cn(
-								"text-muted-foreground text-sm",
-								hideTitleCount ? "" : "mt-1"
-							)}
-						>
-							{description ??
-								"Recent service records with status, ownership, and schedule activity."}
-						</p>
+						{tableDescription ? (
+							<p
+								className={cn(
+									"text-muted-foreground text-sm",
+									hideTitleCount ? "" : "mt-1"
+								)}
+							>
+								{tableDescription}
+							</p>
+						) : null}
 					</div>
 					<Button
 						className={compactButtonClass}
