@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import z from "zod";
 
 import { AuthCard, AuthShell } from "@/components/auth-shell";
+import { PasswordInput } from "@/components/password-input";
 import { authClient } from "@/lib/auth-client";
 import { getAuthError } from "@/lib/business-errors";
 
@@ -72,7 +73,7 @@ export default function SignUpForm({
 				title="Create account"
 			>
 				<form
-					className="flex flex-col gap-4"
+					className="flex flex-col gap-5"
 					onSubmit={(event) => {
 						event.preventDefault();
 						event.stopPropagation();
@@ -81,7 +82,7 @@ export default function SignUpForm({
 				>
 					<form.Field name="name">
 						{(field) => (
-							<div className="flex flex-col gap-2">
+							<div className="flex flex-col gap-1.5">
 								<Label htmlFor={field.name}>Name</Label>
 								<Input
 									autoComplete="name"
@@ -89,6 +90,7 @@ export default function SignUpForm({
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
+									placeholder="Enter your name"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
@@ -102,7 +104,7 @@ export default function SignUpForm({
 
 					<form.Field name="email">
 						{(field) => (
-							<div className="flex flex-col gap-2">
+							<div className="flex flex-col gap-1.5">
 								<Label htmlFor={field.name}>Email</Label>
 								<Input
 									autoComplete="email"
@@ -110,6 +112,7 @@ export default function SignUpForm({
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
+									placeholder="Enter your email"
 									type="email"
 									value={field.state.value}
 								/>
@@ -124,15 +127,16 @@ export default function SignUpForm({
 
 					<form.Field name="password">
 						{(field) => (
-							<div className="flex flex-col gap-2">
+							<div className="flex flex-col gap-1.5">
 								<Label htmlFor={field.name}>Password</Label>
-								<Input
+								<PasswordInput
 									autoComplete="new-password"
+									className="pr-11"
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
-									type="password"
+									placeholder="Create a password"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (

@@ -3,10 +3,48 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEV_PORTS=(3001 8081 8082 19000 19001 19002)
-MODE="${1:-dev}"
+DEV_PORTS=(27099 3001 8081 8082 19000 19001 19002)
+MODE="dev"
+DETACHED=false
 
 cd "$ROOT_DIR"
+
+parse_args() {
+	for arg in "$@"; do
+		case "$arg" in
+			-d | --detach | --detached)
+				DETACHED=true
+				;;
+			-h | --help | help)
+				MODE="help"
+				;;
+			dev | native-dev-client | ios-dev-client-build | testflight | testflight-build | testflight-submit)
+				MODE="$arg"
+				;;
+			*)
+				echo "Unknown argument: $arg"
+				print_usage
+				exit 1
+				;;
+		esac
+	done
+}
+
+run_detached() {
+	local log_dir="$ROOT_DIR/logs"
+	local pid_dir="$ROOT_DIR/tmp"
+	local log_file="$log_dir/restart-${MODE}.log"
+	local pid_file="$pid_dir/restart-${MODE}.pid"
+
+	mkdir -p "$log_dir" "$pid_dir"
+
+	echo "Starting luke (${MODE}) in background..."
+	echo "Log: $log_file"
+	echo "PID: $pid_file"
+
+	nohup "$0" "$MODE" >"$log_file" 2>&1 &
+	echo "$!" >"$pid_file"
+}
 
 stop_processes_on_ports() {
 	for port in "${DEV_PORTS[@]}"; do
@@ -36,7 +74,9 @@ print_usage() {
 	cat <<'USAGE'
 Usage:
   ./restart.sh                      Build iOS dev client, then restart all dev servers
+  ./restart.sh -d                   Same as default, but run in the background
   ./restart.sh dev                  Same as default
+  ./restart.sh dev -d               Restart all dev servers in the background
   ./restart.sh native-dev-client    Start Expo dev client server for iPhone
   ./restart.sh ios-dev-client-build Build/install the iOS development client
   ./restart.sh testflight           Guided TestFlight build/sign/submit flow
@@ -153,6 +193,13 @@ submit_testflight_latest() {
 		npx eas-cli submit --platform ios --profile testflight --latest
 	)
 }
+
+parse_args "$@"
+
+if [[ "$DETACHED" == true ]]; then
+	run_detached
+	exit 0
+fi
 
 case "$MODE" in
 	-h | --help | help)
