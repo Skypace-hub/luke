@@ -15,6 +15,13 @@ import { getAuthError } from "@/lib/business-errors";
 
 import Loader from "./loader";
 
+const authInputClass =
+	"h-10 rounded-none border-0 border-b border-input bg-transparent px-0 shadow-none focus-visible:border-ring focus-visible:ring-0";
+const authLabelClass = "font-medium text-muted-foreground text-xs";
+const authLinkClass =
+	"font-semibold text-primary outline-none underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40";
+const authSubmitClass = "h-10 min-w-32 bg-primary px-6";
+
 export default function SignInForm({
 	onSwitchToSignUp,
 }: {
@@ -65,13 +72,24 @@ export default function SignInForm({
 	}
 
 	return (
-		<AuthShell>
+		<AuthShell variant="sign-in">
 			<AuthCard
-				description="Sign in to manage service operations, jobs, assets, and tenant controls."
-				title="Welcome back"
+				description={
+					<span>
+						New user?{" "}
+						<button
+							className={authLinkClass}
+							onClick={onSwitchToSignUp}
+							type="button"
+						>
+							Create an account
+						</button>
+					</span>
+				}
+				title="Sign in"
 			>
 				<form
-					className="flex flex-col gap-5"
+					className="flex flex-col gap-6"
 					onSubmit={(event) => {
 						event.preventDefault();
 						event.stopPropagation();
@@ -80,15 +98,18 @@ export default function SignInForm({
 				>
 					<form.Field name="email">
 						{(field) => (
-							<div className="flex flex-col gap-1.5">
-								<Label htmlFor={field.name}>Email or username</Label>
+							<div className="flex flex-col gap-1">
+								<Label className={authLabelClass} htmlFor={field.name}>
+									Email address
+								</Label>
 								<Input
 									autoComplete="username"
+									className={authInputClass}
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="Enter your email or username"
+									placeholder="name@company.com"
 									type="text"
 									value={field.state.value}
 								/>
@@ -103,16 +124,18 @@ export default function SignInForm({
 
 					<form.Field name="password">
 						{(field) => (
-							<div className="flex flex-col gap-1.5">
-								<Label htmlFor={field.name}>Password</Label>
+							<div className="flex flex-col gap-1">
+								<Label className={authLabelClass} htmlFor={field.name}>
+									Password
+								</Label>
 								<PasswordInput
 									autoComplete="current-password"
-									className="pr-11"
+									className={`${authInputClass} pr-11`}
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="Enter your password"
+									placeholder="Enter password"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
@@ -124,34 +147,37 @@ export default function SignInForm({
 						)}
 					</form.Field>
 
-					<form.Subscribe
-						selector={(state) => ({
-							canSubmit: state.canSubmit,
-							isSubmitting: state.isSubmitting,
-						})}
-					>
-						{({ canSubmit, isSubmitting }) => (
-							<Button
-								className="w-full"
-								disabled={!canSubmit || isSubmitting}
-								type="submit"
-							>
-								{isSubmitting ? (
-									<Loader2Icon
-										className="animate-spin"
-										data-icon="inline-start"
-									/>
-								) : null}
-								{isSubmitting ? "Submitting..." : "Sign In"}
-							</Button>
-						)}
-					</form.Subscribe>
+					<div className="flex justify-end pt-1">
+						<form.Subscribe
+							selector={(state) => ({
+								canSubmit: state.canSubmit,
+								isSubmitting: state.isSubmitting,
+							})}
+						>
+							{({ canSubmit, isSubmitting }) => (
+								<Button
+									className={authSubmitClass}
+									disabled={!canSubmit || isSubmitting}
+									type="submit"
+								>
+									{isSubmitting ? (
+										<Loader2Icon
+											className="animate-spin"
+											data-icon="inline-start"
+										/>
+									) : null}
+									{isSubmitting ? "Submitting..." : "Sign In"}
+								</Button>
+							)}
+						</form.Subscribe>
+					</div>
 				</form>
 
-				<div className="mt-4 text-center">
-					<Button onClick={onSwitchToSignUp} variant="link">
-						Need an account? Sign Up
-					</Button>
+				<div className="mt-10 border-t pt-6">
+					<p className="text-muted-foreground text-xs leading-relaxed">
+						Protected by Utiliti workspace security. Access is limited to
+						authorized service operations users.
+					</p>
 				</div>
 			</AuthCard>
 		</AuthShell>

@@ -14,6 +14,13 @@ import { getAuthError } from "@/lib/business-errors";
 
 import Loader from "./loader";
 
+const authInputClass =
+	"h-10 rounded-none border-0 border-b border-input bg-transparent px-0 shadow-none focus-visible:border-ring focus-visible:ring-0";
+const authLabelClass = "font-medium text-muted-foreground text-xs";
+const authLinkClass =
+	"font-semibold text-primary outline-none underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40";
+const authSubmitClass = "h-10 bg-primary px-6";
+
 export default function SignUpForm({
 	onSwitchToSignIn,
 }: {
@@ -67,13 +74,24 @@ export default function SignUpForm({
 	}
 
 	return (
-		<AuthShell>
+		<AuthShell variant="sign-up">
 			<AuthCard
-				description="Create a tenant workspace and start tracking service operations."
+				description={
+					<span>
+						Already have an account?{" "}
+						<button
+							className={authLinkClass}
+							onClick={onSwitchToSignIn}
+							type="button"
+						>
+							Sign in
+						</button>
+					</span>
+				}
 				title="Create account"
 			>
 				<form
-					className="flex flex-col gap-5"
+					className="flex flex-col gap-6"
 					onSubmit={(event) => {
 						event.preventDefault();
 						event.stopPropagation();
@@ -82,15 +100,18 @@ export default function SignUpForm({
 				>
 					<form.Field name="name">
 						{(field) => (
-							<div className="flex flex-col gap-1.5">
-								<Label htmlFor={field.name}>Name</Label>
+							<div className="flex flex-col gap-1">
+								<Label className={authLabelClass} htmlFor={field.name}>
+									Name
+								</Label>
 								<Input
 									autoComplete="name"
+									className={authInputClass}
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="Enter your name"
+									placeholder="Your full name"
 									value={field.state.value}
 								/>
 								{field.state.meta.errors.map((error) => (
@@ -104,15 +125,18 @@ export default function SignUpForm({
 
 					<form.Field name="email">
 						{(field) => (
-							<div className="flex flex-col gap-1.5">
-								<Label htmlFor={field.name}>Email</Label>
+							<div className="flex flex-col gap-1">
+								<Label className={authLabelClass} htmlFor={field.name}>
+									Email address
+								</Label>
 								<Input
 									autoComplete="email"
+									className={authInputClass}
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
 									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="Enter your email"
+									placeholder="name@company.com"
 									type="email"
 									value={field.state.value}
 								/>
@@ -127,11 +151,13 @@ export default function SignUpForm({
 
 					<form.Field name="password">
 						{(field) => (
-							<div className="flex flex-col gap-1.5">
-								<Label htmlFor={field.name}>Password</Label>
+							<div className="flex flex-col gap-1">
+								<Label className={authLabelClass} htmlFor={field.name}>
+									Password
+								</Label>
 								<PasswordInput
 									autoComplete="new-password"
-									className="pr-11"
+									className={`${authInputClass} pr-11`}
 									id={field.name}
 									name={field.name}
 									onBlur={field.handleBlur}
@@ -156,7 +182,7 @@ export default function SignUpForm({
 					>
 						{({ canSubmit, isSubmitting }) => (
 							<Button
-								className="w-full"
+								className={authSubmitClass}
 								disabled={!canSubmit || isSubmitting}
 								type="submit"
 							>
@@ -172,10 +198,11 @@ export default function SignUpForm({
 					</form.Subscribe>
 				</form>
 
-				<div className="mt-4 text-center">
-					<Button onClick={onSwitchToSignIn} variant="link">
-						Already have an account? Sign In
-					</Button>
+				<div className="mt-8 border-t pt-6">
+					<p className="text-muted-foreground text-xs leading-relaxed">
+						By creating an account, your workspace can manage tenant service
+						data under your organization&apos;s access controls.
+					</p>
 				</div>
 			</AuthCard>
 		</AuthShell>

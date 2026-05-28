@@ -127,6 +127,7 @@ export interface Asset {
 	hospitalId: string;
 	id: string;
 	installationDate: string;
+	isActive: boolean;
 	location: string;
 	model: string;
 	nextPmDue: string;
@@ -134,6 +135,7 @@ export interface Asset {
 	productModelId: string;
 	recordId: string;
 	serial: string;
+	statusValue: "active" | "inactive";
 	warrantyExpiry: string;
 }
 

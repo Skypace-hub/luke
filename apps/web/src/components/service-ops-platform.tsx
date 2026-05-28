@@ -6487,7 +6487,7 @@ function CrudForm({
 			className="flex min-h-0 flex-1 flex-col bg-muted/20"
 			onSubmit={handleSubmit}
 		>
-			<div className="grid flex-1 auto-rows-min gap-y-6 overflow-y-auto px-6 py-6 md:grid-cols-2 md:gap-x-5">
+			<div className="grid flex-1 auto-rows-min gap-y-6 overflow-y-auto px-6 pt-6 pb-24 sm:pb-6 md:grid-cols-2 md:gap-x-5">
 				{fields.map((field) => {
 					const contractDateField = getContractDateFieldState(
 						field,
@@ -6539,6 +6539,10 @@ function CrudForm({
 }
 
 function getCrudDialogTitle(state: CrudState) {
+	if (state.entity === "asset" && state.mode === "create") {
+		return "Register New Asset";
+	}
+
 	if (state.entity === "hospital" && state.mode === "create") {
 		return "Add New Hospital";
 	}
@@ -6567,6 +6571,10 @@ function getCrudSubmitLabel(
 
 	if (state.entity === "part" && state.mode === "create") {
 		return "Create Part";
+	}
+
+	if (state.entity === "asset" && state.mode === "create") {
+		return "Create Asset";
 	}
 
 	if (state.entity === "hospital" && state.mode === "create") {
@@ -6844,6 +6852,16 @@ function FormField({
 		formFieldClass,
 		field.span === "full" ? "md:col-span-2" : ""
 	);
+
+	if (field.type === "hidden") {
+		return (
+			<input
+				defaultValue={getInputDefaultValue(defaultValue)}
+				name={field.name}
+				type="hidden"
+			/>
+		);
+	}
 
 	if (field.type === "section") {
 		return (

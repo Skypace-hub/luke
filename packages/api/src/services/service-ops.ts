@@ -170,6 +170,7 @@ export interface AssetMutationInput {
 	designatedEngineerId?: null | string;
 	hospitalId: string;
 	installationDate?: null | string;
+	isActive: boolean;
 	locationLabel: string;
 	nextPmDueDate?: null | string;
 	nfcUid: string;
@@ -1383,6 +1384,7 @@ const getAssets = async (tenantId: string): Promise<Asset[]> => {
 			hospital: hospitals.name,
 			hospitalId: assets.hospitalId,
 			installationDate: assets.installationDate,
+			isActive: assets.isActive,
 			locationLabel: assets.locationLabel,
 			modelName: productModels.modelName,
 			nextPmDueDate: assets.nextPmDueDate,
@@ -1417,6 +1419,7 @@ const getAssets = async (tenantId: string): Promise<Asset[]> => {
 		hospitalId: row.hospitalId,
 		id: row.assetNumber,
 		installationDate: dateOnly(row.installationDate),
+		isActive: row.isActive,
 		location: row.locationLabel,
 		model: row.modelName,
 		nextPmDue: dateOnly(row.nextPmDueDate),
@@ -1424,6 +1427,7 @@ const getAssets = async (tenantId: string): Promise<Asset[]> => {
 		productModelId: row.productModelId,
 		recordId: row.recordId,
 		serial: row.serialNumber,
+		statusValue: row.isActive ? "active" : "inactive",
 		warrantyExpiry: dateOnly(row.warrantyExpiryDate),
 	}));
 };
@@ -1505,6 +1509,7 @@ const mapAssetRowToAsset = (row: {
 	hospitalName: string;
 	id: string;
 	installationDate: null | string;
+	isActive: boolean;
 	locationLabel: string;
 	modelName: string;
 	nextPmDueDate: null | string;
@@ -1521,6 +1526,7 @@ const mapAssetRowToAsset = (row: {
 	hospitalId: row.hospitalId,
 	id: row.assetNumber,
 	installationDate: row.installationDate ?? "Not set",
+	isActive: row.isActive,
 	location: row.locationLabel,
 	model: row.modelName,
 	nextPmDue: row.nextPmDueDate ?? "Not scheduled",
@@ -1528,6 +1534,7 @@ const mapAssetRowToAsset = (row: {
 	productModelId: row.productModelId,
 	recordId: row.id,
 	serial: row.serialNumber,
+	statusValue: row.isActive ? "active" : "inactive",
 	warrantyExpiry: row.warrantyExpiryDate ?? "Not set",
 });
 
@@ -2150,6 +2157,7 @@ export async function getNfcDeviceInfo(
 			hospitalName: hospitals.name,
 			id: assets.id,
 			installationDate: assets.installationDate,
+			isActive: assets.isActive,
 			locationLabel: assets.locationLabel,
 			modelName: productModels.modelName,
 			nextPmDueDate: assets.nextPmDueDate,
@@ -3284,6 +3292,7 @@ export async function createAsset(tenantId: string, input: AssetMutationInput) {
 				designatedEngineerId: input.designatedEngineerId ?? null,
 				hospitalId: input.hospitalId,
 				installationDate: toDateValue(input.installationDate),
+				isActive: input.isActive,
 				locationLabel: input.locationLabel,
 				nextPmDueDate: toDateValue(input.nextPmDueDate),
 				nfcUid: input.nfcUid,
@@ -3331,6 +3340,7 @@ export async function updateAsset(
 				designatedEngineerId: input.designatedEngineerId ?? null,
 				hospitalId: input.hospitalId,
 				installationDate: toDateValue(input.installationDate),
+				isActive: input.isActive,
 				locationLabel: input.locationLabel,
 				nextPmDueDate: toDateValue(input.nextPmDueDate),
 				nfcUid: input.nfcUid,

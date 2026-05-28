@@ -1,88 +1,95 @@
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@luke/ui/components/card";
-import {
-	ClipboardCheckIcon,
-	CommandIcon,
-	RadarIcon,
-	ShieldCheckIcon,
-} from "lucide-react";
+import { CheckIcon, CommandIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-const authFeatures = [
-	{
-		description:
-			"Track live job state, engineer ownership, and field activity.",
-		icon: RadarIcon,
-		title: "Live dispatch",
-	},
-	{
-		description: "Keep SLA, entitlement, and contract coverage visible.",
-		icon: ShieldCheckIcon,
-		title: "Contract coverage",
-	},
-	{
-		description: "Monitor stock thresholds, shortages, and product parts.",
-		icon: ClipboardCheckIcon,
-		title: "Parts visibility",
-	},
-] as const;
+type AuthShellVariant = "sign-in" | "sign-up";
 
-export function AuthShell({ children }: { children: ReactNode }) {
+const authMarketing = {
+	"sign-in": {
+		body: "Coordinate jobs, assets, engineers, contracts, exceptions, and inventory from one tenant-aware workspace.",
+		bullets: [
+			"Live dispatch and service status",
+			"Asset history with contract coverage",
+			"Parts visibility across operations",
+		],
+		eyebrow: "Service Operations",
+		heading: "One workspace for your whole team",
+	},
+	"sign-up": {
+		body: "Create a workspace for hospital service operations with the controls your team needs from day one.",
+		bullets: [
+			"Tenant-aware asset and job records",
+			"Engineer ownership and workflow tracking",
+			"Inventory signals for service parts",
+		],
+		eyebrow: "Utiliti Online Plan",
+		heading: "Your Utiliti service plan",
+	},
+} as const satisfies Record<
+	AuthShellVariant,
+	{
+		body: string;
+		bullets: readonly string[];
+		eyebrow: string;
+		heading: string;
+	}
+>;
+
+export function AuthShell({
+	children,
+	variant = "sign-in",
+}: {
+	children: ReactNode;
+	variant?: AuthShellVariant;
+}) {
+	const content = authMarketing[variant];
+
 	return (
-		<main className="grid min-h-svh bg-background text-foreground lg:grid-cols-[minmax(420px,0.95fr)_minmax(0,1fr)]">
-			<section className="hidden border-r bg-sidebar px-10 py-10 lg:flex lg:flex-col xl:px-16">
-				<div className="flex items-center gap-3">
-					<div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-						<CommandIcon className="size-4" />
-					</div>
-					<div>
-						<p className="font-semibold text-base">Utiliti</p>
-						<p className="text-muted-foreground text-xs">Service Operations</p>
-					</div>
-				</div>
-				<div className="mt-28 flex max-w-lg flex-col gap-7">
-					<div>
-						<h1 className="font-medium text-3xl tracking-tight">
-							Operational command for field service teams
-						</h1>
-						<p className="mt-3 text-muted-foreground text-sm leading-relaxed">
-							Monitor jobs, assets, engineers, contracts, exceptions, and
-							inventory from one tenant-aware workspace.
-						</p>
-					</div>
-					<div className="grid max-w-md gap-3">
-						{authFeatures.map((feature) => {
-							const Icon = feature.icon;
+		<main className="min-h-svh bg-muted/40 p-3 text-foreground sm:p-6">
+			<div className="mx-auto grid min-h-[calc(100svh-1.5rem)] max-w-[1440px] overflow-hidden bg-primary text-primary-foreground shadow-sm ring-1 ring-border/60 sm:min-h-[calc(100svh-3rem)] lg:grid-cols-[minmax(440px,0.95fr)_minmax(0,1fr)]">
+				<section className="flex min-h-[calc(100svh-1.5rem)] items-center justify-center px-6 py-10 sm:min-h-[calc(100svh-3rem)] sm:px-10 lg:min-h-0 lg:justify-end lg:px-14 xl:px-20">
+					{children}
+				</section>
+				<section className="hidden items-center px-12 py-16 lg:flex xl:px-24">
+					<div className="max-w-lg">
+						<div className="flex items-center gap-3">
+							<span className="flex size-9 items-center justify-center rounded-lg bg-primary-foreground/10 ring-1 ring-primary-foreground/20">
+								<CommandIcon className="size-4" />
+							</span>
+							<span className="font-semibold text-base">Utiliti</span>
+						</div>
 
-							return (
-								<div
-									className="flex items-start gap-3 rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10"
-									key={feature.title}
-								>
-									<span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-										<Icon className="size-4" />
+						<div className="mt-12">
+							<p className="font-medium text-primary-foreground/75 text-sm">
+								{content.eyebrow}
+							</p>
+							<h2 className="mt-4 max-w-md font-semibold text-4xl leading-tight">
+								{content.heading}
+							</h2>
+							<p className="mt-5 max-w-md text-primary-foreground/70 text-sm leading-relaxed">
+								{content.body}
+							</p>
+						</div>
+
+						<div className="mt-9 grid gap-3">
+							{content.bullets.map((bullet) => (
+								<div className="flex items-center gap-3" key={bullet}>
+									<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-foreground/10 ring-1 ring-primary-foreground/20">
+										<CheckIcon className="size-3.5" />
 									</span>
-									<span className="min-w-0">
-										<span className="block font-medium text-sm">
-											{feature.title}
-										</span>
-										<span className="mt-1 block text-muted-foreground text-xs leading-relaxed">
-											{feature.description}
-										</span>
+									<span className="text-primary-foreground/80 text-sm">
+										{bullet}
 									</span>
 								</div>
-							);
-						})}
+							))}
+						</div>
+
+						<p className="mt-10 max-w-sm text-primary-foreground/60 text-xs leading-relaxed">
+							Built for focused service teams that need clear ownership,
+							accurate records, and fast operational handoffs.
+						</p>
 					</div>
-				</div>
-			</section>
-			<section className="flex min-h-svh items-center justify-center bg-muted/20 px-4 py-8">
-				{children}
-			</section>
+				</section>
+			</div>
 		</main>
 	);
 }
@@ -93,16 +100,18 @@ export function AuthCard({
 	title,
 }: {
 	children: ReactNode;
-	description: string;
+	description: ReactNode;
 	title: string;
 }) {
 	return (
-		<Card className="w-full max-w-md border-0 bg-card shadow-[0_20px_60px_rgb(15_23_42_/_0.08)] ring-1 ring-foreground/5">
-			<CardHeader className="px-8 pt-8">
-				<CardTitle className="text-2xl tracking-tight">{title}</CardTitle>
-				<p className="text-muted-foreground text-sm">{description}</p>
-			</CardHeader>
-			<CardContent className="px-8 pb-8">{children}</CardContent>
-		</Card>
+		<div className="w-full max-w-[440px] rounded-[1.75rem] bg-card px-8 py-10 text-card-foreground shadow-[0_24px_80px_rgb(0_0_0_/_0.18)] ring-1 ring-border/70 sm:px-12 sm:py-14">
+			<div className="mx-auto flex w-full max-w-[330px] flex-col">
+				<h1 className="font-semibold text-3xl leading-tight">{title}</h1>
+				<div className="mt-2 text-muted-foreground text-xs leading-relaxed">
+					{description}
+				</div>
+				<div className="mt-8">{children}</div>
+			</div>
+		</div>
 	);
 }

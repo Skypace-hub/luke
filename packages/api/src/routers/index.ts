@@ -167,6 +167,7 @@ const assetSchema = z.object({
 	designatedEngineerId: optionalTextSchema,
 	hospitalId: z.string().min(1),
 	installationDate: optionalTextSchema,
+	isActive: z.boolean().default(true),
 	locationLabel: z.string().trim().min(1),
 	nextPmDueDate: optionalTextSchema,
 	nfcUid: z.string().trim().min(1),

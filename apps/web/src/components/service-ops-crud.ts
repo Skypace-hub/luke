@@ -56,6 +56,7 @@ export interface FieldConfig {
 		| "date"
 		| "datetime-local"
 		| "file"
+		| "hidden"
 		| "number"
 		| "part-picker"
 		| "phone"
@@ -71,6 +72,7 @@ const coverageValues = [
 	"billable_exception",
 	"expired",
 ] as const;
+const assetStatusValues = ["active", "inactive"] as const;
 const engineerStatusValues = [
 	"on_site",
 	"in_transit",
@@ -106,6 +108,7 @@ const faultStatusValues = [
 
 type ContractStatusValue = (typeof contractStatusValues)[number];
 type ContractTypeValue = (typeof contractTypeValues)[number];
+type AssetStatusValue = (typeof assetStatusValues)[number];
 type CoverageValue = (typeof coverageValues)[number];
 type EngineerStatusValue = (typeof engineerStatusValues)[number];
 type FaultSeverityValue = (typeof faultSeverityValues)[number];
@@ -120,6 +123,7 @@ interface AssetPayload {
 	designatedEngineerId: null | string;
 	hospitalId: string;
 	installationDate: null | string;
+	isActive: boolean;
 	locationLabel: string;
 	nextPmDueDate: null | string;
 	nfcUid: string;
@@ -260,11 +264,9 @@ export const destructiveActionLabels = {
 	tenantUser: "suspend",
 } satisfies Record<CrudEntity, "deactivate" | "delete" | "suspend">;
 
-const coverageOptions: FieldOption[] = [
-	{ label: "In contract", value: "in_contract" },
-	{ label: "Out of contract", value: "out_of_contract" },
-	{ label: "Billable exception", value: "billable_exception" },
-	{ label: "Expired", value: "expired" },
+const assetStatusOptions: FieldOption[] = [
+	{ label: "Active", value: "active" },
+	{ label: "Inactive", value: "inactive" },
 ];
 
 const engineerStatusOptions: FieldOption[] = [
@@ -407,13 +409,26 @@ export function getFieldConfigs(
 
 	const configs: Record<CrudEntity, FieldConfig[]> = {
 		asset: [
-			{ label: "Asset number", name: "assetNumber", required: true },
-			{ label: "Serial number", name: "serialNumber", required: true },
+			{ label: "Asset number", name: "assetNumber", type: "hidden" },
+			{ label: "NFC UID", name: "nfcUid", type: "hidden" },
 			{
-				label: "Model",
+				label: "Coverage",
+				name: "contractCoverageStatus",
+				type: "hidden",
+			},
+			{
+				label: "Designated engineer",
+				name: "designatedEngineerId",
+				type: "hidden",
+			},
+			{ label: "Next PM due", name: "nextPmDueDate", type: "hidden" },
+			{
+				label: "Product Model",
 				name: "productModelId",
 				options: productOptions,
+				placeholder: "Select product...",
 				required: true,
+				span: "full",
 				type: "select",
 			},
 			{
@@ -422,26 +437,34 @@ export function getFieldConfigs(
 				options: hospitalOptions,
 				placeholder: "Select hospital...",
 				required: true,
-				type: "select",
-			},
-			{ label: "Location", name: "locationLabel", required: true },
-			{ label: "NFC UID", name: "nfcUid", required: true },
-			{
-				label: "Coverage",
-				name: "contractCoverageStatus",
-				options: coverageOptions,
-				required: true,
+				span: "full",
 				type: "select",
 			},
 			{
-				label: "Designated engineer",
-				name: "designatedEngineerId",
-				options: engineerOptions,
+				label: "Serial Number",
+				name: "serialNumber",
+				placeholder: "e.g. VPX200-2024-00142",
+			},
+			{
+				label: "Status",
+				name: "status",
+				options: assetStatusOptions,
 				type: "select",
 			},
-			{ label: "Installation date", name: "installationDate", type: "date" },
-			{ label: "Warranty expiry", name: "warrantyExpiryDate", type: "date" },
-			{ label: "Next PM due", name: "nextPmDueDate", type: "date" },
+			{ label: "Floor", name: "floor", placeholder: "e.g. 3" },
+			{ label: "Room", name: "room", placeholder: "e.g. ICU-302" },
+			{
+				label: "Purchase Date",
+				name: "installationDate",
+				type: "date",
+			},
+			{ label: "Warranty Expiry", name: "warrantyExpiryDate", type: "date" },
+			{
+				label: "Location Description",
+				name: "locationDescription",
+				placeholder: "e.g. Bed 3, ICU Ward B",
+				span: "full",
+			},
 		],
 		contract: [
 			{ label: "Contract number", name: "contractNumber", required: true },
@@ -832,6 +855,28 @@ function nullableValueFromForm(formData: FormData, name: string) {
 	return value || null;
 }
 
+function fallbackValueFromForm(
+	formData: FormData,
+	name: string,
+	fallbackName: string
+) {
+	return valueFromForm(formData, name) || valueFromForm(formData, fallbackName);
+}
+
+function assetLocationLabelFromForm(formData: FormData) {
+	const locationParts = [
+		valueFromForm(formData, "locationDescription"),
+		valueFromForm(formData, "floor"),
+		valueFromForm(formData, "room"),
+	].filter(Boolean);
+
+	return locationParts.length > 0 ? locationParts.join(" / ") : "Not specified";
+}
+
+function assetStatusFromForm(formData: FormData): AssetStatusValue {
+	return enumFromForm(formData, "status", assetStatusValues);
+}
+
 function phoneValueFromForm(formData: FormData, name: string) {
 	const localNumber = valueFromForm(formData, `${name}LocalNumber`);
 
@@ -899,6 +944,19 @@ function enumFromForm<T extends readonly string[]>(
 	}
 
 	return values[0];
+}
+
+function parseAssetLocation(location: string) {
+	const parts = location
+		.split("/")
+		.map((part) => part.trim())
+		.filter(Boolean);
+
+	return {
+		description: parts[0] ?? "",
+		floor: parts[1] ?? "",
+		room: parts[2] ?? "",
+	};
 }
 
 export function getRecordId(entity: CrudEntity, record: unknown) {
@@ -1002,18 +1060,23 @@ function getAssetDefaults(
 	record: unknown
 ): Record<string, FormDefaultValue> | null {
 	if (isAssetRecord(record)) {
+		const locationParts = parseAssetLocation(record.location);
+
 		return {
 			assetNumber: record.id,
 			contractCoverageStatus: record.contractCoverageValue,
 			designatedEngineerId: record.designatedEngineerId ?? "",
+			floor: locationParts.floor,
 			hospitalId: record.hospitalId,
 			installationDate:
 				record.installationDate === "Not set" ? "" : record.installationDate,
-			locationLabel: record.location,
+			locationDescription: locationParts.description,
 			nextPmDueDate: record.nextPmDue === "Not set" ? "" : record.nextPmDue,
 			nfcUid: record.nfcUid,
 			productModelId: record.productModelId,
+			room: locationParts.room,
 			serialNumber: record.serial,
+			status: record.statusValue,
 			warrantyExpiryDate:
 				record.warrantyExpiry === "Not set" ? "" : record.warrantyExpiry,
 		};
@@ -1242,6 +1305,7 @@ function getCreateDefaults(entity: CrudEntity) {
 		defaults.contractCoverageStatus = "in_contract";
 		defaults.installationDate = today;
 		defaults.nfcUid = `nfc-${suffix}`;
+		defaults.status = "active";
 	}
 
 	if (entity === "job") {
@@ -1301,11 +1365,16 @@ export function buildAssetPayload(formData: FormData): AssetPayload {
 		),
 		hospitalId: valueFromForm(formData, "hospitalId"),
 		installationDate: nullableValueFromForm(formData, "installationDate"),
-		locationLabel: valueFromForm(formData, "locationLabel"),
+		isActive: assetStatusFromForm(formData) === "active",
+		locationLabel: assetLocationLabelFromForm(formData),
 		nextPmDueDate: nullableValueFromForm(formData, "nextPmDueDate"),
 		nfcUid: valueFromForm(formData, "nfcUid"),
 		productModelId: valueFromForm(formData, "productModelId"),
-		serialNumber: valueFromForm(formData, "serialNumber"),
+		serialNumber: fallbackValueFromForm(
+			formData,
+			"serialNumber",
+			"assetNumber"
+		),
 		warrantyExpiryDate: nullableValueFromForm(formData, "warrantyExpiryDate"),
 	};
 }
