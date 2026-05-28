@@ -46,7 +46,7 @@ Then, run the development server:
 npm run dev
 ```
 
-Open [http://localhost:27099](http://localhost:27099) in your browser to see the fullstack application.
+Open [http://localhost:27099](http://localhost:27099) locally, or use `http://<server-ip>:27099` when running the web app on a server.
 Use the Expo Go app to run the mobile application.
 
 ## UI Customization
