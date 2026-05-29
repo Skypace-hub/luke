@@ -50,8 +50,8 @@ export function AuthShell({
 	return (
 		<main className="min-h-svh bg-muted/40 p-3 text-foreground sm:p-6">
 			<div className="relative mx-auto grid min-h-[calc(100svh-1.5rem)] max-w-[1360px] overflow-hidden bg-primary text-primary-foreground shadow-sm ring-1 ring-border/60 sm:min-h-[calc(100svh-3rem)] lg:grid-cols-[minmax(380px,0.78fr)_minmax(0,1.12fr)]">
-				<div className="absolute top-4 right-4 z-10">
-					<LanguageSwitcher />
+				<div className="absolute top-5 right-5 z-10 sm:top-6 sm:right-6">
+					<LanguageSwitcher tone="on-dark" />
 				</div>
 				<div
 					aria-hidden="true"
@@ -61,7 +61,7 @@ export function AuthShell({
 					aria-hidden="true"
 					className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgb(145_161_216_/_0.075)_1px,transparent_1px),linear-gradient(0deg,rgb(145_161_216_/_0.055)_1px,transparent_1px)] bg-[size:48px_48px] opacity-70 [mask-image:linear-gradient(90deg,transparent,black_18%,black_86%,transparent)]"
 				/>
-				<section className="relative flex min-h-[calc(100svh-1.5rem)] items-center justify-center px-6 py-10 sm:min-h-[calc(100svh-3rem)] sm:px-10 lg:min-h-0 lg:justify-end lg:px-10 xl:px-14">
+				<section className="relative flex min-h-[calc(100svh-1.5rem)] items-center justify-center px-6 pt-20 pb-10 sm:min-h-[calc(100svh-3rem)] sm:px-10 lg:min-h-0 lg:justify-end lg:px-10 lg:py-10 xl:px-14">
 					{children}
 				</section>
 				<section className="relative hidden items-center px-16 py-16 lg:flex xl:px-24">
