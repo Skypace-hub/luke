@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { translateServiceText } from "@luke/i18n";
 import { Text, View } from "react-native";
 import { useEngineerApp } from "@/components/engineer-app/engineer-app-context";
 import {
@@ -16,6 +17,7 @@ import {
 	TextField,
 } from "@/components/engineer-app/engineer-ui";
 import { PartsList } from "@/components/engineer-app/parts-list";
+import { useI18n } from "@/contexts/i18n-context";
 import { knownDevice } from "@/lib/engineer-app-data";
 
 export default function CheckDeviceTab() {
@@ -34,16 +36,17 @@ export default function CheckDeviceTab() {
 }
 
 function ScanDeviceScreen() {
+	const { locale } = useI18n();
 	const { setCheckDeviceStage } = useEngineerApp();
 
 	return (
 		<EngineerScreen>
 			<View style={{ alignItems: "center", paddingTop: 20 }}>
 				<Text style={{ color: colors.text, fontSize: 28, fontWeight: "900" }}>
-					Check Device
+					{translateServiceText(locale, "Check Device")}
 				</Text>
 				<Text style={{ color: colors.text2, fontSize: 13, marginTop: 6 }}>
-					Tap NFC or scan QR on any device
+					{translateServiceText(locale, "Tap NFC or scan QR on any device")}
 				</Text>
 				<View
 					style={{
@@ -71,7 +74,8 @@ function ScanDeviceScreen() {
 					</View>
 				</View>
 				<Text style={{ color: colors.text3, fontSize: 12 }}>
-					Hold phone near tag · or scan QR code
+					{translateServiceText(locale, "Hold phone near tag")} ·{" "}
+					{translateServiceText(locale, "or scan QR code")}
 				</Text>
 				<Text
 					style={{
@@ -82,7 +86,7 @@ function ScanDeviceScreen() {
 						textAlign: "center",
 					}}
 				>
-					Works on any device in any hospital.
+					{translateServiceText(locale, "Works on any device in any hospital.")}
 				</Text>
 			</View>
 			<ActionButton
@@ -107,6 +111,7 @@ function ScanDeviceScreen() {
 }
 
 function KnownDeviceScreen() {
+	const { locale } = useI18n();
 	const { selectedJob, setCheckDeviceStage, startSelectedJob } =
 		useEngineerApp();
 
@@ -145,7 +150,7 @@ function KnownDeviceScreen() {
 							{knownDevice.name}
 						</Text>
 						<Text style={{ color: colors.text2, fontSize: 12, marginTop: 2 }}>
-							{knownDevice.category}
+							{translateServiceText(locale, knownDevice.category)}
 						</Text>
 					</View>
 					<Badge tone="green">Active</Badge>
@@ -165,7 +170,7 @@ function KnownDeviceScreen() {
 			{knownDevice.history.map((event) => (
 				<Card key={event.id}>
 					<Text style={{ color: colors.text, fontSize: 14, fontWeight: "800" }}>
-						{event.title}
+						{translateServiceText(locale, event.title)}
 					</Text>
 					<Text style={{ color: colors.text2, fontSize: 12, marginTop: 3 }}>
 						{event.date} · {event.engineer} · {event.duration}
@@ -208,6 +213,7 @@ function KnownDeviceScreen() {
 }
 
 function UnknownDeviceScreen() {
+	const { locale } = useI18n();
 	const { setAddDeviceStage, setCheckDeviceStage } = useEngineerApp();
 
 	const addDevice = () => {
@@ -233,7 +239,7 @@ function UnknownDeviceScreen() {
 					<Ionicons color={colors.amber} name="help" size={38} />
 				</View>
 				<Text style={{ color: colors.text, fontSize: 28, fontWeight: "900" }}>
-					Unknown Device
+					{translateServiceText(locale, "Unknown Device")}
 				</Text>
 				<Text
 					style={{
@@ -244,7 +250,10 @@ function UnknownDeviceScreen() {
 						textAlign: "center",
 					}}
 				>
-					This tag has no device record in the system yet.
+					{translateServiceText(
+						locale,
+						"This tag has no device record in the system yet."
+					)}
 				</Text>
 			</View>
 			<Card style={{ marginTop: 24 }}>
@@ -252,8 +261,10 @@ function UnknownDeviceScreen() {
 				<InfoRow isLast label="Status" tone="amber" value="Not registered" />
 			</Card>
 			<Text style={{ color: colors.text2, fontSize: 13, lineHeight: 20 }}>
-				You can add this device. Your back office will receive the record to
-				review and complete.
+				{translateServiceText(
+					locale,
+					"You can add this device. Your back office will receive the record to review and complete."
+				)}
 			</Text>
 			<ActionButton
 				icon="add-circle"
@@ -270,6 +281,7 @@ function UnknownDeviceScreen() {
 }
 
 function ReportFaultScreen() {
+	const { locale } = useI18n();
 	const { setCheckDeviceStage } = useEngineerApp();
 
 	return (
@@ -334,11 +346,13 @@ function ReportFaultScreen() {
 						justifyContent: "space-between",
 					}}
 				>
-					<Text style={{ color: colors.text2, fontSize: 13 }}>Photos</Text>
+					<Text style={{ color: colors.text2, fontSize: 13 }}>
+						{translateServiceText(locale, "Photos")}
+					</Text>
 					<Text
 						style={{ color: colors.blueLight, fontSize: 13, fontWeight: "700" }}
 					>
-						Add
+						{translateServiceText(locale, "Add")}
 					</Text>
 				</View>
 			</Card>

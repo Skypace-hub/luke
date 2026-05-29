@@ -1,5 +1,6 @@
 "use client";
 
+import { translateServiceText } from "@luke/i18n";
 import { Button } from "@luke/ui/components/button";
 import {
 	DropdownMenu,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/components/i18n-provider";
 
 const colorThemeStorageKey = "luke-color-theme";
 
@@ -57,6 +59,7 @@ const applyColorTheme = (theme: ColorTheme) => {
 };
 
 export function ThemeColorSwitcher({ className }: { className?: string }) {
+	const { locale } = useI18n();
 	const { setTheme, theme } = useTheme();
 	const [colorTheme, setColorThemeState] = useState<ColorTheme>("neutral");
 
@@ -86,7 +89,7 @@ export function ThemeColorSwitcher({ className }: { className?: string }) {
 			<DropdownMenuTrigger
 				render={
 					<Button
-						aria-label="Change theme"
+						aria-label={translateServiceText(locale, "Change theme")}
 						className={cn("rounded-lg", className)}
 						size="icon-lg"
 						variant="outline"
@@ -97,7 +100,9 @@ export function ThemeColorSwitcher({ className }: { className?: string }) {
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-56" sideOffset={8}>
 				<DropdownMenuGroup>
-					<DropdownMenuLabel>Appearance</DropdownMenuLabel>
+					<DropdownMenuLabel>
+						{translateServiceText(locale, "Appearance")}
+					</DropdownMenuLabel>
 					<DropdownMenuRadioGroup
 						onValueChange={setTheme}
 						value={theme ?? "system"}
@@ -113,7 +118,7 @@ export function ThemeColorSwitcher({ className }: { className?: string }) {
 									value={option.value}
 								>
 									<Icon />
-									<span>{option.label}</span>
+									<span>{translateServiceText(locale, option.label)}</span>
 								</DropdownMenuRadioItem>
 							);
 						})}
@@ -121,7 +126,9 @@ export function ThemeColorSwitcher({ className }: { className?: string }) {
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuGroup>
-					<DropdownMenuLabel>Color theme</DropdownMenuLabel>
+					<DropdownMenuLabel>
+						{translateServiceText(locale, "Color theme")}
+					</DropdownMenuLabel>
 					<DropdownMenuRadioGroup
 						onValueChange={setColorTheme}
 						value={colorTheme}
@@ -138,7 +145,7 @@ export function ThemeColorSwitcher({ className }: { className?: string }) {
 									className="size-3 rounded-full ring-1 ring-foreground/15"
 									style={{ backgroundColor: option.swatch }}
 								/>
-								<span>{option.label}</span>
+								<span>{translateServiceText(locale, option.label)}</span>
 							</DropdownMenuRadioItem>
 						))}
 					</DropdownMenuRadioGroup>

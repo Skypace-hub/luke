@@ -1,3 +1,10 @@
+import {
+	type AppLocale,
+	defaultLocale,
+	translateServiceText,
+} from "@luke/i18n";
+
+import { internationalDialCodes } from "@/lib/international-dial-codes";
 import type {
 	Asset,
 	Contract,
@@ -337,6 +344,19 @@ const membershipStatusOptions: FieldOption[] = [
 	{ label: "Suspended", value: "suspended" },
 ];
 
+const defaultTenantRegion = "Hong Kong";
+const defaultTenantReleaseLabel = "Early Release v1";
+const englishRegionLabelOverrides = new Map([
+	["HK", defaultTenantRegion],
+	["MO", "Macau"],
+]);
+const tenantRegionIsoByValue = new Map(
+	internationalDialCodes.map((option) => [option.country, option.iso])
+);
+tenantRegionIsoByValue.set(defaultTenantRegion, "HK");
+tenantRegionIsoByValue.set("Macau", "MO");
+tenantRegionIsoByValue.set("Macao", "MO");
+
 function optionFromRecord(
 	record: { id: string; name?: string },
 	fallback?: string
@@ -372,9 +392,106 @@ function formatPartOptionLabel(part: Part) {
 	return `${partNumber} - ${partName}`;
 }
 
+function getRegionDisplayNames(locale: AppLocale = defaultLocale) {
+	try {
+		return new Intl.DisplayNames([locale], { type: "region" });
+	} catch {
+		return new Intl.DisplayNames([defaultLocale], { type: "region" });
+	}
+}
+
+function isEnglishLocale(locale: AppLocale = defaultLocale) {
+	return locale.toLowerCase().startsWith("en");
+}
+
+function getLocalizedRegionLabel(
+	iso: string,
+	fallback: string,
+	locale: AppLocale = defaultLocale
+) {
+	if (isEnglishLocale(locale)) {
+		return englishRegionLabelOverrides.get(iso) ?? fallback;
+	}
+
+	return getRegionDisplayNames(locale).of(iso) ?? fallback;
+}
+
+function getTenantRegionLabel(
+	value: string,
+	locale: AppLocale = defaultLocale
+) {
+	const iso = tenantRegionIsoByValue.get(value);
+
+	return iso ? getLocalizedRegionLabel(iso, value, locale) : value;
+}
+
+function getTenantRegionValue(iso: string, fallback: string) {
+	return englishRegionLabelOverrides.get(iso) ?? fallback;
+}
+
+function uniqueFieldOptions(options: FieldOption[]) {
+	const seenValues = new Set<string>();
+	const uniqueOptions: FieldOption[] = [];
+
+	for (const option of options) {
+		const trimmedValue = option.value.trim();
+
+		if (!trimmedValue || seenValues.has(trimmedValue)) {
+			continue;
+		}
+
+		seenValues.add(trimmedValue);
+		uniqueOptions.push({
+			...option,
+			value: trimmedValue,
+		});
+	}
+
+	return uniqueOptions;
+}
+
+function uniqueTextOptions(
+	values: Array<null | string | undefined>,
+	getLabel = (value: string) => value
+) {
+	return uniqueFieldOptions(
+		values.map((value) => {
+			const trimmedValue = value?.trim() ?? "";
+
+			return {
+				label: getLabel(trimmedValue),
+				value: trimmedValue,
+			};
+		})
+	);
+}
+
+function getTenantRegionOptions(
+	values: Array<null | string | undefined>,
+	locale: AppLocale = defaultLocale
+) {
+	const currentRegionOptions = uniqueTextOptions(values, (value) =>
+		getTenantRegionLabel(value, locale)
+	);
+	const internationalRegionOptions = internationalDialCodes.map((option) => ({
+		label: getLocalizedRegionLabel(option.iso, option.country, locale),
+		value: getTenantRegionValue(option.iso, option.country),
+	}));
+
+	return uniqueFieldOptions([
+		...currentRegionOptions,
+		...internationalRegionOptions,
+	]).toSorted((firstOption, secondOption) =>
+		firstOption.label.localeCompare(secondOption.label, locale, {
+			sensitivity: "base",
+		})
+	);
+}
+
 export function getFieldConfigs(
 	entity: CrudEntity,
-	data: ServiceOpsSnapshot
+	data: ServiceOpsSnapshot,
+	locale: AppLocale = defaultLocale
 ): FieldConfig[] {
 	const hospitalOptions = data.hospitals.map((hospital) => {
 		const option = optionFromRecord(hospital);
@@ -406,6 +523,19 @@ export function getFieldConfigs(
 		label: `${asset.id} · ${asset.model}`,
 		value: asset.recordId,
 	}));
+	const tenantRegionOptions = getTenantRegionOptions(
+		[
+			defaultTenantRegion,
+			data.tenant.region,
+			...data.tenants.map((tenant) => tenant.region),
+		],
+		locale
+	);
+	const tenantReleaseOptions = uniqueTextOptions([
+		defaultTenantReleaseLabel,
+		data.tenant.release,
+		...data.tenants.map((tenant) => tenant.release),
+	]);
 
 	const configs: Record<CrudEntity, FieldConfig[]> = {
 		asset: [
@@ -736,10 +866,11 @@ export function getFieldConfigs(
 			},
 			{ label: "Supplier", name: "supplier" },
 			{
-				label: "Unit Cost (HKD)",
+				label: "Unit Cost",
 				name: "unitCost",
 				placeholder: "e.g. 0.00",
 				required: true,
+				suffix: "HKD",
 				type: "number",
 			},
 			{
@@ -809,12 +940,27 @@ export function getFieldConfigs(
 		],
 		tenant: [
 			{
+				description:
+					"Optional. Leave blank to generate a stable ID from the tenant name.",
 				label: "Tenant ID",
 				name: "id",
+				placeholder: "Auto-generated if blank",
 			},
 			{ label: "Tenant name", name: "name", required: true },
-			{ label: "Region", name: "region", required: true },
-			{ label: "Release label", name: "releaseLabel", required: true },
+			{
+				label: "Region",
+				name: "region",
+				options: tenantRegionOptions,
+				required: true,
+				type: "select",
+			},
+			{
+				label: "Release label",
+				name: "releaseLabel",
+				options: tenantReleaseOptions,
+				required: true,
+				type: "select",
+			},
 			{ label: "Active", name: "isActive", type: "checkbox" },
 		],
 		tenantUser: [
@@ -842,7 +988,34 @@ export function getFieldConfigs(
 		],
 	};
 
-	return configs[entity];
+	return configs[entity].map((field) => localizeFieldConfig(field, locale));
+}
+
+function localizeFieldConfig(
+	field: FieldConfig,
+	locale: AppLocale
+): FieldConfig {
+	return {
+		...field,
+		description: field.description
+			? translateServiceText(locale, field.description)
+			: undefined,
+		label: translateServiceText(locale, field.label),
+		options: field.options?.map((option) => ({
+			...option,
+			description: option.description
+				? translateServiceText(locale, option.description)
+				: undefined,
+			label: translateServiceText(locale, option.label),
+			meta: option.meta ? translateServiceText(locale, option.meta) : undefined,
+		})),
+		placeholder: field.placeholder
+			? translateServiceText(locale, field.placeholder)
+			: undefined,
+		suffix: field.suffix
+			? translateServiceText(locale, field.suffix)
+			: undefined,
+	};
 }
 
 function valueFromForm(formData: FormData, name: string) {
@@ -1339,8 +1512,8 @@ function getCreateDefaults(entity: CrudEntity) {
 	if (entity === "tenant") {
 		defaults.id = "";
 		defaults.isActive = true;
-		defaults.region = "Hong Kong";
-		defaults.releaseLabel = "Early Release v1";
+		defaults.region = defaultTenantRegion;
+		defaults.releaseLabel = defaultTenantReleaseLabel;
 	}
 
 	if (entity === "tenantUser") {

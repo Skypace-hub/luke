@@ -1,5 +1,13 @@
+import {
+	defaultLocale,
+	localeCookieName,
+	localeToHtmlLang,
+	normalizeLocale,
+	translate,
+} from "@luke/i18n";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies, headers } from "next/headers";
 
 import "../index.css";
 import Providers from "@/components/providers";
@@ -15,21 +23,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Utiliti Service Operations",
-	description: "Multi-tenant service operations platform",
+	title: translate(defaultLocale, "app.name"),
+	description: translate(defaultLocale, "app.description"),
 };
 
-export default function RootLayout({
+export default async function RootLayout({
 	children,
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
+	const cookieStore = await cookies();
+	const requestHeaders = await headers();
+	const initialLocale =
+		normalizeLocale(cookieStore.get(localeCookieName)?.value) ??
+		normalizeLocale(requestHeaders.get("accept-language")) ??
+		defaultLocale;
+
 	return (
-		<html lang="en" suppressHydrationWarning>
+		<html lang={localeToHtmlLang(initialLocale)} suppressHydrationWarning>
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
-				<Providers>
+				<Providers initialLocale={initialLocale}>
 					<div>{children}</div>
 				</Providers>
 			</body>

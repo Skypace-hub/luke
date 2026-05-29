@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { translateServiceText } from "@luke/i18n";
 import type { PropsWithChildren, ReactNode } from "react";
 import {
 	Pressable,
@@ -10,7 +11,7 @@ import {
 	View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
+import { useI18n } from "@/contexts/i18n-context";
 import type {
 	IconName,
 	JobStatus,
@@ -96,34 +97,45 @@ export function ScreenHeader({
 	title,
 	subtitle,
 	onBack,
-	backLabel = "Back",
+	backLabel,
 	right,
 }: HeaderProps) {
+	const { locale, t } = useI18n();
+	const resolvedBackLabel = backLabel
+		? translateServiceText(locale, backLabel)
+		: t("common.back");
+
 	return (
 		<View style={styles.header}>
 			<View style={styles.headerTop}>
 				{onBack ? (
 					<Pressable
-						accessibilityLabel={backLabel}
+						accessibilityLabel={resolvedBackLabel}
 						accessibilityRole="button"
 						onPress={onBack}
 						style={styles.backButton}
 					>
 						<Ionicons color={colors.blueLight} name="chevron-back" size={16} />
-						<Text style={styles.backText}>{backLabel}</Text>
+						<Text style={styles.backText}>{resolvedBackLabel}</Text>
 					</Pressable>
 				) : (
 					<View />
 				)}
 				{right}
 			</View>
-			<Text style={styles.title}>{title}</Text>
-			{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+			<Text style={styles.title}>{translateServiceText(locale, title)}</Text>
+			{subtitle ? (
+				<Text style={styles.subtitle}>
+					{translateServiceText(locale, subtitle)}
+				</Text>
+			) : null}
 		</View>
 	);
 }
 
 export function BrandHeader() {
+	const { t } = useI18n();
+
 	return (
 		<View style={styles.brandHeader}>
 			<View style={styles.logoMark}>
@@ -133,20 +145,24 @@ export function BrandHeader() {
 				<Text style={styles.logoText}>
 					<Text style={styles.logoAccent}>u</Text>tiliti
 				</Text>
-				<Text style={styles.logoSub}>Field service platform</Text>
+				<Text style={styles.logoSub}>{t("native.fieldServicePlatform")}</Text>
 			</View>
 		</View>
 	);
 }
 
 export function ShiftStatus() {
+	const { locale, t } = useI18n();
+
 	return (
 		<View style={styles.shiftStatus}>
 			<View style={styles.statusLeft}>
 				<View style={[styles.dot, { backgroundColor: colors.green }]} />
 				<View>
-					<Text style={styles.statusTitle}>Shift active</Text>
-					<Text style={styles.statusSub}>Clocked in 08:23</Text>
+					<Text style={styles.statusTitle}>{t("native.shiftActive")}</Text>
+					<Text style={styles.statusSub}>
+						{translateServiceText(locale, "Clocked in 08:23")}
+					</Text>
 				</View>
 			</View>
 			<Text style={styles.statusTime}>1h 18m</Text>
@@ -166,7 +182,15 @@ interface SectionLabelProps {
 }
 
 export function SectionLabel({ children }: SectionLabelProps) {
-	return <Text style={styles.sectionLabel}>{children}</Text>;
+	const { locale } = useI18n();
+
+	return (
+		<Text style={styles.sectionLabel}>
+			{typeof children === "string"
+				? translateServiceText(locale, children)
+				: children}
+		</Text>
+	);
 }
 
 interface BadgeProps {
@@ -176,12 +200,16 @@ interface BadgeProps {
 
 export function Badge({ children, tone = "muted" }: BadgeProps) {
 	const toneStyle = getToneStyle(tone);
+	const { locale } = useI18n();
+
 	return (
 		<View
 			style={[styles.badge, { backgroundColor: toneStyle.backgroundColor }]}
 		>
 			<Text style={[styles.badgeText, { color: toneStyle.color }]}>
-				{children}
+				{typeof children === "string"
+					? translateServiceText(locale, children)
+					: children}
 			</Text>
 		</View>
 	);
@@ -201,11 +229,12 @@ export function InfoRow({
 	isLast,
 }: InfoRowProps) {
 	const toneStyle = getToneStyle(tone);
+	const { locale } = useI18n();
 	return (
 		<View style={[styles.infoRow, isLast ? styles.infoRowLast : undefined]}>
-			<Text style={styles.infoKey}>{label}</Text>
+			<Text style={styles.infoKey}>{translateServiceText(locale, label)}</Text>
 			<Text style={[styles.infoValue, { color: toneStyle.color }]}>
-				{value}
+				{translateServiceText(locale, value)}
 			</Text>
 		</View>
 	);
@@ -227,6 +256,7 @@ export function ActionButton({
 	disabled,
 }: ActionButtonProps) {
 	const toneStyle = getToneStyle(tone);
+	const { locale } = useI18n();
 	const getOpacity = (pressed: boolean) => {
 		if (disabled) {
 			return 0.45;
@@ -253,7 +283,7 @@ export function ActionButton({
 		>
 			{icon ? <Ionicons color={toneStyle.color} name={icon} size={16} /> : null}
 			<Text style={[styles.actionText, { color: toneStyle.color }]}>
-				{label}
+				{translateServiceText(locale, label)}
 			</Text>
 		</Pressable>
 	);
@@ -266,6 +296,8 @@ interface GhostButtonProps {
 }
 
 export function GhostButton({ label, onPress, icon }: GhostButtonProps) {
+	const { locale } = useI18n();
+
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -276,7 +308,9 @@ export function GhostButton({ label, onPress, icon }: GhostButtonProps) {
 			]}
 		>
 			{icon ? <Ionicons color={colors.text2} name={icon} size={15} /> : null}
-			<Text style={styles.ghostText}>{label}</Text>
+			<Text style={styles.ghostText}>
+				{translateServiceText(locale, label)}
+			</Text>
 		</Pressable>
 	);
 }
@@ -295,6 +329,8 @@ export function SelectOption({
 	tone = "blue",
 }: SelectOptionProps) {
 	const toneStyle = getToneStyle(tone);
+	const { locale } = useI18n();
+
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -317,7 +353,7 @@ export function SelectOption({
 					{ color: selected ? toneStyle.color : colors.text2 },
 				]}
 			>
-				{label}
+				{translateServiceText(locale, label)}
 			</Text>
 		</Pressable>
 	);
@@ -331,11 +367,22 @@ export function TextField({
 	label,
 	multiline,
 	style,
+	value,
 	...props
 }: TextFieldProps) {
+	const { locale } = useI18n();
+	const localizedPlaceholder =
+		typeof props.placeholder === "string"
+			? translateServiceText(locale, props.placeholder)
+			: props.placeholder;
+	const localizedValue =
+		typeof value === "string" ? translateServiceText(locale, value) : value;
+
 	return (
 		<View style={styles.fieldWrap}>
-			<Text style={styles.fieldLabel}>{label}</Text>
+			<Text style={styles.fieldLabel}>
+				{translateServiceText(locale, label)}
+			</Text>
 			<TextInput
 				multiline={multiline}
 				placeholderTextColor={colors.text3}
@@ -345,6 +392,8 @@ export function TextField({
 					style,
 				]}
 				{...props}
+				placeholder={localizedPlaceholder}
+				value={localizedValue}
 			/>
 		</View>
 	);
@@ -358,12 +407,16 @@ interface MetricProps {
 
 export function Metric({ label, value, tone = "blue" }: MetricProps) {
 	const toneStyle = getToneStyle(tone);
+	const { locale } = useI18n();
+
 	return (
 		<Card style={styles.metricCard}>
 			<Text style={[styles.metricValue, { color: toneStyle.color }]}>
-				{value}
+				{translateServiceText(locale, value)}
 			</Text>
-			<Text style={styles.metricLabel}>{label}</Text>
+			<Text style={styles.metricLabel}>
+				{translateServiceText(locale, label)}
+			</Text>
 		</Card>
 	);
 }
@@ -384,6 +437,8 @@ export function RowButton({
 	onPress,
 }: RowButtonProps) {
 	const toneStyle = getToneStyle(tone);
+	const { locale } = useI18n();
+
 	return (
 		<Pressable
 			accessibilityRole="button"
@@ -405,8 +460,12 @@ export function RowButton({
 				<Ionicons color={toneStyle.color} name={icon} size={18} />
 			</View>
 			<View style={styles.rowTextWrap}>
-				<Text style={styles.rowTitle}>{title}</Text>
-				<Text style={styles.rowSubtitle}>{subtitle}</Text>
+				<Text style={styles.rowTitle}>
+					{translateServiceText(locale, title)}
+				</Text>
+				<Text style={styles.rowSubtitle}>
+					{translateServiceText(locale, subtitle)}
+				</Text>
 			</View>
 			<Ionicons color={colors.text3} name="chevron-forward" size={18} />
 		</Pressable>
@@ -443,6 +502,12 @@ export function jobTypeLabel(type: JobType): string {
 	return "Repair";
 }
 
+export function useJobTypeLabel() {
+	const { locale } = useI18n();
+
+	return (type: JobType) => translateServiceText(locale, jobTypeLabel(type));
+}
+
 export function statusTone(status: JobStatus): Tone {
 	if (status === "active") {
 		return "green";
@@ -458,6 +523,13 @@ export function statusTone(status: JobStatus): Tone {
 
 export function partStatusLabel(status: PartStatus): string {
 	return status === "in-contract" ? "In contract" : "Billable";
+}
+
+export function usePartStatusLabel() {
+	const { locale } = useI18n();
+
+	return (status: PartStatus) =>
+		translateServiceText(locale, partStatusLabel(status));
 }
 
 function getToneStyle(tone: Tone) {

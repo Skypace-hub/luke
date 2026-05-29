@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import { translateServiceText } from "@luke/i18n";
 import { Pressable, Text, View } from "react-native";
 
+import { useI18n } from "@/contexts/i18n-context";
 import type { EngineerPart } from "@/lib/engineer-app-data";
 
-import { colors, partStatusLabel } from "./engineer-ui";
+import { colors, usePartStatusLabel } from "./engineer-ui";
 
 interface PartsListProps {
 	onChangeQuantity?: (partId: string, quantity: number) => void;
@@ -22,6 +24,9 @@ export function PartsList({
 	selectedPartIds,
 	onTogglePart,
 }: PartsListProps) {
+	const getPartStatusLabel = usePartStatusLabel();
+	const { locale } = useI18n();
+
 	return (
 		<View
 			style={{
@@ -69,14 +74,15 @@ export function PartsList({
 									marginTop: 3,
 								}}
 							>
-								P/N: {part.partNumber} · {partStatusLabel(part.status)}
+								P/N: {part.partNumber} · {getPartStatusLabel(part.status)}
 							</Text>
 						</View>
 						{selectable ? (
 							<Pressable
-								accessibilityLabel={`${isSelected ? "Unselect" : "Select"} ${
-									part.name
-								}`}
+								accessibilityLabel={`${translateServiceText(
+									locale,
+									isSelected ? "Unselect" : "Select"
+								)} ${part.name}`}
 								accessibilityRole="checkbox"
 								accessibilityState={{ checked: isSelected }}
 								onPress={() => onTogglePart?.(part.id)}

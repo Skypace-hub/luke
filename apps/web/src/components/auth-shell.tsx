@@ -1,28 +1,31 @@
 import { CheckIcon, CommandIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useI18n } from "@/components/i18n-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
+
 type AuthShellVariant = "sign-in" | "sign-up";
 
-const authMarketing = {
+const authMarketingKeys = {
 	"sign-in": {
-		body: "Coordinate jobs, assets, engineers, contracts, exceptions, and inventory from one tenant-aware workspace.",
+		body: "auth.marketing.signIn.body",
 		bullets: [
-			"Live dispatch and service status",
-			"Asset history with contract coverage",
-			"Parts visibility across operations",
+			"auth.marketing.signIn.bullet1",
+			"auth.marketing.signIn.bullet2",
+			"auth.marketing.signIn.bullet3",
 		],
-		eyebrow: "Service Operations",
-		heading: "One workspace for your whole team",
+		eyebrow: "auth.marketing.signIn.eyebrow",
+		heading: "auth.marketing.signIn.heading",
 	},
 	"sign-up": {
-		body: "Create a workspace for hospital service operations with the controls your team needs from day one.",
+		body: "auth.marketing.signUp.body",
 		bullets: [
-			"Tenant-aware asset and job records",
-			"Engineer ownership and workflow tracking",
-			"Inventory signals for service parts",
+			"auth.marketing.signUp.bullet1",
+			"auth.marketing.signUp.bullet2",
+			"auth.marketing.signUp.bullet3",
 		],
-		eyebrow: "Utiliti Online Plan",
-		heading: "Your Utiliti service plan",
+		eyebrow: "auth.marketing.signUp.eyebrow",
+		heading: "auth.marketing.signUp.heading",
 	},
 } as const satisfies Record<
 	AuthShellVariant,
@@ -41,11 +44,15 @@ export function AuthShell({
 	children: ReactNode;
 	variant?: AuthShellVariant;
 }) {
-	const content = authMarketing[variant];
+	const { t } = useI18n();
+	const content = authMarketingKeys[variant];
 
 	return (
 		<main className="min-h-svh bg-muted/40 p-3 text-foreground sm:p-6">
 			<div className="relative mx-auto grid min-h-[calc(100svh-1.5rem)] max-w-[1360px] overflow-hidden bg-primary text-primary-foreground shadow-sm ring-1 ring-border/60 sm:min-h-[calc(100svh-3rem)] lg:grid-cols-[minmax(380px,0.78fr)_minmax(0,1.12fr)]">
+				<div className="absolute top-4 right-4 z-10">
+					<LanguageSwitcher />
+				</div>
 				<div
 					aria-hidden="true"
 					className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_72%_42%,rgb(58_72_113_/_0.42)_0%,rgb(35_43_70_/_0.2)_33%,transparent_68%),linear-gradient(135deg,rgb(255_255_255_/_0.04),transparent_38%)]"
@@ -68,13 +75,13 @@ export function AuthShell({
 
 						<div className="mt-10">
 							<p className="font-semibold text-primary-foreground text-xs uppercase">
-								{content.eyebrow}
+								{t(content.eyebrow)}
 							</p>
 							<h2 className="mt-4 max-w-md font-bold text-[2.625rem] leading-[1.16]">
-								{content.heading}
+								{t(content.heading)}
 							</h2>
 							<p className="mt-4 max-w-md text-primary-foreground/75 text-sm leading-6">
-								{content.body}
+								{t(content.body)}
 							</p>
 						</div>
 
@@ -89,15 +96,14 @@ export function AuthShell({
 										className="mt-0.5 size-4 text-primary-foreground"
 									/>
 									<span className="text-primary-foreground/80 text-sm">
-										{bullet}
+										{t(bullet)}
 									</span>
 								</div>
 							))}
 						</div>
 
 						<p className="mt-12 max-w-sm text-primary-foreground/65 text-xs leading-relaxed">
-							Built for focused service teams that need clear ownership,
-							accurate records, and fast operational handoffs.
+							{t("auth.marketing.footer")}
 						</p>
 					</div>
 				</section>

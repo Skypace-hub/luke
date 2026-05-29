@@ -13,20 +13,23 @@ import { useRef } from "react";
 import { Text, type TextInput, View } from "react-native";
 import z from "zod";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useI18n } from "@/contexts/i18n-context";
 import { authClient } from "@/lib/auth-client";
 import { queryClient } from "@/utils/trpc";
 
-const signInSchema = z.object({
-	email: z
-		.string()
-		.trim()
-		.min(1, "Email is required")
-		.email("Enter a valid email address"),
-	password: z
-		.string()
-		.min(1, "Password is required")
-		.min(8, "Use at least 8 characters"),
-});
+const getSignInSchema = (t: ReturnType<typeof useI18n>["t"]) =>
+	z.object({
+		email: z
+			.string()
+			.trim()
+			.min(1, t("native.emailRequired"))
+			.email(t("native.enterValidEmail")),
+		password: z
+			.string()
+			.min(1, t("native.passwordRequired"))
+			.min(8, t("native.useAtLeast8")),
+	});
 
 function getErrorMessage(error: unknown): string | null {
 	if (!error) {
@@ -58,6 +61,7 @@ function getErrorMessage(error: unknown): string | null {
 }
 
 function SignIn() {
+	const { t } = useI18n();
 	const passwordInputRef = useRef<TextInput>(null);
 	const { toast } = useToast();
 
@@ -67,7 +71,7 @@ function SignIn() {
 			password: "",
 		},
 		validators: {
-			onSubmit: signInSchema,
+			onSubmit: getSignInSchema(t),
 		},
 		onSubmit: async ({ value, formApi }) => {
 			await authClient.signIn.email(
@@ -79,14 +83,14 @@ function SignIn() {
 					onError(error) {
 						toast.show({
 							variant: "danger",
-							label: error.error?.message || "Failed to sign in",
+							label: error.error?.message || t("native.failedSignIn"),
 						});
 					},
 					onSuccess() {
 						formApi.reset();
 						toast.show({
 							variant: "success",
-							label: "Signed in successfully",
+							label: t("native.signedIn"),
 						});
 						queryClient.refetchQueries();
 					},
@@ -97,7 +101,10 @@ function SignIn() {
 
 	return (
 		<Surface className="rounded-lg p-4" variant="secondary">
-			<Text className="mb-4 font-medium text-foreground">Sign In</Text>
+			<View className="mb-4 flex-row items-center justify-between">
+				<Text className="font-medium text-foreground">{t("auth.signIn")}</Text>
+				<LanguageSwitcher />
+			</View>
 
 			<form.Subscribe
 				selector={(state) => ({
@@ -118,7 +125,7 @@ function SignIn() {
 								<form.Field name="email">
 									{(field) => (
 										<TextField>
-											<Label>Email</Label>
+											<Label>{t("native.email")}</Label>
 											<Input
 												autoCapitalize="none"
 												autoComplete="email"
@@ -141,7 +148,7 @@ function SignIn() {
 								<form.Field name="password">
 									{(field) => (
 										<TextField>
-											<Label>Password</Label>
+											<Label>{t("auth.password")}</Label>
 											<Input
 												autoComplete="password"
 												onBlur={field.handleBlur}
@@ -166,7 +173,7 @@ function SignIn() {
 									{isSubmitting ? (
 										<Spinner color="default" size="sm" />
 									) : (
-										<Button.Label>Sign In</Button.Label>
+										<Button.Label>{t("auth.signInSubmit")}</Button.Label>
 									)}
 								</Button>
 							</View>

@@ -1,5 +1,7 @@
+import { translateServiceText } from "@luke/i18n";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+
 import { useEngineerApp } from "@/components/engineer-app/engineer-app-context";
 import {
 	Badge,
@@ -12,6 +14,7 @@ import {
 	styles,
 } from "@/components/engineer-app/engineer-ui";
 import { JobCard } from "@/components/engineer-app/job-card";
+import { useI18n } from "@/contexts/i18n-context";
 import { calendarDays } from "@/lib/engineer-app-data";
 
 const weekdays = [
@@ -26,6 +29,7 @@ const weekdays = [
 
 export default function CalendarTab() {
 	const { jobs, selectJob } = useEngineerApp();
+	const { locale } = useI18n();
 	const [selectedDayId, setSelectedDayId] = useState("2026-05-27");
 	const selectedDay =
 		calendarDays.find((day) => day.id === selectedDayId) ??
@@ -72,8 +76,12 @@ export default function CalendarTab() {
 						<Pressable
 							accessibilityLabel={
 								day.day === 0
-									? "Empty calendar day"
-									: `May ${day.day}${day.hasJobs ? ", has scheduled jobs" : ""}`
+									? translateServiceText(locale, "Empty calendar day")
+									: `${translateServiceText(locale, "May")} ${day.day}${
+											day.hasJobs
+												? `, ${translateServiceText(locale, "has scheduled jobs")}`
+												: ""
+										}`
 							}
 							accessibilityRole="button"
 							disabled={day.day === 0}
@@ -123,10 +131,10 @@ export default function CalendarTab() {
 					}}
 				/>
 				<Text style={{ color: colors.text3, fontSize: 12 }}>
-					Day has scheduled jobs
+					{translateServiceText(locale, "Day has scheduled jobs")}
 				</Text>
 			</View>
-			<SectionLabel>{getSelectedDayLabel(selectedDay)}</SectionLabel>
+			<SectionLabel>{getSelectedDayLabel(selectedDay, locale)}</SectionLabel>
 			{selectedJobs.length > 0 ? (
 				selectedJobs.map((job) => (
 					<JobCard
@@ -140,7 +148,7 @@ export default function CalendarTab() {
 				<Card style={{ alignItems: "center", paddingVertical: 28 }}>
 					<Badge>No jobs</Badge>
 					<Text style={[styles.subtitle, { marginTop: 8 }]}>
-						No scheduled work for this day.
+						{translateServiceText(locale, "No scheduled work for this day.")}
 					</Text>
 				</Card>
 			)}
@@ -188,12 +196,15 @@ function getCalendarDayStyle({
 	};
 }
 
-function getSelectedDayLabel(selectedDay: { day: number; isToday?: boolean }) {
+function getSelectedDayLabel(
+	selectedDay: { day: number; isToday?: boolean },
+	locale: "en" | "zh-Hans" | "zh-Hant"
+) {
 	if (selectedDay.isToday) {
-		return "Today - 27 May";
+		return `${translateServiceText(locale, "Today")} - ${translateServiceText(locale, "27 May")}`;
 	}
 	if (selectedDay.day) {
-		return `May ${selectedDay.day}`;
+		return `${translateServiceText(locale, "May")} ${selectedDay.day}`;
 	}
-	return "Select a day";
+	return translateServiceText(locale, "Select a day");
 }

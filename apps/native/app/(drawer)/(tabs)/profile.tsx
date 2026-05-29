@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { translateServiceText } from "@luke/i18n";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 
@@ -19,6 +20,7 @@ import {
 	styles,
 	TextField,
 } from "@/components/engineer-app/engineer-ui";
+import { useI18n } from "@/contexts/i18n-context";
 import { engineerProfile, initialEngineerJobs } from "@/lib/engineer-app-data";
 
 export default function ProfileTab() {
@@ -44,6 +46,7 @@ export default function ProfileTab() {
 
 function ProfileHomeScreen() {
 	const { setProfileStage } = useEngineerApp();
+	const { locale, t } = useI18n();
 
 	return (
 		<EngineerScreen>
@@ -76,11 +79,12 @@ function ProfileHomeScreen() {
 						{engineerProfile.name}
 					</Text>
 					<Text style={{ color: colors.text2, fontSize: 13, marginTop: 3 }}>
-						{engineerProfile.role} · {engineerProfile.region}
+						{translateServiceText(locale, engineerProfile.role)} ·{" "}
+						{translateServiceText(locale, engineerProfile.region)}
 					</Text>
 					<View style={{ marginTop: 7 }}>
 						<Badge tone="green">
-							Shift active · {engineerProfile.shiftDuration}
+							{t("native.shiftActive")} · {engineerProfile.shiftDuration}
 						</Badge>
 					</View>
 				</View>
@@ -161,6 +165,7 @@ function ProfileHomeScreen() {
 
 function DailyExpensesScreen() {
 	const { addExpense, expenses, setProfileStage } = useEngineerApp();
+	const { locale } = useI18n();
 	const [selectedCategory, setSelectedCategory] = useState("Mileage");
 	const [distance, setDistance] = useState("47");
 	const total = useMemo(() => {
@@ -175,9 +180,12 @@ function DailyExpensesScreen() {
 		addExpense({
 			id: `expense-${Date.now()}`,
 			category: selectedCategory,
-			detail: selectedCategory === "Mileage" ? `${distance} km` : "1 day",
+			detail:
+				selectedCategory === "Mileage"
+					? `${distance} km`
+					: translateServiceText(locale, "1 day"),
 			value: total,
-			linkedJob: "Job #1042",
+			linkedJob: `${translateServiceText(locale, "Job")} #1042`,
 		});
 	};
 
@@ -210,9 +218,12 @@ function DailyExpensesScreen() {
 				/>
 			</View>
 			<Text style={{ color: colors.text3, fontSize: 12, marginBottom: 10 }}>
-				GBP 0.45/km · Total: {total}
+				GBP 0.45/km · {translateServiceText(locale, "Total")}: {total}
 			</Text>
-			<TextField label="Link to job" value="Job #1042 - Ventilator Repair" />
+			<TextField
+				label="Link to job"
+				value={`${translateServiceText(locale, "Job")} #1042 - ${translateServiceText(locale, "Ventilator Repair")}`}
+			/>
 			<SectionLabel>Today's logged expenses</SectionLabel>
 			<Card>
 				{expenses.map((expense, index) => (
@@ -226,7 +237,8 @@ function DailyExpensesScreen() {
 						<View style={{ flexDirection: "row", gap: 8, flex: 1 }}>
 							<Ionicons color={colors.text2} name="receipt" size={16} />
 							<Text style={{ color: colors.text2, flex: 1, fontSize: 13 }}>
-								{expense.category} · {expense.detail}
+								{translateServiceText(locale, expense.category)} ·{" "}
+								{translateServiceText(locale, expense.detail)}
 							</Text>
 						</View>
 						<Text
@@ -248,6 +260,7 @@ function DailyExpensesScreen() {
 
 function JobHistoryScreen() {
 	const { setProfileStage } = useEngineerApp();
+	const { locale } = useI18n();
 
 	return (
 		<EngineerScreen>
@@ -268,14 +281,14 @@ function JobHistoryScreen() {
 						}}
 					>
 						<Badge tone={job.type === "urgent" ? "red" : "blue"}>
-							Job #{job.id}
+							{translateServiceText(locale, "Job")} #{job.id}
 						</Badge>
 						<Text style={{ color: colors.text3, fontSize: 12 }}>
 							{job.duration}
 						</Text>
 					</View>
 					<Text style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>
-						{job.title}
+						{translateServiceText(locale, job.title)}
 					</Text>
 					<Text style={{ color: colors.text2, fontSize: 12, marginTop: 3 }}>
 						{job.site} · {job.scheduledTime}
@@ -321,6 +334,7 @@ function PerformanceScreen() {
 
 function ServiceManualScreen() {
 	const { setProfileStage } = useEngineerApp();
+	const { locale } = useI18n();
 
 	return (
 		<EngineerScreen>
@@ -333,11 +347,14 @@ function ServiceManualScreen() {
 			<Card style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
 				<Ionicons color={colors.text3} name="search" size={18} />
 				<Text style={{ color: colors.text3, fontSize: 14 }}>
-					Search this manual...
+					{translateServiceText(locale, "Search this manual...")}
 				</Text>
 			</Card>
 			<Card>
-				<Badge tone="blue">Page 47 · Maintenance Procedures</Badge>
+				<Badge tone="blue">
+					{translateServiceText(locale, "Page 47")} ·{" "}
+					{translateServiceText(locale, "Maintenance Procedures")}
+				</Badge>
 				<Text
 					style={{
 						color: colors.text2,
@@ -346,9 +363,10 @@ function ServiceManualScreen() {
 						marginTop: 10,
 					}}
 				>
-					To replace the expiratory valve kit, first power off and disconnect
-					from patient circuit. Remove the 4 screws on the expiratory module
-					cover.
+					{translateServiceText(
+						locale,
+						"To replace the expiratory valve kit, first power off and disconnect from patient circuit. Remove the 4 screws on the expiratory module cover."
+					)}
 				</Text>
 				<Text
 					style={{
@@ -358,14 +376,16 @@ function ServiceManualScreen() {
 						marginTop: 10,
 					}}
 				>
-					Jump to page 47
+					{translateServiceText(locale, "Jump to page 47")}
 				</Text>
 			</Card>
 			<Card>
-				<SectionLabel>Page 48</SectionLabel>
+				<SectionLabel>{translateServiceText(locale, "Page 48")}</SectionLabel>
 				<Text style={{ color: colors.text2, fontSize: 13, lineHeight: 20 }}>
-					Step 1: Power off. Step 2: Disconnect patient circuit. Step 3: Remove
-					module cover using Torx T10.
+					{translateServiceText(
+						locale,
+						"Step 1: Power off. Step 2: Disconnect patient circuit. Step 3: Remove module cover using Torx T10."
+					)}
 				</Text>
 			</Card>
 		</EngineerScreen>

@@ -4,8 +4,10 @@ import { Button, Surface, useThemeColor } from "heroui-native";
 import { Text, View } from "react-native";
 
 import { Container } from "@/components/container";
+import { useI18n } from "@/contexts/i18n-context";
 
 function Modal() {
+	const { t } = useI18n();
 	const accentForegroundColor = useThemeColor("accent-foreground");
 
 	function handleClose() {
@@ -25,14 +27,14 @@ function Modal() {
 							/>
 						</View>
 						<Text className="mb-1 font-medium text-foreground text-lg">
-							Modal Screen
+							{t("native.modalScreen")}
 						</Text>
 						<Text className="mb-4 text-center text-muted text-sm">
-							This is an example modal screen for dialogs and confirmations.
+							{t("native.modalDescription")}
 						</Text>
 					</View>
 					<Button className="w-full" onPress={handleClose} size="sm">
-						<Button.Label>Close</Button.Label>
+						<Button.Label>{t("common.close")}</Button.Label>
 					</Button>
 				</Surface>
 			</View>

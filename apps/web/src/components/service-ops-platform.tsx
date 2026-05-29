@@ -1,13 +1,18 @@
 "use client";
 "use no memo";
 
-import { Button } from "@luke/ui/components/button";
+import {
+	type AppLocale,
+	type TranslationKey,
+	translateServiceText,
+} from "@luke/i18n";
+import { Button as UiButton } from "@luke/ui/components/button";
 import {
 	Card,
 	CardAction,
 	CardContent,
 	CardHeader,
-	CardTitle,
+	CardTitle as UiCardTitle,
 } from "@luke/ui/components/card";
 import {
 	DropdownMenu,
@@ -19,8 +24,8 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@luke/ui/components/dropdown-menu";
-import { Input } from "@luke/ui/components/input";
-import { Label } from "@luke/ui/components/label";
+import { Input as UiInput } from "@luke/ui/components/input";
+import { Label as UiLabel } from "@luke/ui/components/label";
 import { cn } from "@luke/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -55,7 +60,6 @@ import {
 	SearchIcon,
 	ShieldCheckIcon,
 	Trash2Icon,
-	TrendingUpIcon,
 	UploadIcon,
 	UserXIcon,
 	WrenchIcon,
@@ -63,9 +67,26 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type {
+	ComponentProps,
+	FormEvent,
+	KeyboardEvent,
+	ReactNode,
+	RefObject,
+} from "react";
+import {
+	Children,
+	cloneElement,
+	isValidElement,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { toast } from "sonner";
+import { useI18n } from "@/components/i18n-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
 	buildAssetPayload,
 	buildContractPayload,
@@ -203,6 +224,15 @@ const panelClass =
 
 const mutedPanelClass = "rounded-lg border border-border/60 bg-muted/35";
 
+const dashboardPanelClass =
+	"rounded-xl border-0 bg-card text-card-foreground shadow-[0_12px_38px_-32px_rgb(0_0_0_/_0.45)] ring-1 ring-foreground/10";
+
+const dashboardFocusPanelClass =
+	"rounded-xl border-0 bg-card text-card-foreground shadow-[0_20px_54px_-36px_rgb(0_0_0_/_0.52)] ring-1 ring-foreground/10";
+
+const dashboardStatCardClass =
+	"rounded-xl border-0 bg-card py-5 text-card-foreground shadow-[0_10px_30px_-26px_rgb(0_0_0_/_0.45)] ring-1 ring-foreground/10 transition-shadow hover:shadow-[0_16px_38px_-28px_rgb(0_0_0_/_0.5)]";
+
 const iconTileClass =
 	"flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground";
 
@@ -248,6 +278,16 @@ const wordBoundaryRegex = /\b\w/g;
 
 const whitespaceRegex = /\s+/;
 
+const dashboardUrgentMetaRegex = /^(\d+) urgent, (\d+) anomaly$/;
+
+const dashboardSeverityMetaRegex = /^(\d+) high or critical$/;
+
+const timerAlertMessageRegex = /^(.+) left (.+) while (.+) timer is running\.$/;
+
+const pmAlertMessageRegex = /^(.+) is on-site at (.+)\. (.+) PM is due soon\.$/;
+
+const contractAlertMessageRegex = /^(.+) contract expires on (.+)\.$/;
+
 const hongKongBounds = {
 	maxLat: 22.56,
 	maxLng: 114.35,
@@ -268,16 +308,20 @@ const formatProperName = (value: string) =>
 		.map((word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`)
 		.join(" ");
 
-const toPastTense = (value: string) => {
+const getPastTenseActionKey = (value: ServiceOpsAction): TranslationKey => {
 	if (value === "deactivate") {
-		return "deactivated";
+		return "toast.service.action.deactivated";
 	}
 
 	if (value === "suspend") {
-		return "suspended";
+		return "toast.service.action.suspended";
 	}
 
-	return "deleted";
+	if (value === "save") {
+		return "toast.service.action.saved";
+	}
+
+	return "toast.service.action.deleted";
 };
 
 const coordinateStyle = (lat: number, lng: number) => {
@@ -422,6 +466,18 @@ const getHashBackOfficeView = (): BackOfficeView | null => {
 	return navigationItem?.id ?? null;
 };
 
+function getNavigationSectionLabelKey(label: string): TranslationKey {
+	if (label === "General") {
+		return "service.navigation.general";
+	}
+
+	if (label === "Operations") {
+		return "service.navigation.operations";
+	}
+
+	return "service.navigation.other";
+}
+
 export default function ServiceOpsPlatform({
 	currentUser,
 	initialData,
@@ -432,6 +488,7 @@ export default function ServiceOpsPlatform({
 	initialHospitalId?: string;
 }) {
 	const router = useRouter();
+	const { locale, t } = useI18n();
 	const [selectedTenantId, setSelectedTenantId] = useState(
 		initialData.tenant.id
 	);
@@ -550,7 +607,7 @@ export default function ServiceOpsPlatform({
 				},
 			})
 			.catch(() => {
-				toast.error("Unable to sign out.");
+				toast.error(t("service.signOutError"));
 			});
 	};
 
@@ -597,7 +654,7 @@ export default function ServiceOpsPlatform({
 	};
 	const visibleNavigationSections = navigationSections
 		.map((section) => ({
-			...section,
+			label: t(getNavigationSectionLabelKey(section.label)),
 			items: section.items.filter((itemId) => {
 				if (!currentData) {
 					return true;
@@ -673,10 +730,10 @@ export default function ServiceOpsPlatform({
 												<button
 													aria-current={isActive ? "page" : undefined}
 													className={cn(
-														"flex h-10 min-w-max cursor-pointer items-center gap-3 rounded-xl px-3 text-left font-medium text-base transition-colors xl:w-full",
+														"flex h-10 min-w-max cursor-pointer items-center gap-3 rounded-xl px-4 text-left font-medium text-base transition-[background-color,color,box-shadow] xl:w-full",
 														isActive
-															? "bg-muted text-foreground shadow-xs"
-															: "text-foreground/85 hover:bg-muted/70 hover:text-foreground"
+															? "bg-muted text-foreground shadow-xs ring-1 ring-foreground/5"
+															: "text-foreground/70 hover:bg-muted/60 hover:text-foreground"
 													)}
 													data-back-office-nav-active={
 														isActive ? "true" : undefined
@@ -687,7 +744,9 @@ export default function ServiceOpsPlatform({
 													type="button"
 												>
 													<Icon className="size-5 shrink-0" />
-													<span className="truncate">{item.label}</span>
+													<span className="truncate">
+														{translateServiceText(locale, item.label)}
+													</span>
 												</button>
 											);
 										})}
@@ -712,18 +771,26 @@ export default function ServiceOpsPlatform({
 						<header className="z-20 flex min-h-18 shrink-0 items-center justify-between gap-4 border-b bg-background/95 px-4 pt-5 pb-3 backdrop-blur lg:px-6">
 							<div className="min-w-0">
 								<p className="text-muted-foreground text-xs">
-									Service operations
+									{t("service.header.subtitle")}
 								</p>
 								<h1 className="truncate font-semibold text-lg leading-tight">
-									{getBackOfficeTitle(visibleActiveView)}
+									{translateServiceText(
+										locale,
+										getBackOfficeTitle(visibleActiveView)
+									)}
 								</h1>
 							</div>
 							<div className="flex min-w-0 items-center gap-3">
 								<div className="hidden min-w-0 items-center gap-2 text-muted-foreground text-xs md:flex">
-									<span className="truncate">{tenant.release}</span>
+									<span className="truncate">
+										{translateServiceText(locale, tenant.release)}
+									</span>
 									<span className="size-1 rounded-full bg-border" />
-									<span className="truncate">{tenant.region}</span>
+									<span className="truncate">
+										{translateServiceText(locale, tenant.region)}
+									</span>
 								</div>
+								<LanguageSwitcher compact />
 								<ThemeColorSwitcher />
 							</div>
 						</header>
@@ -786,6 +853,8 @@ function TenantSwitcher({
 	selectedTenant: ServiceOpsSnapshot["tenant"];
 	selectedTenantId: string;
 }) {
+	const { locale, t } = useI18n();
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
@@ -803,7 +872,7 @@ function TenantSwitcher({
 				<div className="min-w-0 flex-1">
 					<p className="truncate font-bold text-xl leading-tight">Utiliti</p>
 					<p className="truncate font-medium text-muted-foreground text-sm">
-						{selectedTenant.name}
+						{translateServiceText(locale, selectedTenant.name)}
 					</p>
 				</div>
 				<div className="flex size-10 shrink-0 items-center justify-center rounded-xl border bg-background text-foreground shadow-xs">
@@ -820,7 +889,9 @@ function TenantSwitcher({
 				sideOffset={8}
 			>
 				<DropdownMenuGroup>
-					<DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
+					<DropdownMenuLabel>
+						{t("service.action.switchWorkspace")}
+					</DropdownMenuLabel>
 				</DropdownMenuGroup>
 				<DropdownMenuSeparator />
 				<DropdownMenuRadioGroup
@@ -839,10 +910,11 @@ function TenantSwitcher({
 							</span>
 							<span className="min-w-0">
 								<span className="block truncate font-medium">
-									{tenantOption.name}
+									{translateServiceText(locale, tenantOption.name)}
 								</span>
 								<span className="block truncate text-muted-foreground text-xs">
-									{tenantOption.region} · {tenantOption.release}
+									{translateServiceText(locale, tenantOption.region)} ·{" "}
+									{translateServiceText(locale, tenantOption.release)}
 								</span>
 							</span>
 						</DropdownMenuRadioItem>
@@ -854,11 +926,13 @@ function TenantSwitcher({
 }
 
 function TenantSnapshotLoading({ tenantName }: { tenantName: string }) {
+	const { t } = useI18n();
+
 	return (
 		<div className="flex min-h-[420px] flex-col items-center justify-center gap-3 rounded-2xl border bg-card p-8 text-center">
 			<Loader2Icon className="size-6 animate-spin text-muted-foreground" />
 			<div>
-				<p className="font-medium">Loading workspace</p>
+				<p className="font-medium">{t("service.empty.loadingWorkspace")}</p>
 				<p className="text-muted-foreground text-sm">{tenantName}</p>
 			</div>
 		</div>
@@ -872,8 +946,10 @@ function UserProfile({
 	currentUser: CurrentUser;
 	onSignOut: () => void;
 }) {
-	const displayName = currentUser.name?.trim() || "Signed-in user";
-	const initials = getInitials(displayName, currentUser.email);
+	const { locale, t } = useI18n();
+	const rawDisplayName = currentUser.name?.trim() || t("service.signedInUser");
+	const displayName = translateServiceText(locale, rawDisplayName);
+	const initials = getInitials(rawDisplayName, currentUser.email);
 
 	return (
 		<div className="flex items-center gap-3 rounded-2xl bg-card p-2 transition-colors hover:bg-muted/70">
@@ -889,7 +965,7 @@ function UserProfile({
 				</p>
 			</div>
 			<Button
-				aria-label="Sign out"
+				aria-label={t("service.signOut")}
 				className={compactButtonClass}
 				onClick={onSignOut}
 				size="icon-sm"
@@ -1043,7 +1119,9 @@ function BackOfficeViewPanel({
 								<CardContent className="flex flex-col gap-4">
 									<StateMachine currentStatus={selectedJob.status} />
 									<div className={`${mutedPanelClass} p-3 text-sm`}>
-										<p className="font-medium">Latest event</p>
+										<LocalizedText as="p" className="font-medium">
+											Latest event
+										</LocalizedText>
 										<p className="mt-1 text-muted-foreground">
 											{selectedJob.audit}
 										</p>
@@ -1494,6 +1572,8 @@ function HospitalDetailView({
 	onOpenJob: (jobId: string) => void;
 	tenantId: string;
 }) {
+	const { t } = useI18n();
+
 	if (!hospital) {
 		return (
 			<PageFrame
@@ -1510,7 +1590,7 @@ function HospitalDetailView({
 						type="button"
 					>
 						<ArrowLeftIcon className="size-4" />
-						Back
+						{t("common.back")}
 					</button>
 					<EmptyInline message={`No hospital found for ${hospitalId}.`} />
 				</div>
@@ -1616,12 +1696,16 @@ function HospitalDetailView({
 }
 
 function HospitalStatCard({ label, value }: { label: string; value: number }) {
+	const { locale } = useI18n();
+
 	return (
 		<div className={`${panelClass} p-4`}>
 			<p className="font-medium text-3xl leading-none tracking-tight">
 				{value}
 			</p>
-			<p className="mt-3 text-muted-foreground text-sm">{label}</p>
+			<p className="mt-3 text-muted-foreground text-sm">
+				{translateServiceText(locale, label)}
+			</p>
 		</div>
 	);
 }
@@ -1870,10 +1954,16 @@ function HospitalDetailField({
 	label: string;
 	value: ReactNode;
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<div>
-			<p className="text-muted-foreground text-xs">{label}</p>
-			<p className="mt-1 break-words font-medium text-sm">{value}</p>
+			<p className="text-muted-foreground text-xs">
+				{translateServiceText(locale, label)}
+			</p>
+			<p className="mt-1 break-words font-medium text-sm">
+				{localizeServiceNode(value, locale)}
+			</p>
 		</div>
 	);
 }
@@ -2188,30 +2278,37 @@ function AssetServiceStatusCard({
 			</CardHeader>
 			<CardContent className="flex flex-col gap-5">
 				<div>
-					<p className="text-muted-foreground text-sm">NFC Tag</p>
+					<LocalizedText as="p" className="text-muted-foreground text-sm">
+						NFC Tag
+					</LocalizedText>
 					<div className="mt-3 flex items-center gap-2">
 						<span className="size-2 rounded-full bg-emerald-500" />
-						<p className="font-semibold text-base text-emerald-700">
+						<LocalizedText
+							as="p"
+							className="font-semibold text-base text-emerald-700"
+						>
 							Commissioned
-						</p>
+						</LocalizedText>
 					</div>
 					<p className="mt-2 break-all font-mono text-muted-foreground text-sm">
 						{asset.nfcUid}
 					</p>
 				</div>
 				<div className="border-t pt-5">
-					<p className="text-muted-foreground text-sm">
+					<LocalizedText as="p" className="text-muted-foreground text-sm">
 						Preventive Maintenance
-					</p>
-					<p className="mt-2 font-medium text-base">
+					</LocalizedText>
+					<LocalizedText as="p" className="mt-2 font-medium text-base">
 						{asset.nextPmDue === "Not scheduled"
 							? "No PM schedule set"
 							: asset.nextPmDue}
-					</p>
+					</LocalizedText>
 				</div>
 				{activeJob ? (
 					<div className="border-t pt-5">
-						<p className="text-muted-foreground text-sm">Current Job</p>
+						<LocalizedText as="p" className="text-muted-foreground text-sm">
+							Current Job
+						</LocalizedText>
 						<p className="mt-2 font-semibold">{activeJob.id}</p>
 						<p className="mt-1 text-muted-foreground text-sm">
 							{activeJob.description}
@@ -2219,7 +2316,9 @@ function AssetServiceStatusCard({
 					</div>
 				) : null}
 				<div className="border-t pt-5">
-					<p className="text-muted-foreground text-sm">Designated Engineer</p>
+					<LocalizedText as="p" className="text-muted-foreground text-sm">
+						Designated Engineer
+					</LocalizedText>
 					<p className="mt-2 font-medium text-base">
 						{asset.designatedEngineer}
 					</p>
@@ -2970,11 +3069,15 @@ function EngineerStatCard({
 }
 
 function ContactInfoRow({ label, value }: { label: string; value: ReactNode }) {
+	const { locale } = useI18n();
+
 	return (
 		<div>
-			<p className="text-muted-foreground text-xs">{label}</p>
+			<p className="text-muted-foreground text-xs">
+				{translateServiceText(locale, label)}
+			</p>
 			<p className="mt-1 break-words font-medium text-foreground text-sm">
-				{value}
+				{localizeServiceNode(value, locale)}
 			</p>
 		</div>
 	);
@@ -3379,10 +3482,16 @@ function PartDetailField({
 	label: string;
 	value: ReactNode;
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<div className={className}>
-			<p className="text-muted-foreground text-sm">{label}</p>
-			<p className="mt-1 break-words font-medium text-base">{value}</p>
+			<p className="text-muted-foreground text-sm">
+				{translateServiceText(locale, label)}
+			</p>
+			<p className="mt-1 break-words font-medium text-base">
+				{localizeServiceNode(value, locale)}
+			</p>
 		</div>
 	);
 }
@@ -3688,6 +3797,7 @@ function ConfigView({
 	systemParameters: ServiceOpsSnapshot["systemParameters"];
 	tenantId: string;
 }) {
+	const { locale, t } = useI18n();
 	const initialValues = useMemo(
 		() => getSystemParameterValues(systemParameters),
 		[systemParameters]
@@ -3743,9 +3853,9 @@ function ConfigView({
 					})
 				)
 			);
-			toast.success("System parameters saved.");
+			toast.success(t("service.toast.systemSaved"));
 		} catch {
-			toast.error("Unable to save system parameters.");
+			toast.error(t("service.toast.systemSaveFailed"));
 		}
 	};
 
@@ -3758,7 +3868,7 @@ function ConfigView({
 				type="button"
 				variant="outline"
 			>
-				Cancel
+				{t("common.cancel")}
 			</Button>
 			<Button
 				className={primaryActionClass}
@@ -3767,7 +3877,7 @@ function ConfigView({
 				type="button"
 			>
 				{isSaving ? <Loader2Icon className="size-4 animate-spin" /> : null}
-				Save Changes
+				{t("common.saveChanges")}
 			</Button>
 		</div>
 	) : null;
@@ -3780,7 +3890,9 @@ function ConfigView({
 			<div className="grid gap-4 lg:grid-cols-[1fr_380px]">
 				<Card className={panelClass}>
 					<CardHeader>
-						<CardTitle>System parameters</CardTitle>
+						<CardTitle>
+							{translateServiceText(locale, "System parameters")}
+						</CardTitle>
 					</CardHeader>
 					<CardContent className="grid gap-x-4 gap-y-5 md:grid-cols-2">
 						{systemParameters.length > 0 ? (
@@ -3795,14 +3907,14 @@ function ConfigView({
 							))
 						) : (
 							<div className="md:col-span-2">
-								<EmptyInline message="No system parameters yet." />
+								<EmptyInline message={t("service.empty.noSystemParameters")} />
 							</div>
 						)}
 					</CardContent>
 				</Card>
 				<Card className={panelClass}>
 					<CardHeader>
-						<CardTitle>User roles</CardTitle>
+						<CardTitle>{translateServiceText(locale, "User roles")}</CardTitle>
 					</CardHeader>
 					<CardContent className="grid gap-3 text-sm">
 						{roleLabels.map((role) => (
@@ -3812,10 +3924,10 @@ function ConfigView({
 							>
 								<div className="min-w-0">
 									<p className="font-medium text-foreground">
-										{roleDisplayNames[role]}
+										{translateServiceText(locale, roleDisplayNames[role])}
 									</p>
 									<p className="mt-1 text-muted-foreground text-xs">
-										{roleDescriptions[role]}
+										{translateServiceText(locale, roleDescriptions[role])}
 									</p>
 								</div>
 								<span
@@ -3824,7 +3936,9 @@ function ConfigView({
 										roleBadgeStyles[role]
 									)}
 								>
-									{role === "super_admin" ? "System" : "Tenant"}
+									{role === "super_admin"
+										? t("common.system")
+										: t("common.tenant")}
 								</span>
 							</div>
 						))}
@@ -4195,7 +4309,7 @@ function DashboardView({
 				onCategoryChange={handleCategoryChange}
 			/>
 
-			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-4 md:grid-cols-2 lg:gap-5 xl:grid-cols-4">
 				{dashboardStats.map((stat) => (
 					<DashboardStatCard key={stat.id} stat={stat} />
 				))}
@@ -4241,10 +4355,12 @@ function DashboardCategoryTabs({
 	activeCategory: DashboardCategory;
 	onCategoryChange: (category: DashboardCategory) => void;
 }) {
+	const { locale, t } = useI18n();
+
 	return (
 		<div className="max-w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 			<div
-				aria-label="Dashboard category"
+				aria-label={t("service.dashboard.category")}
 				className="inline-flex rounded-xl bg-muted p-1"
 				role="tablist"
 			>
@@ -4265,7 +4381,7 @@ function DashboardCategoryTabs({
 							role="tab"
 							type="button"
 						>
-							{item.label}
+							{translateServiceText(locale, item.label)}
 						</button>
 					);
 				})}
@@ -4298,7 +4414,7 @@ function DashboardOverviewPanel({
 				jobs={jobs}
 				urgentJobsCount={urgentJobsCount}
 			/>
-			<div className="grid gap-4 xl:grid-cols-12">
+			<div className="grid gap-5 xl:grid-cols-12">
 				<DashboardScheduleCard
 					className="xl:col-span-8"
 					timelineJobs={timelineJobs}
@@ -4420,57 +4536,63 @@ function DashboardActivityCard({
 	jobs: Job[];
 	urgentJobsCount: number;
 }) {
+	const { locale, t } = useI18n();
+
 	return (
-		<Card className={panelClass}>
-			<CardHeader>
+		<Card className={dashboardFocusPanelClass}>
+			<CardHeader className="px-5">
 				<CardTitle>Service Activity Flow</CardTitle>
 				<CardAction>
 					<Button className={compactButtonClass} size="sm" variant="outline">
 						<CalendarDaysIcon data-icon="inline-start" />
-						Today
+						{t("common.today")}
 					</Button>
 				</CardAction>
 			</CardHeader>
-			<CardContent>
+			<CardContent className="px-5">
 				<div className="grid gap-5 lg:grid-cols-12">
-					<div className="flex min-h-72 items-end gap-2 rounded-lg bg-muted/20 p-3 lg:col-span-8">
+					<div className="flex min-h-72 items-end gap-4 rounded-lg bg-muted/20 px-4 pt-5 pb-3 lg:col-span-8">
 						{buildJobActivityBars(jobs).map((bar) => (
 							<div
-								className="flex h-full flex-1 flex-col justify-end gap-2"
+								className="flex h-full flex-1 flex-col justify-end gap-3"
 								key={bar.id}
 							>
 								<div
-									className="rounded-t-lg border border-chart-2/45 bg-[repeating-linear-gradient(135deg,var(--color-chart-2)_0_1px,transparent_1px_5px)] bg-chart-2/10"
+									className={cn(
+										"rounded-t-lg ring-1 ring-black/5",
+										bar.count > 0
+											? "bg-[linear-gradient(180deg,var(--color-chart-4),var(--color-chart-2))] shadow-[0_10px_24px_-18px_rgb(0_0_0_/_0.6)]"
+											: "bg-muted-foreground/18"
+									)}
 									style={{ height: `${bar.height}%` }}
-									title={`${bar.label}: ${bar.count} jobs`}
+									title={`${translateServiceText(locale, bar.label)}: ${bar.count} ${translateServiceText(locale, "jobs")}`}
 								/>
 								<span className="text-center text-muted-foreground text-xs">
-									{bar.label}
+									{translateServiceText(locale, bar.label)}
 								</span>
 							</div>
 						))}
 					</div>
-					<div className="flex flex-col gap-5 lg:col-span-4">
-						<div className="flex flex-col gap-1">
-							<div className="font-medium text-4xl tabular-nums leading-none">
+					<div className="flex flex-col justify-center gap-5 lg:col-span-4 lg:py-3">
+						<div className="flex flex-col gap-3">
+							<div className="font-semibold text-3xl tabular-nums leading-none">
 								{activeJobsCount}{" "}
 								<span className="font-normal text-lg text-muted-foreground">
-									open
+									{t("service.dashboard.open")}
 								</span>
 							</div>
 							<p className="text-muted-foreground text-sm">
-								Active field-service jobs currently moving through dispatch,
-								travel, on-site work, and close-out.
+								{t("service.dashboard.activeJobsCopy")}
 							</p>
 						</div>
-						<div className="flex flex-col gap-3 rounded-lg border border-border/60 p-3">
+						<div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-background/70 p-4">
 							<div className="text-[11px] text-muted-foreground uppercase tracking-widest">
-								Urgent Workload
+								{t("service.dashboard.urgentWorkload")}
 							</div>
 							<div className="font-medium text-2xl tabular-nums leading-none">
 								{urgentJobsCount}{" "}
 								<span className="font-normal text-muted-foreground text-sm">
-									urgent jobs
+									{t("service.dashboard.urgentJobs")}
 								</span>
 							</div>
 							<SegmentedProgress
@@ -4479,10 +4601,10 @@ function DashboardActivityCard({
 							/>
 							<div className="flex items-center justify-between text-xs">
 								<span className="font-medium tabular-nums">
-									{completedJobs} completed
+									{t("service.dashboard.completed", { count: completedJobs })}
 								</span>
 								<span className="text-muted-foreground tabular-nums">
-									{completionGoal} total
+									{t("service.dashboard.total", { count: completionGoal })}
 								</span>
 							</div>
 						</div>
@@ -4500,23 +4622,30 @@ function DashboardScheduleCard({
 	className?: string;
 	timelineJobs: Job[];
 }) {
+	const { locale, t } = useI18n();
+
 	return (
-		<Card className={className}>
-			<CardHeader>
+		<Card className={cn(dashboardPanelClass, className)}>
+			<CardHeader className="px-5">
 				<CardTitle>Upcoming Service Windows</CardTitle>
 				<CardAction>
 					<Button className={compactButtonClass} size="sm" variant="outline">
 						<CalendarDaysIcon data-icon="inline-start" />
-						View schedule
+						{t("service.dashboard.viewSchedule")}
 					</Button>
 				</CardAction>
 			</CardHeader>
-			<CardContent>
+			<CardContent className="px-5">
 				<div className="flex flex-col gap-3">
 					<div className="grid grid-cols-4 gap-2 text-muted-foreground text-xs tabular-nums">
 						{timelineJobs.map((job) => (
 							<div className="flex flex-col items-center gap-1" key={job.id}>
-								<span>{job.scheduledFor.split(",").at(0) ?? "Today"}</span>
+								<span>
+									{translateServiceText(
+										locale,
+										job.scheduledFor.split(",").at(0) ?? t("common.today")
+									)}
+								</span>
 								<span className="h-2 w-px bg-border" />
 							</div>
 						))}
@@ -4568,27 +4697,31 @@ function DashboardResolutionCard({
 	completedJobs: number;
 	completionGoal: number;
 }) {
+	const { t } = useI18n();
+	const completionPercent = Math.round((completedJobs / completionGoal) * 100);
+
 	return (
-		<Card className={className}>
-			<CardHeader>
+		<Card className={cn(dashboardPanelClass, className)}>
+			<CardHeader className="px-5">
 				<CardTitle>Resolution Goal</CardTitle>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-3">
+			<CardContent className="flex flex-col gap-4 px-5">
 				<div className="flex items-end justify-between gap-3">
 					<div className="font-medium text-2xl tabular-nums leading-none">
 						{completedJobs}{" "}
 						<span className="font-normal text-base text-muted-foreground">
-							closed
+							{t("service.dashboard.closed")}
 						</span>
 					</div>
 					<div className="text-muted-foreground text-sm tabular-nums">
-						{completionGoal} target
+						{t("service.dashboard.target", { count: completionGoal })}
 					</div>
 				</div>
 				<SegmentedProgress active={completedJobs} total={completionGoal} />
 				<p className="text-muted-foreground text-sm">
-					{Math.round((completedJobs / completionGoal) * 100)}% of current
-					service jobs are completed.
+					{t("service.dashboard.currentCompleted", {
+						percent: completionPercent,
+					})}
 				</p>
 			</CardContent>
 		</Card>
@@ -4602,6 +4735,8 @@ function DashboardAlertQueueCard({
 	hasLiveAlerts: boolean;
 	liveAlerts: ServiceOpsSnapshot["liveAlerts"];
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<Card className={panelClass}>
 			<CardHeader>
@@ -4621,9 +4756,11 @@ function DashboardAlertQueueCard({
 									<Icon className="size-4" />
 								</span>
 								<div>
-									<p className="font-medium text-sm">{alert.title}</p>
+									<p className="font-medium text-sm">
+										{translateServiceText(locale, alert.title)}
+									</p>
 									<p className="mt-0.5 text-muted-foreground text-xs leading-relaxed">
-										{alert.message}
+										{translateLiveAlertMessage(alert.message, locale)}
 									</p>
 								</div>
 							</div>
@@ -4638,6 +4775,8 @@ function DashboardAlertQueueCard({
 }
 
 function DashboardScopeCard() {
+	const { locale } = useI18n();
+
 	return (
 		<Card className={panelClass}>
 			<CardHeader>
@@ -4653,9 +4792,11 @@ function DashboardScopeCard() {
 								<Icon className="size-4" />
 							</span>
 							<div>
-								<p className="font-medium text-sm">{card.title}</p>
+								<p className="font-medium text-sm">
+									{translateServiceText(locale, card.title)}
+								</p>
 								<p className="text-muted-foreground text-xs leading-relaxed">
-									{card.detail}
+									{translateServiceText(locale, card.detail)}
 								</p>
 							</div>
 						</div>
@@ -4667,11 +4808,13 @@ function DashboardScopeCard() {
 }
 
 function EmptyInline({ message }: { message: string }) {
+	const { locale } = useI18n();
+
 	return (
 		<div
 			className={`${mutedPanelClass} p-4 text-center text-muted-foreground text-sm`}
 		>
-			{message}
+			{translateServiceText(locale, message)}
 		</div>
 	);
 }
@@ -4704,6 +4847,8 @@ function JobActionPanel({
 	parts: Part[];
 	tenantId: string;
 }) {
+	const { locale } = useI18n();
+
 	if (!canWrite) {
 		return null;
 	}
@@ -4711,11 +4856,13 @@ function JobActionPanel({
 	return (
 		<div className="flex flex-col gap-4 rounded-lg border border-border/60 p-3">
 			<div>
-				<p className="font-medium text-sm">Operational actions</p>
-				<p className="text-muted-foreground text-xs">
+				<LocalizedText as="p" className="font-medium text-sm">
+					Operational actions
+				</LocalizedText>
+				<LocalizedText as="p" className="text-muted-foreground text-xs">
 					NFC, shortage, cost, and close-out commands are recorded as service
 					events.
-				</p>
+				</LocalizedText>
 			</div>
 			<div className="grid gap-2 sm:grid-cols-2">
 				<Button
@@ -4755,7 +4902,10 @@ function JobActionPanel({
 						mutations.reportTimerAnomaly.mutate({
 							data: {
 								nfcUid: job.nfcUid,
-								notes: "Back Office marked timer anomaly",
+								notes: translateServiceText(
+									locale,
+									"Back Office marked timer anomaly"
+								),
 							},
 							id: job.recordId,
 							tenantId,
@@ -4811,6 +4961,7 @@ function JobPartUsageForm({
 }) {
 	const [partId, setPartId] = useState(parts[0]?.recordId ?? "");
 	const [quantity, setQuantity] = useState(1);
+	const { locale } = useI18n();
 
 	useEffect(() => {
 		setPartId(parts[0]?.recordId ?? "");
@@ -4819,7 +4970,7 @@ function JobPartUsageForm({
 	return (
 		<div className="grid gap-2 sm:grid-cols-[1fr_88px_auto]">
 			<select
-				aria-label="Part used"
+				aria-label={translateServiceText(locale, "Part used")}
 				className={formControlClass}
 				onChange={(event) => setPartId(event.target.value)}
 				value={partId}
@@ -4869,13 +5020,14 @@ function JobExpenseForm({
 	const [type, setType] = useState<"meal" | "mileage" | "other" | "parking">(
 		"mileage"
 	);
+	const { locale } = useI18n();
 	const [quantity, setQuantity] = useState(0);
 	const [amount, setAmount] = useState(0);
 
 	return (
 		<div className="grid gap-2 sm:grid-cols-[130px_1fr_1fr_auto]">
 			<select
-				aria-label="Expense type"
+				aria-label={translateServiceText(locale, "Expense type")}
 				className={formControlClass}
 				onChange={(event) =>
 					setType(
@@ -4884,10 +5036,14 @@ function JobExpenseForm({
 				}
 				value={type}
 			>
-				<option value="mileage">Mileage</option>
-				<option value="meal">Meal</option>
-				<option value="parking">Parking</option>
-				<option value="other">Other</option>
+				<option value="mileage">
+					{translateServiceText(locale, "Mileage")}
+				</option>
+				<option value="meal">{translateServiceText(locale, "Meal")}</option>
+				<option value="parking">
+					{translateServiceText(locale, "Parking")}
+				</option>
+				<option value="other">{translateServiceText(locale, "Other")}</option>
 			</select>
 			<Input
 				aria-label="Expense quantity"
@@ -4937,6 +5093,7 @@ function JobShortageForm({
 }) {
 	const [partId, setPartId] = useState(parts[0]?.recordId ?? "");
 	const [quantityRequested, setQuantityRequested] = useState(1);
+	const { locale } = useI18n();
 
 	useEffect(() => {
 		setPartId(parts[0]?.recordId ?? "");
@@ -4945,7 +5102,7 @@ function JobShortageForm({
 	return (
 		<div className="grid gap-2 sm:grid-cols-[1fr_88px_auto]">
 			<select
-				aria-label="Shortage part"
+				aria-label={translateServiceText(locale, "Shortage part")}
 				className={formControlClass}
 				onChange={(event) => setPartId(event.target.value)}
 				value={partId}
@@ -4999,6 +5156,7 @@ function AssetNfcInlineActions({
 	const [isOpen, setIsOpen] = useState(false);
 	const [nfcUid, setNfcUid] = useState(asset.nfcUid);
 	const [engineerId, setEngineerId] = useState("");
+	const { locale } = useI18n();
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
 	const panelRef = useRef<HTMLDivElement | null>(null);
 	const panelPosition = useInlinePanelPosition({
@@ -5074,7 +5232,9 @@ function AssetNfcInlineActions({
 							onChange={(event) => setEngineerId(event.target.value)}
 							value={engineerId}
 						>
-							<option value="">Back Office</option>
+							<option value="">
+								{translateServiceText(locale, "Back Office")}
+							</option>
 							{engineers.map((engineer) => (
 								<option key={engineer.id} value={engineer.id}>
 									{engineer.name}
@@ -5436,17 +5596,21 @@ function ProductCatalogueTable({
 	products: ProductModel[];
 	tenantId: string;
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<div className={`${panelClass} overflow-hidden`}>
 			<div className="overflow-x-auto">
 				<div className="grid min-w-[1040px] grid-cols-[1.15fr_1fr_1fr_.9fr_1.1fr_1fr_132px] border-b bg-muted/30 px-4 py-3 font-medium text-muted-foreground text-sm">
-					<p>Model name</p>
-					<p>Model number</p>
-					<p>Manufacturer</p>
-					<p>PM interval</p>
-					<p>Standard parts</p>
-					<p>Manual</p>
-					<p className="text-right">Actions</p>
+					<p>{translateServiceText(locale, "Model name")}</p>
+					<p>{translateServiceText(locale, "Model number")}</p>
+					<p>{translateServiceText(locale, "Manufacturer")}</p>
+					<p>{translateServiceText(locale, "PM interval")}</p>
+					<p>{translateServiceText(locale, "Standard parts")}</p>
+					<p>{translateServiceText(locale, "Manual")}</p>
+					<p className="text-right">
+						{translateServiceText(locale, "Actions")}
+					</p>
 				</div>
 				<div>
 					{products.map((product) => (
@@ -5672,6 +5836,7 @@ function ProductDetailView({
 	product: ProductModel;
 	tenantId: string;
 }) {
+	const { t } = useI18n();
 	const repairJobCount = jobs.filter((job) => job.type === "Repair").length;
 
 	return (
@@ -5712,7 +5877,7 @@ function ProductDetailView({
 								deleteDisabled={product.assetCount > 0}
 								deleteDisabledReason={
 									product.assetCount > 0
-										? "Reassign or remove installed assets before deleting this catalogue item."
+										? t("service.empty.productDeleteDisabled")
 										: undefined
 								}
 								entity="product"
@@ -5845,6 +6010,7 @@ function ProductManualReplaceButton({
 	product: ProductModel;
 	tenantId: string;
 }) {
+	const { t } = useI18n();
 	const [file, setFile] = useState<File | null>(null);
 	const [isUploadingManual, setIsUploadingManual] = useState(false);
 	const [isOpen, setIsOpen] = useState(false);
@@ -5868,7 +6034,9 @@ function ProductManualReplaceButton({
 			setFile(null);
 			setIsOpen(false);
 		} catch (error) {
-			toast.error(getManualUploadErrorMessage(error));
+			toast.error(
+				getManualUploadErrorMessage(error, t("service.upload.failed"))
+			);
 		}
 		setIsUploadingManual(false);
 	};
@@ -5894,7 +6062,7 @@ function ProductManualReplaceButton({
 					) : (
 						<UploadIcon className="size-4" />
 					)}
-					Save
+					{t("common.save")}
 				</Button>
 			</div>
 		);
@@ -5909,7 +6077,7 @@ function ProductManualReplaceButton({
 			variant="ghost"
 		>
 			<UploadIcon className="size-4" />
-			Replace
+			{t("service.action.replace")}
 		</Button>
 	);
 }
@@ -5978,9 +6146,13 @@ function ProductOverviewMetric({
 	label: string;
 	value: number;
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<div className="flex items-center justify-between gap-4 text-base">
-			<span className="text-muted-foreground">{label}</span>
+			<span className="text-muted-foreground">
+				{translateServiceText(locale, label)}
+			</span>
 			<span className="font-semibold tabular-nums">{value}</span>
 		</div>
 	);
@@ -6104,6 +6276,7 @@ function ProductPartsForm({
 	tenantId: string;
 }) {
 	const [selectedPartIds, setSelectedPartIds] = useState(product.partIds);
+	const { locale } = useI18n();
 
 	const togglePart = (partId: string) => {
 		setSelectedPartIds((currentIds) =>
@@ -6115,7 +6288,9 @@ function ProductPartsForm({
 
 	return (
 		<div className="flex flex-col gap-2">
-			<p className="font-medium text-sm">Standard parts</p>
+			<p className="font-medium text-sm">
+				{translateServiceText(locale, "Standard parts")}
+			</p>
 			<div className="grid max-h-36 gap-1 overflow-y-auto">
 				{parts.map((part) => (
 					<label
@@ -6162,6 +6337,7 @@ function ProductManualForm({
 	product: ProductModel;
 	tenantId: string;
 }) {
+	const { locale, t } = useI18n();
 	const [file, setFile] = useState<File | null>(null);
 	const [isUploadingManual, setIsUploadingManual] = useState(false);
 	const isSavingManual =
@@ -6169,10 +6345,13 @@ function ProductManualForm({
 
 	return (
 		<div className="flex flex-col gap-2">
-			<p className="font-medium text-sm">Service manual</p>
+			<LocalizedText as="p" className="font-medium text-sm">
+				Service manual
+			</LocalizedText>
 			{product.manualFileName === "Not uploaded" ? null : (
 				<p className="text-muted-foreground text-xs">
-					Current file: {product.manualFileName}
+					{translateServiceText(locale, "Current file")}:{" "}
+					{product.manualFileName}
 				</p>
 			)}
 			<ManualPdfPicker
@@ -6201,7 +6380,9 @@ function ProductManualForm({
 						});
 						onDone();
 					} catch (error) {
-						toast.error(getManualUploadErrorMessage(error));
+						toast.error(
+							getManualUploadErrorMessage(error, t("service.upload.failed"))
+						);
 					}
 					setIsUploadingManual(false);
 				}}
@@ -6421,9 +6602,10 @@ function CrudForm({
 	onClose: () => void;
 	state: CrudState;
 }) {
+	const { locale, t } = useI18n();
 	const tenantId = data.tenant.id;
 	const mutations = useEntityMutations(tenantId, onClose);
-	const fields = getFieldConfigs(state.entity, data);
+	const fields = getFieldConfigs(state.entity, data, locale);
 	const defaults = useMemo(
 		() => getFormDefaults(state.entity, state.record),
 		[state.entity, state.record]
@@ -6434,7 +6616,8 @@ function CrudForm({
 	const submitLabel = getCrudSubmitLabel(
 		state,
 		isSubmitting,
-		isUploadingManual
+		isUploadingManual,
+		t
 	);
 	const [contractDateRange, setContractDateRange] = useState(() => ({
 		endDate: getInputDefaultValue(defaults.endDate),
@@ -6467,7 +6650,9 @@ function CrudForm({
 			try {
 				await attachUploadedServiceManual(formData, tenantId);
 			} catch (error) {
-				toast.error(getManualUploadErrorMessage(error));
+				toast.error(
+					getManualUploadErrorMessage(error, t("service.upload.failed"))
+				);
 				setIsUploadingManual(false);
 				return;
 			}
@@ -6510,7 +6695,7 @@ function CrudForm({
 			</div>
 			<div className="flex flex-col items-stretch gap-3 border-t bg-card px-6 py-4 shadow-[0_-1px_0_rgb(0_0_0_/_0.02)] sm:flex-row sm:items-center sm:justify-between">
 				<p className="hidden text-muted-foreground text-xs sm:block">
-					Fields marked with an asterisk (*) are required.
+					{t("form.fieldsRequired")}
 				</p>
 				<div className="flex shrink-0 justify-end gap-2">
 					<Button
@@ -6520,7 +6705,7 @@ function CrudForm({
 						type="button"
 						variant="outline"
 					>
-						Cancel
+						{t("common.cancel")}
 					</Button>
 					<Button
 						className={primaryActionClass}
@@ -6559,29 +6744,30 @@ function getCrudDialogTitle(state: CrudState) {
 function getCrudSubmitLabel(
 	state: CrudState,
 	isSaving: boolean,
-	isUploadingManual = false
+	isUploadingManual: boolean,
+	t: ReturnType<typeof useI18n>["t"]
 ) {
 	if (isUploadingManual) {
-		return "Uploading";
+		return t("common.uploading");
 	}
 
 	if (isSaving) {
-		return "Saving";
+		return t("common.saving");
 	}
 
 	if (state.entity === "part" && state.mode === "create") {
-		return "Create Part";
+		return t("service.action.newPart");
 	}
 
 	if (state.entity === "asset" && state.mode === "create") {
-		return "Create Asset";
+		return t("service.action.registerAsset");
 	}
 
 	if (state.entity === "hospital" && state.mode === "create") {
-		return "Create Hospital";
+		return t("service.action.newHospital");
 	}
 
-	return "Save";
+	return t("common.save");
 }
 
 function isEntityMutationPending(mutations: EntityMutations) {
@@ -6758,20 +6944,21 @@ async function attachUploadedServiceManual(
 	}
 }
 
-function getManualUploadErrorMessage(error: unknown) {
-	return error instanceof Error ? error.message : "Manual upload failed.";
+function getManualUploadErrorMessage(error: unknown, fallback: string) {
+	return error instanceof Error ? error.message : fallback;
 }
 
 function useServiceOpsActionMutations(tenantId: string) {
+	const { t } = useI18n();
 	const actionResult = useMutationResult(
 		tenantId,
-		"Operation completed.",
+		t("service.toast.operationCompleted"),
 		"operation",
 		"save"
 	);
 	const stockUpdateResult = useMutationResult(
 		tenantId,
-		"Stock updated.",
+		t("service.toast.stockUpdated"),
 		"part",
 		"save"
 	);
@@ -7495,6 +7682,7 @@ function ProductPartPickerField({
 	field: FieldConfig;
 	fieldClassName: string;
 }) {
+	const { locale, t } = useI18n();
 	const options = field.options ?? [];
 	const [selectedValues, setSelectedValues] = useState(() =>
 		getCheckboxListDefaultValues(defaultValue)
@@ -7524,7 +7712,7 @@ function ProductPartPickerField({
 						))
 					) : (
 						<span className="text-muted-foreground text-sm">
-							Select standard parts...
+							{t("form.selectStandardParts")}
 						</span>
 					)}
 				</div>
@@ -7535,7 +7723,7 @@ function ProductPartPickerField({
 					onClick={() => setIsOpen(true)}
 					type="button"
 				>
-					<span>Select</span>
+					<span>{translateServiceText(locale, "Select")}</span>
 					<ChevronDownIcon className="size-4 shrink-0" />
 				</button>
 			</div>
@@ -7566,11 +7754,19 @@ function ProductPartPickerDialog({
 	options: FieldOption[];
 	selectedValues: string[];
 }) {
+	const { locale } = useI18n();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [draftSelectedValues, setDraftSelectedValues] =
 		useState(selectedValues);
 	const selectedValueSet = new Set(draftSelectedValues);
 	const selectedCount = draftSelectedValues.length;
+	const partsSelectedLabel =
+		locale === "en"
+			? `${selectedCount} part${selectedCount === 1 ? "" : "s"} selected`
+			: translateServiceText(locale, "parts selected").replace(
+					"{count}",
+					String(selectedCount)
+				);
 	const normalizedQuery = searchQuery.trim().toLowerCase();
 	const filteredOptions =
 		normalizedQuery.length > 0
@@ -7614,10 +7810,12 @@ function ProductPartPickerDialog({
 			<div className="flex max-h-[calc(100vh-3rem)] w-full max-w-[440px] flex-col rounded-xl bg-card p-5 shadow-2xl">
 				<div className="flex items-start justify-between gap-4">
 					<div>
-						<h3 className="font-semibold text-lg">Add Part to Product</h3>
+						<h3 className="font-semibold text-lg">
+							{translateServiceText(locale, "Add Part to Product")}
+						</h3>
 						<div className="mt-4 border-border border-b">
 							<p className="w-fit border-primary border-b-2 px-3 pb-2 font-medium text-primary text-sm">
-								Search Existing
+								{translateServiceText(locale, "Search Existing")}
 							</p>
 						</div>
 					</div>
@@ -7640,16 +7838,14 @@ function ProductPartPickerDialog({
 					value={searchQuery}
 				/>
 				<div className="mt-2 flex items-center justify-between gap-3 text-xs">
-					<span className="text-muted-foreground">
-						{selectedCount} part{selectedCount === 1 ? "" : "s"} selected
-					</span>
+					<span className="text-muted-foreground">{partsSelectedLabel}</span>
 					{selectedCount > 0 ? (
 						<button
 							className="font-medium text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
 							onClick={() => setDraftSelectedValues([])}
 							type="button"
 						>
-							Clear selected
+							{translateServiceText(locale, "Clear selected")}
 						</button>
 					) : null}
 				</div>
@@ -7775,121 +7971,122 @@ function getCheckboxListDefaultValues(
 }
 
 function useEntityMutations(tenantId: string, onDone: () => void) {
+	const { t } = useI18n();
 	const assetCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Asset created.",
+		t("service.toast.assetCreated"),
 		"asset",
 		onDone
 	);
 	const assetUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Asset updated.",
+		t("service.toast.assetUpdated"),
 		"asset",
 		onDone
 	);
 	const contractCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Contract created.",
+		t("service.toast.contractCreated"),
 		"contract",
 		onDone
 	);
 	const contractUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Contract updated.",
+		t("service.toast.contractUpdated"),
 		"contract",
 		onDone
 	);
 	const engineerCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Engineer created.",
+		t("service.toast.engineerCreated"),
 		"engineer",
 		onDone
 	);
 	const engineerUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Engineer updated.",
+		t("service.toast.engineerUpdated"),
 		"engineer",
 		onDone
 	);
 	const faultCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Fault report created.",
+		t("service.toast.faultCreated"),
 		"fault report",
 		onDone
 	);
 	const faultUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Fault report updated.",
+		t("service.toast.faultUpdated"),
 		"fault report",
 		onDone
 	);
 	const hospitalCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Hospital created.",
+		t("service.toast.hospitalCreated"),
 		"hospital",
 		onDone
 	);
 	const hospitalUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Hospital updated.",
+		t("service.toast.hospitalUpdated"),
 		"hospital",
 		onDone
 	);
 	const jobCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Job created.",
+		t("service.toast.jobCreated"),
 		"job",
 		onDone
 	);
 	const jobUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Job updated.",
+		t("service.toast.jobUpdated"),
 		"job",
 		onDone
 	);
 	const partCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Part created.",
+		t("service.toast.partCreated"),
 		"part",
 		onDone
 	);
 	const partUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Part updated.",
+		t("service.toast.partUpdated"),
 		"part",
 		onDone
 	);
 	const productCreateSuccess = useMutationSuccess(
 		tenantId,
-		"Product created.",
+		t("service.toast.productCreated"),
 		"product",
 		onDone
 	);
 	const productUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"Product updated.",
+		t("service.toast.productUpdated"),
 		"product",
 		onDone
 	);
 	const tenantCreateSuccess = useTenantMutationSuccess(
-		"Tenant created.",
+		t("service.toast.tenantCreated"),
 		"tenant",
 		onDone
 	);
 	const tenantUpdateSuccess = useTenantMutationSuccess(
-		"Tenant updated.",
+		t("service.toast.tenantUpdated"),
 		"tenant",
 		onDone
 	);
 	const tenantUserCreateSuccess = useMutationSuccess(
 		tenantId,
-		"User created.",
+		t("service.toast.userCreated"),
 		"user",
 		onDone
 	);
 	const tenantUserUpdateSuccess = useMutationSuccess(
 		tenantId,
-		"User updated.",
+		t("service.toast.userUpdated"),
 		"user",
 		onDone
 	);
@@ -8157,10 +8354,12 @@ function RowActions({
 	onEdit: () => void;
 	tenantId: string;
 }) {
+	const { locale, t } = useI18n();
 	const deleteMutation = useDeleteMutation(entity, tenantId);
 	const isDeleting = deleteMutation.isPending;
 	const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 	const destructiveActionLabel = destructiveActionLabels[entity];
+	const entityLabel = translateServiceText(locale, entityLabels[entity]);
 	let deleteButtonContent: ReactNode = <Trash2Icon className="size-4" />;
 
 	if (entity === "tenantUser") {
@@ -8186,7 +8385,7 @@ function RowActions({
 	if (isDeleting) {
 		deleteButtonContent = <Loader2Icon className="size-4 animate-spin" />;
 	} else if (isConfirmingDelete) {
-		deleteButtonContent = "Confirm";
+		deleteButtonContent = t("common.confirm");
 	}
 
 	const handleDelete = () => {
@@ -8205,7 +8404,7 @@ function RowActions({
 	return (
 		<div className="inline-flex items-center justify-end gap-4">
 			<Button
-				aria-label={`Edit ${entityLabels[entity]}`}
+				aria-label={`${t("common.edit")} ${entityLabel}`}
 				className={compactButtonClass}
 				onClick={onEdit}
 				size="icon-sm"
@@ -8216,8 +8415,14 @@ function RowActions({
 			<Button
 				aria-label={
 					isConfirmingDelete
-						? `Confirm ${destructiveActionLabel} ${entityLabels[entity]}`
-						: `${titleCase(destructiveActionLabel)} ${entityLabels[entity]}`
+						? `${t("common.confirm")} ${translateServiceText(
+								locale,
+								destructiveActionLabel
+							)} ${entityLabel}`
+						: `${translateServiceText(
+								locale,
+								titleCase(destructiveActionLabel)
+							)} ${entityLabel}`
 				}
 				className={cn(
 					compactButtonClass,
@@ -8255,6 +8460,7 @@ function useMutationResult(
 	onDone?: () => void
 ) {
 	const queryClient = useQueryClient();
+	const { t } = useI18n();
 
 	return {
 		onError(error: { message?: string }) {
@@ -8262,6 +8468,7 @@ function useMutationResult(
 				action: errorAction,
 				entityLabel: errorLabel,
 				message: error.message,
+				t,
 			});
 
 			toast.error(businessError.title, {
@@ -8274,7 +8481,7 @@ function useMutationResult(
 			queryClient
 				.invalidateQueries(trpc.serviceOps.snapshot.queryFilter({ tenantId }))
 				.catch(() => {
-					toast.error("Unable to refresh tenant data.");
+					toast.error(t("service.toast.refreshFailed"));
 				});
 		},
 	};
@@ -8295,6 +8502,7 @@ function useTenantMutationResult(
 	onDone?: () => void
 ) {
 	const queryClient = useQueryClient();
+	const { t } = useI18n();
 
 	return {
 		onError(error: { message?: string }) {
@@ -8302,6 +8510,7 @@ function useTenantMutationResult(
 				action: errorAction,
 				entityLabel: errorLabel,
 				message: error.message,
+				t,
 			});
 
 			toast.error(businessError.title, {
@@ -8314,23 +8523,29 @@ function useTenantMutationResult(
 			queryClient
 				.invalidateQueries(trpc.serviceOps.snapshot.queryFilter())
 				.catch(() => {
-					toast.error("Unable to refresh tenant data.");
+					toast.error(t("service.toast.refreshFailed"));
 				});
 		},
 	};
 }
 
 function useDeleteMutation(entity: CrudEntity, tenantId: string) {
+	const { locale, t } = useI18n();
 	const actionLabel = destructiveActionLabels[entity];
+	const entityLabel = translateServiceText(locale, entityLabels[entity]);
+	const successLabel = t("toast.service.actionCompleted", {
+		action: t(getPastTenseActionKey(actionLabel)),
+		entity: entityLabel,
+	});
 	const entityDeleteSuccess = useMutationResult(
 		tenantId,
-		`${entityLabels[entity]} ${toPastTense(actionLabel)}.`,
-		entityLabels[entity],
+		successLabel,
+		entityLabel,
 		actionLabel
 	);
 	const tenantDeleteSuccess = useTenantMutationResult(
-		`${entityLabels[entity]} ${toPastTense(actionLabel)}.`,
-		entityLabels[entity],
+		successLabel,
+		entityLabel,
 		actionLabel
 	);
 	const successOptions =
@@ -8423,17 +8638,86 @@ function PageHeader({
 	eyebrow: string;
 	title: string;
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<div className="max-w-3xl">
-			<p className="font-medium text-muted-foreground text-xs">{eyebrow}</p>
-			<h2 className="mt-1 font-medium text-3xl tracking-tight">{title}</h2>
+			<p className="font-medium text-muted-foreground text-xs">
+				{translateServiceText(locale, eyebrow)}
+			</p>
+			<h2 className="mt-1 font-medium text-3xl tracking-tight">
+				{translateServiceText(locale, title)}
+			</h2>
 			{description ? (
 				<p className="mt-1 text-muted-foreground text-sm leading-relaxed">
-					{description}
+					{translateServiceText(locale, description)}
 				</p>
 			) : null}
 		</div>
 	);
+}
+
+function Button({
+	children,
+	title,
+	...props
+}: ComponentProps<typeof UiButton>) {
+	const { locale } = useI18n();
+
+	return (
+		<UiButton
+			title={
+				typeof title === "string" ? translateServiceText(locale, title) : title
+			}
+			{...props}
+		>
+			{localizeServiceNode(children, locale)}
+		</UiButton>
+	);
+}
+
+function CardTitle({ children, ...props }: ComponentProps<typeof UiCardTitle>) {
+	const { locale } = useI18n();
+
+	return (
+		<UiCardTitle {...props}>
+			{localizeServiceNode(children, locale)}
+		</UiCardTitle>
+	);
+}
+
+function Input({
+	"aria-label": ariaLabel,
+	placeholder,
+	title,
+	...props
+}: ComponentProps<typeof UiInput>) {
+	const { locale } = useI18n();
+
+	return (
+		<UiInput
+			aria-label={
+				typeof ariaLabel === "string"
+					? translateServiceText(locale, ariaLabel)
+					: ariaLabel
+			}
+			placeholder={
+				typeof placeholder === "string"
+					? translateServiceText(locale, placeholder)
+					: placeholder
+			}
+			title={
+				typeof title === "string" ? translateServiceText(locale, title) : title
+			}
+			{...props}
+		/>
+	);
+}
+
+function Label({ children, ...props }: ComponentProps<typeof UiLabel>) {
+	const { locale } = useI18n();
+
+	return <UiLabel {...props}>{localizeServiceNode(children, locale)}</UiLabel>;
 }
 
 function StatusPill({
@@ -8443,12 +8727,33 @@ function StatusPill({
 	children: ReactNode;
 	className: string;
 }) {
+	const { locale } = useI18n();
+
 	return (
 		<span
 			className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium text-xs ${className}`}
 		>
-			{children}
+			{localizeServiceNode(children, locale)}
 		</span>
+	);
+}
+
+function LocalizedText({
+	as = "span",
+	children,
+	className,
+}: {
+	as?: "p" | "span";
+	children: ReactNode;
+	className?: string;
+}) {
+	const { locale } = useI18n();
+	const Component = as;
+
+	return (
+		<Component className={className}>
+			{localizeServiceNode(children, locale)}
+		</Component>
 	);
 }
 
@@ -8518,10 +8823,16 @@ function formatCoordinate(value: number, axis: "lat" | "lng") {
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
+	const { locale } = useI18n();
+
 	return (
 		<div className={`${mutedPanelClass} p-3`}>
-			<p className="text-muted-foreground text-xs">{label}</p>
-			<p className="mt-1 font-medium text-sm">{value}</p>
+			<p className="text-muted-foreground text-xs">
+				{translateServiceText(locale, label)}
+			</p>
+			<p className="mt-1 font-medium text-sm">
+				{localizeServiceNode(value, locale)}
+			</p>
 		</div>
 	);
 }
@@ -8531,9 +8842,19 @@ function DashboardStatCard({
 }: {
 	stat: ServiceOpsSnapshot["dashboardStats"][number];
 }) {
+	const { locale, t } = useI18n();
+	const isPrimary = stat.id === "open-jobs";
+
 	return (
-		<Card className={panelClass}>
-			<CardHeader>
+		<Card
+			className={cn(
+				dashboardStatCardClass,
+				isPrimary
+					? "bg-muted/15 shadow-[0_16px_42px_-30px_rgb(0_0_0_/_0.55)]"
+					: ""
+			)}
+		>
+			<CardHeader className="px-5">
 				<CardTitle className="text-muted-foreground text-sm">
 					{stat.label}
 				</CardTitle>
@@ -8541,22 +8862,110 @@ function DashboardStatCard({
 					<ArrowUpRightIcon className="size-4 text-muted-foreground" />
 				</CardAction>
 			</CardHeader>
-			<CardContent className="flex flex-col gap-2">
-				<div className="flex items-start justify-between gap-3">
-					<div>
-						<p className="font-medium text-3xl leading-none tracking-tight">
-							{stat.value}
-						</p>
-					</div>
-					<StatusPill className="border-green-200 bg-green-500/10 text-green-700">
-						<TrendingUpIcon className="size-3" />
-						Live
-					</StatusPill>
+			<CardContent className="flex flex-col gap-3 px-5">
+				<div className="flex items-center justify-between gap-3">
+					<p className="font-semibold text-3xl leading-none tracking-normal">
+						{stat.value}
+					</p>
+					<span className="shrink-0" title={t("service.dashboard.liveData")}>
+						<span
+							aria-hidden="true"
+							className="block size-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgb(16_185_129_/_0.14)]"
+						/>
+						<span className="sr-only">{t("service.dashboard.liveData")}</span>
+					</span>
 				</div>
-				<p className="text-sm">{stat.meta}</p>
+				<p className="text-foreground/80 text-sm leading-relaxed">
+					{getDashboardStatMetaLabel(stat.meta, locale)}
+				</p>
 			</CardContent>
 		</Card>
 	);
+}
+
+function getDashboardStatMetaLabel(value: string, locale: AppLocale) {
+	const urgentMatch = dashboardUrgentMetaRegex.exec(value);
+
+	if (urgentMatch?.[1] && urgentMatch[2]) {
+		return `${urgentMatch[1]} ${translateServiceText(locale, "urgent")}, ${urgentMatch[2]} ${translateServiceText(locale, "anomaly")}`;
+	}
+
+	const severityMatch = dashboardSeverityMetaRegex.exec(value);
+
+	if (severityMatch?.[1]) {
+		return `${severityMatch[1]} ${translateServiceText(locale, "high or critical")}`;
+	}
+
+	return translateServiceText(locale, value);
+}
+
+function translateLiveAlertMessage(value: string, locale: AppLocale) {
+	const timerMatch = timerAlertMessageRegex.exec(value);
+
+	if (timerMatch?.[1] && timerMatch[2] && timerMatch[3]) {
+		return translateServiceText(
+			locale,
+			"{engineer} left {hospital} while {job} timer is running."
+		)
+			.replace("{engineer}", timerMatch[1])
+			.replace("{hospital}", timerMatch[2])
+			.replace("{job}", timerMatch[3]);
+	}
+
+	const pmMatch = pmAlertMessageRegex.exec(value);
+
+	if (pmMatch?.[1] && pmMatch[2] && pmMatch[3]) {
+		return translateServiceText(
+			locale,
+			"{engineer} is on-site at {hospital}. {asset} PM is due soon."
+		)
+			.replace("{engineer}", pmMatch[1])
+			.replace("{hospital}", pmMatch[2])
+			.replace("{asset}", pmMatch[3]);
+	}
+
+	const contractMatch = contractAlertMessageRegex.exec(value);
+
+	if (contractMatch?.[1] && contractMatch[2]) {
+		return translateServiceText(
+			locale,
+			"{hospital} contract expires on {date}."
+		)
+			.replace("{hospital}", contractMatch[1])
+			.replace("{date}", contractMatch[2]);
+	}
+
+	return translateServiceText(locale, value);
+}
+
+function localizeServiceNode(node: ReactNode, locale: AppLocale): ReactNode {
+	if (typeof node === "string") {
+		return translateServiceText(locale, node);
+	}
+
+	if (typeof node === "number") {
+		return node;
+	}
+
+	if (Array.isArray(node)) {
+		return node.map((child) => localizeServiceNode(child, locale));
+	}
+
+	if (isValidElement<{ children?: ReactNode }>(node)) {
+		const children = node.props.children;
+
+		if (children === undefined) {
+			return node;
+		}
+
+		return cloneElement(node, {
+			children: Children.map(children, (child) =>
+				localizeServiceNode(child, locale)
+			),
+		});
+	}
+
+	return node;
 }
 
 function buildJobActivityBars(jobs: Job[]) {
@@ -8589,25 +8998,14 @@ function SegmentedProgress({
 	active: number;
 	total: number;
 }) {
-	const barCount = 34;
-	const activeBars = Math.round((active / Math.max(total, 1)) * barCount);
-	const bars = Array.from({ length: barCount }, (_, index) => ({
-		active: index < activeBars,
-		id: `progress-bar-${index + 1}`,
-	}));
+	const progressPercent = Math.round((active / Math.max(total, 1)) * 100);
 
 	return (
-		<div className="flex h-10 w-full items-end gap-0.5">
-			{bars.map((bar) => (
-				<div className="flex flex-1 justify-center" key={bar.id}>
-					<div
-						className={cn(
-							"h-10 w-1.5 rounded-full",
-							bar.active ? "bg-muted-foreground/75" : "bg-muted-foreground/25"
-						)}
-					/>
-				</div>
-			))}
+		<div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+			<div
+				className="h-full rounded-full bg-[linear-gradient(90deg,var(--color-chart-4),var(--color-chart-2))] transition-[width]"
+				style={{ width: `${Math.min(progressPercent, 100)}%` }}
+			/>
 		</div>
 	);
 }

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { translateServiceText } from "@luke/i18n";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useEngineerApp } from "@/components/engineer-app/engineer-app-context";
@@ -12,15 +13,16 @@ import {
 	GhostButton,
 	InfoRow,
 	jobTone,
-	jobTypeLabel,
 	ScreenHeader,
 	SectionLabel,
 	SelectOption,
 	ShiftStatus,
 	TextField,
+	useJobTypeLabel,
 } from "@/components/engineer-app/engineer-ui";
 import { JobCard } from "@/components/engineer-app/job-card";
 import { PartsList } from "@/components/engineer-app/parts-list";
+import { useI18n } from "@/contexts/i18n-context";
 
 export default function JobsTab() {
 	const { jobStage } = useEngineerApp();
@@ -47,6 +49,7 @@ export default function JobsTab() {
 }
 
 function JobListScreen() {
+	const { locale, t } = useI18n();
 	const { jobs, selectJob } = useEngineerApp();
 
 	return (
@@ -55,7 +58,7 @@ function JobListScreen() {
 			<ShiftStatus />
 			<ScreenHeader
 				subtitle="Wednesday, 27 May · 3 assigned"
-				title="Today's Jobs"
+				title={t("native.todayJobs")}
 			/>
 			{jobs.map((job) => (
 				<JobCard job={job} key={job.id} onPress={() => selectJob(job.id)} />
@@ -72,10 +75,13 @@ function JobListScreen() {
 						<Text
 							style={{ color: colors.text, fontSize: 14, fontWeight: "800" }}
 						>
-							Route order locked
+							{translateServiceText(locale, "Route order locked")}
 						</Text>
 						<Text style={{ color: colors.text2, fontSize: 12, marginTop: 3 }}>
-							Urgent repairs stay pinned above planned maintenance.
+							{translateServiceText(
+								locale,
+								"Urgent repairs stay pinned above planned maintenance."
+							)}
 						</Text>
 					</View>
 				</View>
@@ -85,15 +91,17 @@ function JobListScreen() {
 }
 
 function JobDetailScreen() {
+	const { locale, t } = useI18n();
 	const { selectedJob, setJobStage, startSelectedJob } = useEngineerApp();
 	const tone = jobTone(selectedJob.type);
 	const isInstallation = selectedJob.type === "installation";
+	const getJobTypeLabel = useJobTypeLabel();
 
 	return (
 		<EngineerScreen>
 			<ShiftStatus />
 			<ScreenHeader
-				backLabel="Jobs"
+				backLabel={t("native.jobs")}
 				onBack={() => setJobStage("list")}
 				subtitle={selectedJob.title}
 				title={`Job #${selectedJob.id}`}
@@ -106,12 +114,18 @@ function JobDetailScreen() {
 					marginBottom: 10,
 				}}
 			>
-				<Badge tone={tone}>{jobTypeLabel(selectedJob.type)}</Badge>
-				<Badge>Assigned</Badge>
+				<Badge tone={tone}>{getJobTypeLabel(selectedJob.type)}</Badge>
+				<Badge>{translateServiceText(locale, "Assigned")}</Badge>
 			</View>
 			<Card>
-				<InfoRow label="Hospital" value={selectedJob.site} />
-				<InfoRow label="Location" value={selectedJob.location} />
+				<InfoRow
+					label={translateServiceText(locale, "Hospital")}
+					value={selectedJob.site}
+				/>
+				<InfoRow
+					label={translateServiceText(locale, "Location")}
+					value={selectedJob.location}
+				/>
 				<InfoRow label="Device" value={selectedJob.device} />
 				<InfoRow label="Serial No." value={selectedJob.serial} />
 				<InfoRow
@@ -124,7 +138,9 @@ function JobDetailScreen() {
 			<ActionButton
 				icon={isInstallation ? "play-circle" : "scan"}
 				label={
-					isInstallation ? "Start Installation" : "Scan NFC / QR - Start Job"
+					isInstallation
+						? t("native.startInstallation")
+						: t("native.scanStartJob")
 				}
 				onPress={startSelectedJob}
 			/>
@@ -132,14 +148,14 @@ function JobDetailScreen() {
 				<View style={{ flex: 1 }}>
 					<GhostButton
 						icon="document-text"
-						label="Service Manual"
+						label={t("native.serviceManual")}
 						onPress={() => undefined}
 					/>
 				</View>
 				<View style={{ flex: 1 }}>
 					<GhostButton
 						icon="cube"
-						label="Parts List"
+						label={t("native.partsList")}
 						onPress={() => setJobStage("parts")}
 					/>
 				</View>
@@ -149,6 +165,7 @@ function JobDetailScreen() {
 }
 
 function ActiveJobScreen() {
+	const { locale, t } = useI18n();
 	const { selectedJob, setJobStage } = useEngineerApp();
 
 	return (
@@ -161,7 +178,7 @@ function ActiveJobScreen() {
 				}}
 			>
 				<View style={{ alignItems: "center" }}>
-					<Badge tone="blue">Job In Progress</Badge>
+					<Badge tone="blue">{t("native.jobInProgress")}</Badge>
 					<Text
 						style={{
 							color: colors.blueLight,
@@ -174,7 +191,7 @@ function ActiveJobScreen() {
 						1:23:45
 					</Text>
 					<Text style={{ color: colors.text2, fontSize: 12, marginTop: 4 }}>
-						Job #{selectedJob.id} · NFC confirmed · Timer running
+						{`${translateServiceText(locale, "Job")} #${selectedJob.id} · ${translateServiceText(locale, "NFC confirmed")} · ${translateServiceText(locale, "Timer running")}`}
 					</Text>
 				</View>
 			</Card>
@@ -215,27 +232,27 @@ function ActiveJobScreen() {
 				<View style={{ flex: 1 }}>
 					<GhostButton
 						icon="document-text"
-						label="Manual"
+						label={t("service.action.viewManual")}
 						onPress={() => undefined}
 					/>
 				</View>
 				<View style={{ flex: 1 }}>
 					<GhostButton
 						icon="cube"
-						label="Parts"
+						label={t("native.parts")}
 						onPress={() => setJobStage("parts")}
 					/>
 				</View>
 			</View>
 			<ActionButton
 				icon="pause-circle"
-				label="Pause Job"
+				label={t("native.pauseJob")}
 				onPress={() => setJobStage("pause")}
 				tone="amber"
 			/>
 			<ActionButton
 				icon="scan-circle"
-				label="Scan NFC / QR - Complete Job"
+				label={t("native.scanCompleteJob")}
 				onPress={() => setJobStage("submit-record")}
 			/>
 		</EngineerScreen>
@@ -243,6 +260,7 @@ function ActiveJobScreen() {
 }
 
 function PauseJobScreen() {
+	const { locale } = useI18n();
 	const { selectedJob, setJobStage, pauseSelectedJob } = useEngineerApp();
 	const [reason, setReason] = useState("Parts not available");
 	const [selectedParts, setSelectedParts] = useState(
@@ -303,7 +321,10 @@ function PauseJobScreen() {
 					))}
 				</View>
 			</Card>
-			<SectionLabel>Select missing parts - {selectedJob.device}</SectionLabel>
+			<SectionLabel>
+				{translateServiceText(locale, "Select missing parts")} -{" "}
+				{selectedJob.device}
+			</SectionLabel>
 			<PartsList
 				onTogglePart={togglePart}
 				parts={selectedJob.parts}
@@ -333,15 +354,16 @@ function PauseJobScreen() {
 }
 
 function SubmitRecordScreen() {
+	const { locale, t } = useI18n();
 	const { selectedJob, setJobStage } = useEngineerApp();
 
 	return (
 		<EngineerScreen>
 			<ScreenHeader
-				backLabel="Active Job"
+				backLabel={t("native.activeJob")}
 				onBack={() => setJobStage("active")}
-				subtitle={`NFC confirmed · Job #${selectedJob.id}`}
-				title="Submit Record"
+				subtitle={`${translateServiceText(locale, "NFC confirmed")} · ${translateServiceText(locale, "Job")} #${selectedJob.id}`}
+				title={t("native.submitRecord")}
 			/>
 			<Card>
 				<View
@@ -352,7 +374,7 @@ function SubmitRecordScreen() {
 						marginBottom: 6,
 					}}
 				>
-					<Badge tone="green">Job Complete</Badge>
+					<Badge tone="green">{t("native.jobComplete")}</Badge>
 					<Text
 						style={{ color: colors.blueLight, fontSize: 13, fontWeight: "800" }}
 					>
@@ -387,18 +409,20 @@ function SubmitRecordScreen() {
 				>
 					<View style={{ flexDirection: "row", gap: 9, alignItems: "center" }}>
 						<Ionicons color={colors.text2} name="camera" size={18} />
-						<Text style={{ color: colors.text2, fontSize: 13 }}>Photos</Text>
+						<Text style={{ color: colors.text2, fontSize: 13 }}>
+							{translateServiceText(locale, "Photos")}
+						</Text>
 					</View>
 					<Text
 						style={{ color: colors.blueLight, fontSize: 13, fontWeight: "700" }}
 					>
-						Add photo
+						{translateServiceText(locale, "Add photo")}
 					</Text>
 				</View>
 			</Card>
 			<ActionButton
 				icon="arrow-forward-circle"
-				label="Submit Record"
+				label={t("native.submitRecord")}
 				onPress={() => setJobStage("parts")}
 			/>
 		</EngineerScreen>
@@ -406,6 +430,7 @@ function SubmitRecordScreen() {
 }
 
 function LogPartsScreen() {
+	const { locale, t } = useI18n();
 	const { selectedJob, setJobStage, completeSelectedJob } = useEngineerApp();
 	const [quantities, setQuantities] = useState<Record<string, number>>(() =>
 		Object.fromEntries(
@@ -427,10 +452,10 @@ function LogPartsScreen() {
 	return (
 		<EngineerScreen>
 			<ScreenHeader
-				backLabel="Submit Record"
+				backLabel={t("native.submitRecord")}
 				onBack={() => setJobStage("submit-record")}
 				subtitle={`${selectedJob.device} · Job #${selectedJob.id}`}
-				title="Log Parts Used"
+				title={t("native.logPartsUsed")}
 			/>
 			<Card
 				style={{
@@ -439,12 +464,19 @@ function LogPartsScreen() {
 				}}
 			>
 				<Text style={{ color: colors.amber, fontSize: 12, lineHeight: 18 }}>
-					Log parts used during this job. Parts records are linked to this job
-					in the system.
+					{translateServiceText(
+						locale,
+						"Log parts used during this job. Parts records are linked to this job in the system."
+					)}
 				</Text>
 			</Card>
-			<TextField label="Search parts" placeholder="Search parts..." />
-			<SectionLabel>Standard parts for this model</SectionLabel>
+			<TextField
+				label={t("common.search")}
+				placeholder={t("form.searchFieldPlaceholder", {
+					label: t("native.parts"),
+				})}
+			/>
+			<SectionLabel>{t("form.selectStandardParts")}</SectionLabel>
 			<PartsList
 				onChangeQuantity={setQuantity}
 				parts={selectedJob.parts}
@@ -452,7 +484,7 @@ function LogPartsScreen() {
 			/>
 			<ActionButton
 				icon="save"
-				label={`Save Parts (${totalItems} item${totalItems === 1 ? "" : "s"})`}
+				label={`${translateServiceText(locale, "Save Parts")} (${translateServiceText(locale, totalItems === 1 ? "1 item" : "{count} items").replace("{count}", String(totalItems))})`}
 				onPress={completeSelectedJob}
 			/>
 		</EngineerScreen>
@@ -460,6 +492,7 @@ function LogPartsScreen() {
 }
 
 function JobCompleteScreen() {
+	const { locale, t } = useI18n();
 	const { selectedJob, setJobStage } = useEngineerApp();
 
 	return (
@@ -480,10 +513,10 @@ function JobCompleteScreen() {
 					<Ionicons color={colors.green} name="checkmark" size={38} />
 				</View>
 				<Text style={{ color: colors.text, fontSize: 28, fontWeight: "900" }}>
-					Job Complete
+					{t("native.jobComplete")}
 				</Text>
 				<Text style={{ color: colors.text2, fontSize: 13, marginTop: 6 }}>
-					Record submitted · Back office notified
+					{`${translateServiceText(locale, "Record submitted")} · ${translateServiceText(locale, "Back office notified")}`}
 				</Text>
 			</View>
 			<Card style={{ marginTop: 24 }}>
@@ -493,7 +526,7 @@ function JobCompleteScreen() {
 			</Card>
 			<ActionButton
 				icon="list"
-				label="Back to Jobs"
+				label={t("native.backToJobs")}
 				onPress={() => setJobStage("list")}
 			/>
 		</EngineerScreen>

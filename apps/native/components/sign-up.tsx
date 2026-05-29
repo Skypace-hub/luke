@@ -13,25 +13,28 @@ import { useRef } from "react";
 import { Text, type TextInput, View } from "react-native";
 import z from "zod";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useI18n } from "@/contexts/i18n-context";
 import { authClient } from "@/lib/auth-client";
 import { queryClient } from "@/utils/trpc";
 
-const signUpSchema = z.object({
-	name: z
-		.string()
-		.trim()
-		.min(1, "Name is required")
-		.min(2, "Name must be at least 2 characters"),
-	email: z
-		.string()
-		.trim()
-		.min(1, "Email is required")
-		.email("Enter a valid email address"),
-	password: z
-		.string()
-		.min(1, "Password is required")
-		.min(8, "Use at least 8 characters"),
-});
+const getSignUpSchema = (t: ReturnType<typeof useI18n>["t"]) =>
+	z.object({
+		name: z
+			.string()
+			.trim()
+			.min(1, t("native.nameRequired"))
+			.min(2, t("auth.nameMin")),
+		email: z
+			.string()
+			.trim()
+			.min(1, t("native.emailRequired"))
+			.email(t("native.enterValidEmail")),
+		password: z
+			.string()
+			.min(1, t("native.passwordRequired"))
+			.min(8, t("native.useAtLeast8")),
+	});
 
 function getErrorMessage(error: unknown): string | null {
 	if (!error) {
@@ -63,6 +66,7 @@ function getErrorMessage(error: unknown): string | null {
 }
 
 export function SignUp() {
+	const { t } = useI18n();
 	const emailInputRef = useRef<TextInput>(null);
 	const passwordInputRef = useRef<TextInput>(null);
 	const { toast } = useToast();
@@ -74,7 +78,7 @@ export function SignUp() {
 			password: "",
 		},
 		validators: {
-			onSubmit: signUpSchema,
+			onSubmit: getSignUpSchema(t),
 		},
 		onSubmit: async ({ value, formApi }) => {
 			await authClient.signUp.email(
@@ -87,14 +91,14 @@ export function SignUp() {
 					onError(error) {
 						toast.show({
 							variant: "danger",
-							label: error.error?.message || "Failed to sign up",
+							label: error.error?.message || t("native.failedSignUp"),
 						});
 					},
 					onSuccess() {
 						formApi.reset();
 						toast.show({
 							variant: "success",
-							label: "Account created successfully",
+							label: t("native.accountCreated"),
 						});
 						queryClient.refetchQueries();
 					},
@@ -105,7 +109,12 @@ export function SignUp() {
 
 	return (
 		<Surface className="rounded-lg p-4" variant="secondary">
-			<Text className="mb-4 font-medium text-foreground">Create Account</Text>
+			<View className="mb-4 flex-row items-center justify-between">
+				<Text className="font-medium text-foreground">
+					{t("native.createAccount")}
+				</Text>
+				<LanguageSwitcher />
+			</View>
 
 			<form.Subscribe
 				selector={(state) => ({
@@ -126,7 +135,7 @@ export function SignUp() {
 								<form.Field name="name">
 									{(field) => (
 										<TextField>
-											<Label>Name</Label>
+											<Label>{t("auth.name")}</Label>
 											<Input
 												autoComplete="name"
 												blurOnSubmit={false}
@@ -147,7 +156,7 @@ export function SignUp() {
 								<form.Field name="email">
 									{(field) => (
 										<TextField>
-											<Label>Email</Label>
+											<Label>{t("native.email")}</Label>
 											<Input
 												autoCapitalize="none"
 												autoComplete="email"
@@ -171,7 +180,7 @@ export function SignUp() {
 								<form.Field name="password">
 									{(field) => (
 										<TextField>
-											<Label>Password</Label>
+											<Label>{t("auth.password")}</Label>
 											<Input
 												autoComplete="new-password"
 												onBlur={field.handleBlur}
@@ -196,7 +205,7 @@ export function SignUp() {
 									{isSubmitting ? (
 										<Spinner color="default" size="sm" />
 									) : (
-										<Button.Label>Create Account</Button.Label>
+										<Button.Label>{t("native.createAccount")}</Button.Label>
 									)}
 								</Button>
 							</View>

@@ -1,6 +1,11 @@
 "use client";
 "use no memo";
 
+import {
+	type AppLocale,
+	type Translate,
+	translateServiceText,
+} from "@luke/i18n";
 import { Button } from "@luke/ui/components/button";
 import {
 	DropdownMenu,
@@ -43,7 +48,9 @@ import {
 	SlidersHorizontalIcon,
 } from "lucide-react";
 import {
+	Children,
 	type ComponentPropsWithoutRef,
+	cloneElement,
 	isValidElement,
 	type KeyboardEvent,
 	type MouseEvent,
@@ -54,6 +61,8 @@ import {
 	useState,
 } from "react";
 import { toast } from "sonner";
+
+import { useI18n } from "@/components/i18n-provider";
 
 export interface DataTableRow {
 	actions?: ReactNode;
@@ -123,6 +132,7 @@ export function DataTable({
 	selectedRowId = "",
 	title,
 }: DataTableProps) {
+	const { locale, t } = useI18n();
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 	const [exportFeedback, setExportFeedback] = useState("");
 	const [sorting, setSorting] = useState<SortingState>([]);
@@ -151,14 +161,31 @@ export function DataTable({
 		() => toServiceTableRows({ columns, rows }),
 		[columns, rows]
 	);
+	const displayColumns = useMemo(
+		() => columns.map((column) => translateServiceText(locale, column)),
+		[columns, locale]
+	);
 	const filterConfigs = useMemo(
 		() =>
-			getServiceTableFilterConfigs({ columns, filterLabels, rows: tableRows }),
-		[columns, filterLabels, tableRows]
+			getServiceTableFilterConfigs({
+				columns,
+				filterLabels,
+				locale,
+				rows: tableRows,
+			}),
+		[columns, filterLabels, locale, tableRows]
 	);
 	const tableColumns = useMemo(
-		() => getServiceTableColumns(columns, hasRowActions, isSingleRowSelection),
-		[columns, hasRowActions, isSingleRowSelection]
+		() =>
+			getServiceTableColumns(
+				columns,
+				displayColumns,
+				hasRowActions,
+				t,
+				locale,
+				isSingleRowSelection
+			),
+		[columns, displayColumns, hasRowActions, isSingleRowSelection, locale, t]
 	);
 	const table = useReactTable({
 		columns: tableColumns,
@@ -226,12 +253,16 @@ export function DataTable({
 	const sortValue = getSortMenuValue(primarySort);
 	const normalizedSearchQuery = globalFilter.trim();
 	const recordCountLabel =
-		title ?? `${rows.length} ${rows.length === 1 ? "record" : "records"}`;
+		title === undefined
+			? t("dataTable.recordCount", { count: rows.length })
+			: translateServiceText(locale, title);
 	const tableDescription =
 		description === null
 			? ""
-			: (description ??
-				"Recent service records with status, ownership, and schedule activity.");
+			: translateServiceText(
+					locale,
+					description ?? t("service.table.defaultDescription")
+				);
 
 	const exportVisibleRows = () => {
 		const visibleRows = table
@@ -242,7 +273,7 @@ export function DataTable({
 			rows: visibleRows,
 			title: title ?? "service-records",
 		});
-		setExportFeedback(`${visibleRows.length} row(s) exported.`);
+		setExportFeedback(t("dataTable.exported", { count: visibleRows.length }));
 	};
 
 	return (
@@ -258,7 +289,9 @@ export function DataTable({
 							</div>
 						) : (
 							<p className="font-medium text-base leading-none">
-								{title ?? `${rows.length} Records`}
+								{title === undefined
+									? `${rows.length} ${t("dataTable.records")}`
+									: translateServiceText(locale, title)}
 							</p>
 						)}
 						{tableDescription ? (
@@ -280,7 +313,7 @@ export function DataTable({
 						variant="outline"
 					>
 						<DownloadIcon data-icon="inline-start" />
-						Export
+						{t("common.export")}
 					</Button>
 				</div>
 				<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -288,18 +321,18 @@ export function DataTable({
 						<div className="relative sm:w-[340px]">
 							<SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
 							<Input
-								aria-label="Search records"
+								aria-label={t("dataTable.searchAria")}
 								className="h-8 rounded-lg bg-background pr-8 pl-9"
 								onChange={(event) => {
 									table.setGlobalFilter(event.target.value);
 									table.setPageIndex(0);
 								}}
-								placeholder="Search records..."
+								placeholder={t("dataTable.searchPlaceholder")}
 								value={globalFilter}
 							/>
 							{globalFilter ? (
 								<button
-									aria-label="Clear search"
+									aria-label={t("common.clearSearch")}
 									className="absolute top-1/2 right-2 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 									onClick={() => {
 										table.setGlobalFilter("");
@@ -429,7 +462,9 @@ export function DataTable({
 									className="h-24 text-center text-muted-foreground"
 									colSpan={table.getVisibleLeafColumns().length}
 								>
-									{hasRows ? "No matching records." : "No records yet."}
+									{hasRows
+										? t("dataTable.empty.filtered")
+										: t("dataTable.empty.rows")}
 								</TableCell>
 							</UiTableRow>
 						)}
@@ -439,15 +474,18 @@ export function DataTable({
 			<div className="flex flex-col gap-3 px-6 py-4 text-muted-foreground text-sm lg:flex-row lg:items-center lg:justify-between">
 				<div className="flex flex-col gap-1">
 					<p>
-						{selectedRowCount} of {filteredRowCount} row(s) selected.
+						{t("dataTable.selected", {
+							count: filteredRowCount,
+							selected: selectedRowCount,
+						})}
 					</p>
 					{exportFeedback ? <p>{exportFeedback}</p> : null}
 				</div>
 				<div className="flex flex-wrap items-center gap-3">
 					<label className="flex items-center gap-2">
-						<span>Rows per page</span>
+						<span>{t("dataTable.rowsPerPage")}</span>
 						<select
-							aria-label="Rows per page"
+							aria-label={t("dataTable.rowsPerPage")}
 							className="h-8 rounded-lg border bg-background px-2 text-foreground text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 							name="rows-per-page"
 							onChange={(event) => {
@@ -463,15 +501,20 @@ export function DataTable({
 						</select>
 					</label>
 					<p>
-						Showing {table.getRowModel().rows.length} of {filteredRowCount}
-						{normalizedSearchQuery ? " filtered" : ""} records.
+						{t("dataTable.showing", {
+							count: filteredRowCount,
+							filtered: normalizedSearchQuery
+								? ` ${t("dataTable.filtered")}`
+								: "",
+							visible: table.getRowModel().rows.length,
+						})}
 					</p>
 					<p>
-						Page {currentPage} of {pageCount}
+						{t("dataTable.page", { current: currentPage, total: pageCount })}
 					</p>
 					<div className="flex items-center gap-2">
 						<Button
-							aria-label="Go to previous page"
+							aria-label={t("dataTable.goPrevious")}
 							className={compactButtonClass}
 							disabled={!table.getCanPreviousPage()}
 							onClick={() => table.previousPage()}
@@ -481,7 +524,7 @@ export function DataTable({
 							<ChevronLeftIcon className="size-4" />
 						</Button>
 						<Button
-							aria-label="Go to next page"
+							aria-label={t("dataTable.goNext")}
 							className={compactButtonClass}
 							disabled={!table.getCanNextPage()}
 							onClick={() => table.nextPage()}
@@ -506,8 +549,10 @@ function FilterMenu({
 	onChange: (value: string) => void;
 	value: string;
 }) {
+	const { locale, t } = useI18n();
 	const activeOption =
 		config.options.find((option) => option === value) ?? "All";
+	const displayActiveOption = translateServiceText(locale, activeOption);
 
 	return (
 		<DropdownMenu>
@@ -526,17 +571,19 @@ function FilterMenu({
 				{config.label}
 				<ChevronDownIcon data-icon="inline-end" />
 				{value === "all" ? null : (
-					<span className="ml-1 text-muted-foreground">· {activeOption}</span>
+					<span className="ml-1 text-muted-foreground">
+						· {displayActiveOption}
+					</span>
 				)}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-44 bg-card">
 				<DropdownMenuRadioGroup onValueChange={onChange} value={value}>
 					<DropdownMenuRadioItem closeOnClick value="all">
-						All
+						{t("common.all")}
 					</DropdownMenuRadioItem>
 					{config.options.map((option) => (
 						<DropdownMenuRadioItem closeOnClick key={option} value={option}>
-							{option}
+							{translateServiceText(locale, option)}
 						</DropdownMenuRadioItem>
 					))}
 				</DropdownMenuRadioGroup>
@@ -576,7 +623,10 @@ function SortMenu({
 	onChange: (value: string) => void;
 	value: string;
 }) {
+	const { t } = useI18n();
 	const sortLabel = getSortMenuLabel(value);
+	const displaySortLabel =
+		sortLabel === "Default" ? t("common.default") : sortLabel;
 
 	return (
 		<DropdownMenu>
@@ -593,13 +643,13 @@ function SortMenu({
 				}
 			>
 				<SlidersHorizontalIcon data-icon="inline-start" />
-				Sort
-				<span className="ml-1 text-muted-foreground">· {sortLabel}</span>
+				{t("common.sort")}
+				<span className="ml-1 text-muted-foreground">· {displaySortLabel}</span>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-40 bg-card">
 				<DropdownMenuRadioGroup onValueChange={onChange} value={value}>
 					<DropdownMenuRadioItem closeOnClick value="default">
-						Default
+						{t("common.default")}
 					</DropdownMenuRadioItem>
 					<DropdownMenuRadioItem closeOnClick value="asc">
 						A-Z
@@ -693,6 +743,36 @@ function getNodeText(node: ReactNode): string {
 	return "";
 }
 
+function localizeTableCell(node: ReactNode, locale: AppLocale): ReactNode {
+	if (typeof node === "string") {
+		return translateServiceText(locale, node);
+	}
+
+	if (typeof node === "number") {
+		return node;
+	}
+
+	if (Array.isArray(node)) {
+		return node.map((child) => localizeTableCell(child, locale));
+	}
+
+	if (isValidElement<{ children?: ReactNode }>(node)) {
+		const children = node.props.children;
+
+		if (children === undefined) {
+			return node;
+		}
+
+		return cloneElement(node, {
+			children: Children.map(children, (child) =>
+				localizeTableCell(child, locale)
+			),
+		});
+	}
+
+	return node;
+}
+
 function getDataTableRowValues({
 	columns,
 	row,
@@ -772,10 +852,12 @@ const serviceTableColumnFilter: FilterFn<ServiceTableRow> = (
 function getServiceTableFilterConfigs({
 	columns,
 	filterLabels,
+	locale,
 	rows,
 }: {
 	columns: string[];
 	filterLabels: string[];
+	locale: AppLocale;
 	rows: ServiceTableRow[];
 }): ServiceTableFilterConfig[] {
 	return filterLabels
@@ -793,7 +875,11 @@ function getServiceTableFilterConfigs({
 						.filter(Boolean)
 				)
 			).sort((first, second) =>
-				first.localeCompare(second, undefined, { sensitivity: "base" })
+				translateServiceText(locale, first).localeCompare(
+					translateServiceText(locale, second),
+					locale,
+					{ sensitivity: "base" }
+				)
 			);
 
 			if (options.length === 0) {
@@ -802,7 +888,7 @@ function getServiceTableFilterConfigs({
 
 			return {
 				columnId: `column-${columnIndex}`,
-				label,
+				label: translateServiceText(locale, label),
 				options,
 			};
 		})
@@ -913,7 +999,10 @@ function getServiceTableDataColumnIndex(columnId: string) {
 
 function getServiceTableColumns(
 	columns: string[],
+	displayColumns: string[],
 	hasActions: boolean,
+	t: Translate,
+	locale: AppLocale,
 	isSingleRowSelection = false
 ): ColumnDef<ServiceTableRow>[] {
 	const tableColumns: ColumnDef<ServiceTableRow>[] = [
@@ -921,7 +1010,7 @@ function getServiceTableColumns(
 			cell: ({ row }) => (
 				<div className="flex min-h-5 items-center justify-center">
 					<TableSelectionCheckbox
-						aria-label={`Select ${row.original.id}`}
+						aria-label={t("dataTable.selectRow", { id: row.original.id })}
 						checked={row.getIsSelected()}
 						disabled={!row.getCanSelect()}
 						onChange={row.getToggleSelectedHandler()}
@@ -933,7 +1022,7 @@ function getServiceTableColumns(
 				isSingleRowSelection ? null : (
 					<div className="flex min-h-5 items-center justify-center">
 						<TableSelectionCheckbox
-							aria-label="Select all visible rows"
+							aria-label={t("dataTable.selectAll")}
 							checked={table.getIsAllPageRowsSelected()}
 							disabled={table.getRowModel().rows.length === 0}
 							indeterminate={
@@ -950,9 +1039,12 @@ function getServiceTableColumns(
 		...columns.map<ColumnDef<ServiceTableRow>>((column, index) => ({
 			accessorFn: (row) => row.values[index] ?? "",
 			cell: ({ row }) =>
-				row.original.cells[index] ?? row.original.values[index] ?? "",
+				localizeTableCell(
+					row.original.cells[index] ?? row.original.values[index] ?? "",
+					locale
+				),
 			filterFn: serviceTableColumnFilter,
-			header: column,
+			header: displayColumns[index] ?? column,
 			id: `column-${index}`,
 		})),
 	];
@@ -961,7 +1053,7 @@ function getServiceTableColumns(
 		tableColumns.push({
 			cell: ({ row }) => row.original.actions,
 			enableSorting: false,
-			header: "Actions",
+			header: t("common.edit"),
 			id: "actions",
 		});
 	}

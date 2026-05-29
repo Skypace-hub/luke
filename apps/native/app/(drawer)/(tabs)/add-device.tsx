@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { translateServiceText } from "@luke/i18n";
 import { Text, View } from "react-native";
 import { useEngineerApp } from "@/components/engineer-app/engineer-app-context";
 import {
@@ -13,6 +14,7 @@ import {
 	TextField,
 } from "@/components/engineer-app/engineer-ui";
 import { JobCard } from "@/components/engineer-app/job-card";
+import { useI18n } from "@/contexts/i18n-context";
 import { installationJobs } from "@/lib/engineer-app-data";
 
 export default function AddDeviceTab() {
@@ -32,6 +34,7 @@ export default function AddDeviceTab() {
 
 function AddDeviceHomeScreen() {
 	const { setAddDeviceStage } = useEngineerApp();
+	const { locale } = useI18n();
 
 	return (
 		<EngineerScreen>
@@ -56,7 +59,7 @@ function AddDeviceHomeScreen() {
 			))}
 			<Card style={{ marginTop: 12 }}>
 				<Text style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>
-					Device not in your job list?
+					{translateServiceText(locale, "Device not in your job list?")}
 				</Text>
 				<Text
 					style={{
@@ -66,7 +69,10 @@ function AddDeviceHomeScreen() {
 						marginTop: 4,
 					}}
 				>
-					Add enough detail for back office review and completion.
+					{translateServiceText(
+						locale,
+						"Add enough detail for back office review and completion."
+					)}
 				</Text>
 				<ActionButton
 					icon="create"
@@ -81,6 +87,7 @@ function AddDeviceHomeScreen() {
 
 function CommissionTagScreen() {
 	const { setAddDeviceStage } = useEngineerApp();
+	const { locale } = useI18n();
 	const job = installationJobs[0];
 
 	return (
@@ -88,7 +95,7 @@ function CommissionTagScreen() {
 			<ScreenHeader
 				backLabel="Add Device"
 				onBack={() => setAddDeviceStage("list")}
-				subtitle={`Job #${job.id} · ${job.site}`}
+				subtitle={`${translateServiceText(locale, "Job")} #${job.id} · ${job.site}`}
 				title="Commission Tag"
 			/>
 			<View style={{ alignItems: "center", paddingVertical: 20 }}>
@@ -125,7 +132,10 @@ function CommissionTagScreen() {
 						textAlign: "center",
 					}}
 				>
-					Hold phone near the blank NFC sticker on the new device.
+					{translateServiceText(
+						locale,
+						"Hold phone near the blank NFC sticker on the new device."
+					)}
 				</Text>
 			</View>
 			<Card>
@@ -134,7 +144,10 @@ function CommissionTagScreen() {
 				<InfoRow isLast label="Tag format" value="NTAG213 / 215 / 216" />
 			</Card>
 			<Text style={{ color: colors.text3, fontSize: 12, lineHeight: 18 }}>
-				This links the NFC sticker to the asset record in the system.
+				{translateServiceText(
+					locale,
+					"This links the NFC sticker to the asset record in the system."
+				)}
 			</Text>
 			<ActionButton
 				icon="checkmark-circle"
@@ -148,6 +161,7 @@ function CommissionTagScreen() {
 
 function ManualDeviceEntryScreen() {
 	const { setAddDeviceStage } = useEngineerApp();
+	const { locale } = useI18n();
 
 	return (
 		<EngineerScreen>
@@ -164,8 +178,10 @@ function ManualDeviceEntryScreen() {
 				}}
 			>
 				<Text style={{ color: colors.blueLight, fontSize: 12, lineHeight: 18 }}>
-					Fill in what you know. Back office receives this record and completes
-					missing information.
+					{translateServiceText(
+						locale,
+						"Fill in what you know. Back office receives this record and completes missing information."
+					)}
 				</Text>
 			</Card>
 			<TextField
@@ -192,6 +208,7 @@ function ManualDeviceEntryScreen() {
 
 function TagWriteSuccessScreen() {
 	const { setAddDeviceStage } = useEngineerApp();
+	const { locale } = useI18n();
 
 	return (
 		<EngineerScreen>
@@ -211,7 +228,7 @@ function TagWriteSuccessScreen() {
 					<Ionicons color={colors.green} name="checkmark" size={38} />
 				</View>
 				<Text style={{ color: colors.text, fontSize: 28, fontWeight: "900" }}>
-					Tag Linked
+					{translateServiceText(locale, "Tag Linked")}
 				</Text>
 				<Text
 					style={{
@@ -222,7 +239,10 @@ function TagWriteSuccessScreen() {
 						textAlign: "center",
 					}}
 				>
-					Asset record updated. Back office can now see the commissioned device.
+					{translateServiceText(
+						locale,
+						"Asset record updated. Back office can now see the commissioned device."
+					)}
 				</Text>
 			</View>
 			<Card style={{ marginTop: 24 }}>

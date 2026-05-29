@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { AppThemeProvider } from "@/contexts/app-theme-context";
+import { I18nProvider, useI18n } from "@/contexts/i18n-context";
 import { queryClient } from "@/utils/trpc";
 
 export const unstable_settings = {
@@ -13,12 +14,14 @@ export const unstable_settings = {
 };
 
 function StackLayout() {
+	const { t } = useI18n();
+
 	return (
 		<Stack screenOptions={{}}>
 			<Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 			<Stack.Screen
 				name="modal"
-				options={{ title: "Modal", presentation: "modal" }}
+				options={{ title: t("native.modal"), presentation: "modal" }}
 			/>
 		</Stack>
 	);
@@ -30,9 +33,11 @@ export default function Layout() {
 			<GestureHandlerRootView style={{ flex: 1 }}>
 				<KeyboardProvider>
 					<AppThemeProvider>
-						<HeroUINativeProvider>
-							<StackLayout />
-						</HeroUINativeProvider>
+						<I18nProvider>
+							<HeroUINativeProvider>
+								<StackLayout />
+							</HeroUINativeProvider>
+						</I18nProvider>
 					</AppThemeProvider>
 				</KeyboardProvider>
 			</GestureHandlerRootView>

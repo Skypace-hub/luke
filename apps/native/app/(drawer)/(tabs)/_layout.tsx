@@ -3,8 +3,11 @@ import { Tabs } from "expo-router";
 
 import { EngineerAppProvider } from "@/components/engineer-app/engineer-app-context";
 import { colors } from "@/components/engineer-app/engineer-ui";
+import { useI18n } from "@/contexts/i18n-context";
 
 export default function TabLayout() {
+	const { t } = useI18n();
+
 	return (
 		<EngineerAppProvider>
 			<Tabs
@@ -29,7 +32,7 @@ export default function TabLayout() {
 				<Tabs.Screen
 					name="index"
 					options={{
-						title: "Jobs",
+						title: t("native.jobs"),
 						tabBarIcon: ({ color, size }) => (
 							<Ionicons color={color} name="clipboard" size={size} />
 						),
@@ -38,7 +41,7 @@ export default function TabLayout() {
 				<Tabs.Screen
 					name="calendar"
 					options={{
-						title: "Calendar",
+						title: t("native.calendar"),
 						tabBarIcon: ({ color, size }) => (
 							<Ionicons color={color} name="calendar" size={size} />
 						),
@@ -47,7 +50,7 @@ export default function TabLayout() {
 				<Tabs.Screen
 					name="check-device"
 					options={{
-						title: "Check",
+						title: t("native.checkDevice"),
 						tabBarIcon: ({ color, focused }) => (
 							<Ionicons
 								color={focused ? colors.white : color}
@@ -64,7 +67,7 @@ export default function TabLayout() {
 				<Tabs.Screen
 					name="add-device"
 					options={{
-						title: "Add",
+						title: t("native.addDevice"),
 						tabBarIcon: ({ color, size }) => (
 							<Ionicons color={color} name="add-circle" size={size} />
 						),
@@ -73,7 +76,7 @@ export default function TabLayout() {
 				<Tabs.Screen
 					name="profile"
 					options={{
-						title: "Profile",
+						title: t("native.profile"),
 						tabBarIcon: ({ color, size }) => (
 							<Ionicons color={color} name="person-circle" size={size} />
 						),

@@ -20,6 +20,7 @@ import {
 	authSubmitClass,
 } from "@/components/auth-form-styles";
 import { AuthCard, AuthShell } from "@/components/auth-shell";
+import { useI18n } from "@/components/i18n-provider";
 import { PasswordInput } from "@/components/password-input";
 import { authClient } from "@/lib/auth-client";
 import { getAuthError } from "@/lib/business-errors";
@@ -32,6 +33,7 @@ export default function SignInForm({
 	onSwitchToSignUp: () => void;
 }) {
 	const router = useRouter();
+	const { t } = useI18n();
 	const { isPending } = authClient.useSession();
 
 	const form = useForm({
@@ -48,12 +50,13 @@ export default function SignInForm({
 				{
 					onSuccess: () => {
 						router.push("/dashboard");
-						toast.success("Sign in successful");
+						toast.success(t("auth.signInSuccess"));
 					},
 					onError: (error) => {
 						const businessError = getAuthError({
 							action: "sign-in",
 							message: error.error.message || error.error.statusText,
+							t,
 						});
 
 						toast.error(businessError.title, {
@@ -65,8 +68,8 @@ export default function SignInForm({
 		},
 		validators: {
 			onSubmit: z.object({
-				email: z.string().trim().min(1, "Email or username is required"),
-				password: z.string().min(1, "Password is required"),
+				email: z.string().trim().min(1, t("auth.emailOrUsernameRequired")),
+				password: z.string().min(1, t("auth.passwordRequired")),
 			}),
 		},
 	});
@@ -80,17 +83,17 @@ export default function SignInForm({
 			<AuthCard
 				description={
 					<span>
-						New user?{" "}
+						{t("auth.newUser")}{" "}
 						<button
 							className={authLinkClass}
 							onClick={onSwitchToSignUp}
 							type="button"
 						>
-							Create an account
+							{t("auth.switchToSignUp")}
 						</button>
 					</span>
 				}
-				title="Sign in"
+				title={t("auth.signIn")}
 			>
 				<form
 					className="flex flex-col gap-6"
@@ -109,7 +112,7 @@ export default function SignInForm({
 							return (
 								<div className={authFieldClass}>
 									<Label className={authLabelClass} htmlFor={field.name}>
-										Email address
+										{t("auth.emailAddress")}
 									</Label>
 									<Input
 										aria-describedby={isInvalid ? errorId : undefined}
@@ -120,7 +123,7 @@ export default function SignInForm({
 										name={field.name}
 										onBlur={field.handleBlur}
 										onChange={(event) => field.handleChange(event.target.value)}
-										placeholder="name@company.com"
+										placeholder={t("auth.emailPlaceholder")}
 										type="text"
 										value={field.state.value}
 									/>
@@ -143,7 +146,7 @@ export default function SignInForm({
 							return (
 								<div className={authFieldClass}>
 									<Label className={authLabelClass} htmlFor={field.name}>
-										Password
+										{t("auth.password")}
 									</Label>
 									<PasswordInput
 										aria-describedby={isInvalid ? errorId : undefined}
@@ -154,7 +157,7 @@ export default function SignInForm({
 										name={field.name}
 										onBlur={field.handleBlur}
 										onChange={(event) => field.handleChange(event.target.value)}
-										placeholder="Enter password"
+										placeholder={t("auth.passwordPlaceholder")}
 										value={field.state.value}
 									/>
 									{errorMessage ? (
@@ -186,7 +189,7 @@ export default function SignInForm({
 											data-icon="inline-start"
 										/>
 									) : null}
-									{isSubmitting ? "Submitting..." : "Sign In"}
+									{isSubmitting ? t("auth.submitting") : t("auth.signInSubmit")}
 								</Button>
 							)}
 						</form.Subscribe>
@@ -194,10 +197,7 @@ export default function SignInForm({
 				</form>
 
 				<div className={authFooterClass}>
-					<p className={authFinePrintClass}>
-						Protected by Utiliti workspace security. Access is limited to
-						authorized service operations users.
-					</p>
+					<p className={authFinePrintClass}>{t("auth.footer.signIn")}</p>
 				</div>
 			</AuthCard>
 		</AuthShell>

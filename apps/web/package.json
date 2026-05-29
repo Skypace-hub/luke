@@ -12,6 +12,7 @@
     "@luke/api": "*",
     "@luke/auth": "*",
     "@luke/env": "*",
+    "@luke/i18n": "*",
     "@luke/ui": "*",
     "@tanstack/react-form": "^1.28.0",
     "@tanstack/react-query": "^5.90.12",

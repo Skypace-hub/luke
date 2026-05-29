@@ -19,6 +19,7 @@ import {
 	authSubmitClass,
 } from "@/components/auth-form-styles";
 import { AuthCard, AuthShell } from "@/components/auth-shell";
+import { useI18n } from "@/components/i18n-provider";
 import { PasswordInput } from "@/components/password-input";
 import { authClient } from "@/lib/auth-client";
 import { getAuthError } from "@/lib/business-errors";
@@ -31,6 +32,7 @@ export default function SignUpForm({
 	onSwitchToSignIn: () => void;
 }) {
 	const router = useRouter();
+	const { t } = useI18n();
 	const { isPending } = authClient.useSession();
 
 	const form = useForm({
@@ -49,12 +51,13 @@ export default function SignUpForm({
 				{
 					onSuccess: () => {
 						router.push("/dashboard");
-						toast.success("Sign up successful");
+						toast.success(t("auth.signUpSuccess"));
 					},
 					onError: (error) => {
 						const businessError = getAuthError({
 							action: "sign-up",
 							message: error.error.message || error.error.statusText,
+							t,
 						});
 
 						toast.error(businessError.title, {
@@ -66,9 +69,9 @@ export default function SignUpForm({
 		},
 		validators: {
 			onSubmit: z.object({
-				name: z.string().min(2, "Name must be at least 2 characters"),
-				email: z.email("Invalid email address"),
-				password: z.string().min(8, "Password must be at least 8 characters"),
+				name: z.string().min(2, t("auth.nameMin")),
+				email: z.email(t("auth.invalidEmail")),
+				password: z.string().min(8, t("auth.passwordMin")),
 			}),
 		},
 	});
@@ -82,17 +85,17 @@ export default function SignUpForm({
 			<AuthCard
 				description={
 					<span>
-						Already have an account?{" "}
+						{t("auth.withAccount")}{" "}
 						<button
 							className={authLinkClass}
 							onClick={onSwitchToSignIn}
 							type="button"
 						>
-							Sign in
+							{t("auth.switchToSignIn")}
 						</button>
 					</span>
 				}
-				title="Create account"
+				title={t("auth.createAccount")}
 			>
 				<form
 					className="flex flex-col gap-6"
@@ -111,7 +114,7 @@ export default function SignUpForm({
 							return (
 								<div className={authFieldClass}>
 									<Label className={authLabelClass} htmlFor={field.name}>
-										Name
+										{t("auth.name")}
 									</Label>
 									<Input
 										aria-describedby={isInvalid ? errorId : undefined}
@@ -122,7 +125,7 @@ export default function SignUpForm({
 										name={field.name}
 										onBlur={field.handleBlur}
 										onChange={(event) => field.handleChange(event.target.value)}
-										placeholder="Your full name"
+										placeholder={t("auth.namePlaceholder")}
 										value={field.state.value}
 									/>
 									{errorMessage ? (
@@ -144,7 +147,7 @@ export default function SignUpForm({
 							return (
 								<div className={authFieldClass}>
 									<Label className={authLabelClass} htmlFor={field.name}>
-										Email address
+										{t("auth.emailAddress")}
 									</Label>
 									<Input
 										aria-describedby={isInvalid ? errorId : undefined}
@@ -155,7 +158,7 @@ export default function SignUpForm({
 										name={field.name}
 										onBlur={field.handleBlur}
 										onChange={(event) => field.handleChange(event.target.value)}
-										placeholder="name@company.com"
+										placeholder={t("auth.emailPlaceholder")}
 										type="email"
 										value={field.state.value}
 									/>
@@ -178,7 +181,7 @@ export default function SignUpForm({
 							return (
 								<div className={authFieldClass}>
 									<Label className={authLabelClass} htmlFor={field.name}>
-										Password
+										{t("auth.password")}
 									</Label>
 									<PasswordInput
 										aria-describedby={isInvalid ? errorId : undefined}
@@ -189,7 +192,7 @@ export default function SignUpForm({
 										name={field.name}
 										onBlur={field.handleBlur}
 										onChange={(event) => field.handleChange(event.target.value)}
-										placeholder="Create a password"
+										placeholder={t("auth.passwordCreatePlaceholder")}
 										value={field.state.value}
 									/>
 									{errorMessage ? (
@@ -220,17 +223,16 @@ export default function SignUpForm({
 										data-icon="inline-start"
 									/>
 								) : null}
-								{isSubmitting ? "Submitting..." : "Sign Up"}
+								{isSubmitting
+									? t("auth.submitting")
+									: t("auth.createAccountSubmit")}
 							</Button>
 						)}
 					</form.Subscribe>
 				</form>
 
 				<div className={authFooterClass}>
-					<p className={authFinePrintClass}>
-						By creating an account, your workspace can manage tenant service
-						data under your organization&apos;s access controls.
-					</p>
+					<p className={authFinePrintClass}>{t("auth.footer.signUp")}</p>
 				</div>
 			</AuthCard>
 		</AuthShell>

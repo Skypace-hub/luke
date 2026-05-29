@@ -1,3 +1,5 @@
+import type { Translate } from "@luke/i18n";
+
 export type ServiceOpsAction = "deactivate" | "delete" | "save" | "suspend";
 
 interface BusinessToast {
@@ -28,32 +30,32 @@ function hasTechnicalDetails(message?: string) {
 	return technicalErrorPatterns.some((pattern) => pattern.test(message));
 }
 
-function getServiceOpsDescription(message?: string) {
+function getServiceOpsDescription(message: string | undefined, t: Translate) {
 	const normalizedMessage = message?.toLowerCase() ?? "";
 
 	if (normalizedMessage.includes("tenant access denied")) {
-		return "You do not have permission to change records in this tenant.";
+		return t("toast.service.permission");
 	}
 
 	if (
 		normalizedMessage.includes("duplicate") ||
 		normalizedMessage.includes("unique")
 	) {
-		return "A record with the same code, number, or identifier already exists.";
+		return t("toast.service.duplicate");
 	}
 
 	if (
 		normalizedMessage.includes("catalogue item") &&
 		normalizedMessage.includes("installed assets")
 	) {
-		return "This catalogue item is linked to installed assets. Reassign or remove those assets before deleting it.";
+		return t("toast.service.catalogueLinked");
 	}
 
 	if (
 		normalizedMessage.includes("foreign key") ||
 		normalizedMessage.includes("restrict")
 	) {
-		return "This record is still linked to other operational data. Remove those links before trying again.";
+		return t("toast.service.linked");
 	}
 
 	if (
@@ -61,51 +63,58 @@ function getServiceOpsDescription(message?: string) {
 		normalizedMessage.includes("longitude") ||
 		normalizedMessage.includes("range")
 	) {
-		return "Check the location values. Latitude must be between -90 and 90, and longitude must be between -180 and 180.";
+		return t("toast.service.location");
 	}
 
 	if (hasTechnicalDetails(message)) {
-		return "The request could not be completed. Check the form values and try again.";
+		return t("toast.service.technical");
 	}
 
-	return "Check the form values and try again.";
+	return t("toast.service.default");
 }
 
 export function getServiceOpsMutationError({
 	action,
 	entityLabel,
 	message,
+	t,
 }: {
 	action: ServiceOpsAction;
 	entityLabel: string;
 	message?: string;
+	t: Translate;
 }): BusinessToast {
 	return {
-		description: getServiceOpsDescription(message),
-		title: `Unable to ${action} ${entityLabel}.`,
+		description: getServiceOpsDescription(message, t),
+		title: t("toast.service.unableAction", { action, entity: entityLabel }),
 	};
 }
 
-export function getServiceOpsQueryError(message?: string): BusinessToast {
+export function getServiceOpsQueryError(
+	message: string | undefined,
+	t: Translate
+): BusinessToast {
 	if (message?.toLowerCase().includes("tenant access denied")) {
 		return {
-			description: "You do not have permission to view this tenant.",
-			title: "Unable to load tenant data.",
+			description: t("toast.service.load.forbidden"),
+			title: t("toast.service.load.title"),
 		};
 	}
 
 	return {
-		description: "Refresh the page or try again in a moment.",
-		title: "Unable to load service data.",
+		description: t("toast.service.load.description"),
+		title: t("toast.service.load.title"),
 	};
 }
 
 export function getAuthError({
 	action,
 	message,
+	t,
 }: {
 	action: "sign-in" | "sign-up";
 	message?: string;
+	t: Translate;
 }): BusinessToast {
 	const normalizedMessage = message?.toLowerCase() ?? "";
 
@@ -117,9 +126,12 @@ export function getAuthError({
 		return {
 			description:
 				action === "sign-in"
-					? "Check your email and password, then try again."
-					: "Check the account details and try again.",
-			title: action === "sign-in" ? "Unable to sign in." : "Unable to sign up.",
+					? t("auth.unable.signIn.invalid")
+					: t("auth.unable.signUp.invalid"),
+			title:
+				action === "sign-in"
+					? t("auth.unable.signIn.title")
+					: t("auth.unable.signUp.title"),
 		};
 	}
 
@@ -129,16 +141,19 @@ export function getAuthError({
 		normalizedMessage.includes("duplicate")
 	) {
 		return {
-			description: "Use a different email address or sign in instead.",
-			title: "Account already exists.",
+			description: t("auth.accountAlreadyExists.description"),
+			title: t("auth.accountAlreadyExists.title"),
 		};
 	}
 
 	return {
 		description:
 			action === "sign-in"
-				? "Check your credentials and try again."
-				: "Check the account details and try again.",
-		title: action === "sign-in" ? "Unable to sign in." : "Unable to sign up.",
+				? t("auth.unable.signIn.description")
+				: t("auth.unable.signUp.description"),
+		title:
+			action === "sign-in"
+				? t("auth.unable.signIn.title")
+				: t("auth.unable.signUp.title"),
 	};
 }

@@ -1,14 +1,16 @@
+import { translateServiceText } from "@luke/i18n";
 import { Pressable, Text, View } from "react-native";
 
+import { useI18n } from "@/contexts/i18n-context";
 import type { EngineerJob } from "@/lib/engineer-app-data";
 
 import {
 	Badge,
 	colors,
 	jobTone,
-	jobTypeLabel,
 	statusTone,
 	styles,
+	useJobTypeLabel,
 } from "./engineer-ui";
 
 interface JobCardProps {
@@ -19,9 +21,12 @@ interface JobCardProps {
 
 export function JobCard({ job, onPress, compact }: JobCardProps) {
 	const tone = jobTone(job.type);
+	const getJobTypeLabel = useJobTypeLabel();
+	const { locale } = useI18n();
+
 	return (
 		<Pressable
-			accessibilityLabel={`Open job ${job.id}: ${job.title}`}
+			accessibilityLabel={`${translateServiceText(locale, "Open job")} ${job.id}: ${translateServiceText(locale, job.title)}`}
 			accessibilityRole="button"
 			onPress={onPress}
 			style={({ pressed }) => [
@@ -43,7 +48,7 @@ export function JobCard({ job, onPress, compact }: JobCardProps) {
 			>
 				<View style={{ flex: 1 }}>
 					<View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-						<Badge tone={tone}>{jobTypeLabel(job.type)}</Badge>
+						<Badge tone={tone}>{getJobTypeLabel(job.type)}</Badge>
 						{job.status === "assigned" ? null : (
 							<Badge tone={statusTone(job.status)}>{job.status}</Badge>
 						)}
@@ -56,7 +61,7 @@ export function JobCard({ job, onPress, compact }: JobCardProps) {
 							marginTop: 8,
 						}}
 					>
-						{job.title}
+						{translateServiceText(locale, job.title)}
 					</Text>
 					<Text
 						style={{
