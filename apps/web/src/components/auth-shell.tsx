@@ -62,20 +62,21 @@ export function AuthShell({
 							<p className="font-medium text-primary-foreground/75 text-sm">
 								{content.eyebrow}
 							</p>
-							<h2 className="mt-4 max-w-md font-semibold text-4xl leading-tight">
+							<h2 className="mt-4 max-w-md font-semibold text-4xl leading-[1.22]">
 								{content.heading}
 							</h2>
-							<p className="mt-5 max-w-md text-primary-foreground/70 text-sm leading-relaxed">
+							<p className="mt-4 max-w-md text-primary-foreground/75 text-sm leading-6">
 								{content.body}
 							</p>
 						</div>
 
-						<div className="mt-9 grid gap-3">
+						<div className="mt-10 grid gap-3.5">
 							{content.bullets.map((bullet) => (
-								<div className="flex items-center gap-3" key={bullet}>
-									<span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-foreground/10 ring-1 ring-primary-foreground/20">
-										<CheckIcon className="size-3.5" />
-									</span>
+								<div className="flex items-start gap-3" key={bullet}>
+									<CheckIcon
+										aria-hidden="true"
+										className="mt-0.5 size-4 shrink-0 text-primary-foreground"
+									/>
 									<span className="text-primary-foreground/80 text-sm">
 										{bullet}
 									</span>
@@ -83,7 +84,7 @@ export function AuthShell({
 							))}
 						</div>
 
-						<p className="mt-10 max-w-sm text-primary-foreground/60 text-xs leading-relaxed">
+						<p className="mt-12 max-w-sm text-primary-foreground/65 text-xs leading-relaxed">
 							Built for focused service teams that need clear ownership,
 							accurate records, and fast operational handoffs.
 						</p>

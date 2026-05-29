@@ -7,19 +7,23 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import z from "zod";
 
+import {
+	authErrorClass,
+	authFieldClass,
+	authFinePrintClass,
+	authFooterClass,
+	authInputClass,
+	authLabelClass,
+	authLinkClass,
+	authPasswordInputClass,
+	authSubmitClass,
+} from "@/components/auth-form-styles";
 import { AuthCard, AuthShell } from "@/components/auth-shell";
 import { PasswordInput } from "@/components/password-input";
 import { authClient } from "@/lib/auth-client";
 import { getAuthError } from "@/lib/business-errors";
 
 import Loader from "./loader";
-
-const authInputClass =
-	"h-10 rounded-none border-0 border-b border-input bg-transparent px-0 shadow-none focus-visible:border-ring focus-visible:ring-0";
-const authLabelClass = "font-medium text-muted-foreground text-xs";
-const authLinkClass =
-	"font-semibold text-primary outline-none underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring/40";
-const authSubmitClass = "h-10 bg-primary px-6";
 
 export default function SignUpForm({
 	onSwitchToSignIn,
@@ -99,79 +103,103 @@ export default function SignUpForm({
 					}}
 				>
 					<form.Field name="name">
-						{(field) => (
-							<div className="flex flex-col gap-1">
-								<Label className={authLabelClass} htmlFor={field.name}>
-									Name
-								</Label>
-								<Input
-									autoComplete="name"
-									className={authInputClass}
-									id={field.name}
-									name={field.name}
-									onBlur={field.handleBlur}
-									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="Your full name"
-									value={field.state.value}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p className="text-destructive text-xs" key={error?.message}>
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
+						{(field) => {
+							const errorMessage = field.state.meta.errors[0]?.message;
+							const errorId = `${field.name}-error`;
+							const isInvalid = Boolean(errorMessage);
+
+							return (
+								<div className={authFieldClass}>
+									<Label className={authLabelClass} htmlFor={field.name}>
+										Name
+									</Label>
+									<Input
+										aria-describedby={isInvalid ? errorId : undefined}
+										aria-invalid={isInvalid || undefined}
+										autoComplete="name"
+										className={authInputClass}
+										id={field.name}
+										name={field.name}
+										onBlur={field.handleBlur}
+										onChange={(event) => field.handleChange(event.target.value)}
+										placeholder="Your full name"
+										value={field.state.value}
+									/>
+									{errorMessage ? (
+										<p className={authErrorClass} id={errorId}>
+											{errorMessage}
+										</p>
+									) : null}
+								</div>
+							);
+						}}
 					</form.Field>
 
 					<form.Field name="email">
-						{(field) => (
-							<div className="flex flex-col gap-1">
-								<Label className={authLabelClass} htmlFor={field.name}>
-									Email address
-								</Label>
-								<Input
-									autoComplete="email"
-									className={authInputClass}
-									id={field.name}
-									name={field.name}
-									onBlur={field.handleBlur}
-									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="name@company.com"
-									type="email"
-									value={field.state.value}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p className="text-destructive text-xs" key={error?.message}>
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
+						{(field) => {
+							const errorMessage = field.state.meta.errors[0]?.message;
+							const errorId = `${field.name}-error`;
+							const isInvalid = Boolean(errorMessage);
+
+							return (
+								<div className={authFieldClass}>
+									<Label className={authLabelClass} htmlFor={field.name}>
+										Email address
+									</Label>
+									<Input
+										aria-describedby={isInvalid ? errorId : undefined}
+										aria-invalid={isInvalid || undefined}
+										autoComplete="email"
+										className={authInputClass}
+										id={field.name}
+										name={field.name}
+										onBlur={field.handleBlur}
+										onChange={(event) => field.handleChange(event.target.value)}
+										placeholder="name@company.com"
+										type="email"
+										value={field.state.value}
+									/>
+									{errorMessage ? (
+										<p className={authErrorClass} id={errorId}>
+											{errorMessage}
+										</p>
+									) : null}
+								</div>
+							);
+						}}
 					</form.Field>
 
 					<form.Field name="password">
-						{(field) => (
-							<div className="flex flex-col gap-1">
-								<Label className={authLabelClass} htmlFor={field.name}>
-									Password
-								</Label>
-								<PasswordInput
-									autoComplete="new-password"
-									className={`${authInputClass} pr-11`}
-									id={field.name}
-									name={field.name}
-									onBlur={field.handleBlur}
-									onChange={(event) => field.handleChange(event.target.value)}
-									placeholder="Create a password"
-									value={field.state.value}
-								/>
-								{field.state.meta.errors.map((error) => (
-									<p className="text-destructive text-xs" key={error?.message}>
-										{error?.message}
-									</p>
-								))}
-							</div>
-						)}
+						{(field) => {
+							const errorMessage = field.state.meta.errors[0]?.message;
+							const errorId = `${field.name}-error`;
+							const isInvalid = Boolean(errorMessage);
+
+							return (
+								<div className={authFieldClass}>
+									<Label className={authLabelClass} htmlFor={field.name}>
+										Password
+									</Label>
+									<PasswordInput
+										aria-describedby={isInvalid ? errorId : undefined}
+										aria-invalid={isInvalid || undefined}
+										autoComplete="new-password"
+										className={authPasswordInputClass}
+										id={field.name}
+										name={field.name}
+										onBlur={field.handleBlur}
+										onChange={(event) => field.handleChange(event.target.value)}
+										placeholder="Create a password"
+										value={field.state.value}
+									/>
+									{errorMessage ? (
+										<p className={authErrorClass} id={errorId}>
+											{errorMessage}
+										</p>
+									) : null}
+								</div>
+							);
+						}}
 					</form.Field>
 
 					<form.Subscribe
@@ -198,8 +226,8 @@ export default function SignUpForm({
 					</form.Subscribe>
 				</form>
 
-				<div className="mt-8 border-t pt-6">
-					<p className="text-muted-foreground text-xs leading-relaxed">
+				<div className={authFooterClass}>
+					<p className={authFinePrintClass}>
 						By creating an account, your workspace can manage tenant service
 						data under your organization&apos;s access controls.
 					</p>
