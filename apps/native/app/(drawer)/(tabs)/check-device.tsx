@@ -18,7 +18,6 @@ import {
 } from "@/components/engineer-app/engineer-ui";
 import { PartsList } from "@/components/engineer-app/parts-list";
 import { useI18n } from "@/contexts/i18n-context";
-import { knownDevice } from "@/lib/engineer-app-data";
 
 export default function CheckDeviceTab() {
 	const { checkDeviceStage } = useEngineerApp();
@@ -37,7 +36,7 @@ export default function CheckDeviceTab() {
 
 function ScanDeviceScreen() {
 	const { locale } = useI18n();
-	const { setCheckDeviceStage } = useEngineerApp();
+	const { currentDevice, setCheckDeviceStage } = useEngineerApp();
 
 	return (
 		<EngineerScreen>
@@ -103,7 +102,7 @@ function ScanDeviceScreen() {
 			<Divider />
 			<GhostButton
 				icon="search"
-				label="Search by serial number"
+				label={`Search by serial number (${currentDevice.serial})`}
 				onPress={() => setCheckDeviceStage("known")}
 			/>
 		</EngineerScreen>
@@ -112,7 +111,7 @@ function ScanDeviceScreen() {
 
 function KnownDeviceScreen() {
 	const { locale } = useI18n();
-	const { selectedJob, setCheckDeviceStage, startSelectedJob } =
+	const { currentDevice, selectedJob, setCheckDeviceStage, startSelectedJob } =
 		useEngineerApp();
 
 	return (
@@ -147,40 +146,50 @@ function KnownDeviceScreen() {
 						<Text
 							style={{ color: colors.text, fontSize: 16, fontWeight: "800" }}
 						>
-							{knownDevice.name}
+							{currentDevice.name}
 						</Text>
 						<Text style={{ color: colors.text2, fontSize: 12, marginTop: 2 }}>
-							{translateServiceText(locale, knownDevice.category)}
+							{translateServiceText(locale, currentDevice.category)}
 						</Text>
 					</View>
 					<Badge tone="green">Active</Badge>
 				</View>
 				<View style={{ marginTop: 10 }}>
-					<InfoRow label="Hospital" value={knownDevice.site} />
-					<InfoRow label="Location" value={knownDevice.location} />
-					<InfoRow label="Serial No." value={knownDevice.serial} />
+					<InfoRow label="Hospital" value={currentDevice.site} />
+					<InfoRow label="Location" value={currentDevice.location} />
+					<InfoRow label="Serial No." value={currentDevice.serial} />
 					<InfoRow
 						isLast
 						label="Last serviced"
-						value={knownDevice.lastServiced}
+						value={currentDevice.lastServiced}
 					/>
 				</View>
 			</Card>
 			<SectionLabel>Recent service history</SectionLabel>
-			{knownDevice.history.map((event) => (
-				<Card key={event.id}>
-					<Text style={{ color: colors.text, fontSize: 14, fontWeight: "800" }}>
-						{translateServiceText(locale, event.title)}
-					</Text>
-					<Text style={{ color: colors.text2, fontSize: 12, marginTop: 3 }}>
-						{event.date} · {event.engineer} · {event.duration}
+			{currentDevice.history.length > 0 ? (
+				currentDevice.history.map((event) => (
+					<Card key={event.id}>
+						<Text
+							style={{ color: colors.text, fontSize: 14, fontWeight: "800" }}
+						>
+							{translateServiceText(locale, event.title)}
+						</Text>
+						<Text style={{ color: colors.text2, fontSize: 12, marginTop: 3 }}>
+							{event.date} · {event.engineer} · {event.duration}
+						</Text>
+					</Card>
+				))
+			) : (
+				<Card>
+					<Text style={{ color: colors.text2, fontSize: 13 }}>
+						{translateServiceText(locale, "No service history found.")}
 					</Text>
 				</Card>
-			))}
+			)}
 			<ActionButton
 				icon="play"
 				label={
-					selectedJob.assetId === knownDevice.id
+					selectedJob.assetId === currentDevice.assetId
 						? "This matches my job - Start"
 						: "Open matched job"
 				}
@@ -282,14 +291,14 @@ function UnknownDeviceScreen() {
 
 function ReportFaultScreen() {
 	const { locale } = useI18n();
-	const { setCheckDeviceStage } = useEngineerApp();
+	const { currentDevice, setCheckDeviceStage } = useEngineerApp();
 
 	return (
 		<EngineerScreen>
 			<ScreenHeader
 				backLabel="Device Info"
 				onBack={() => setCheckDeviceStage("known")}
-				subtitle={`${knownDevice.name} · ICU Rm 302`}
+				subtitle={`${currentDevice.name} · ${currentDevice.location}`}
 				title="Report Fault"
 			/>
 			<SectionLabel>Fault type</SectionLabel>
@@ -364,9 +373,9 @@ function ReportFaultScreen() {
 			/>
 			<SectionLabel>Parts on this device</SectionLabel>
 			<PartsList
-				parts={knownDevice.parts}
+				parts={currentDevice.parts}
 				quantities={Object.fromEntries(
-					knownDevice.parts.map((part) => [part.id, part.defaultQuantity])
+					currentDevice.parts.map((part) => [part.id, part.defaultQuantity])
 				)}
 			/>
 		</EngineerScreen>

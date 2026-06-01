@@ -15,7 +15,6 @@ import {
 } from "@/components/engineer-app/engineer-ui";
 import { JobCard } from "@/components/engineer-app/job-card";
 import { useI18n } from "@/contexts/i18n-context";
-import { calendarDays } from "@/lib/engineer-app-data";
 
 const weekdays = [
 	{ id: "monday", label: "M" },
@@ -28,12 +27,14 @@ const weekdays = [
 ] as const;
 
 export default function CalendarTab() {
-	const { jobs, selectJob } = useEngineerApp();
+	const { calendarDays, calendarMonthLabel, jobs, selectJob } =
+		useEngineerApp();
 	const { locale } = useI18n();
-	const [selectedDayId, setSelectedDayId] = useState("2026-05-27");
+	const today = calendarDays.find((day) => day.isToday);
+	const [selectedDayId, setSelectedDayId] = useState(today?.id ?? "");
 	const selectedDay =
 		calendarDays.find((day) => day.id === selectedDayId) ??
-		calendarDays.find((day) => day.isToday) ??
+		today ??
 		calendarDays[0];
 	const selectedJobs = jobs.filter((job) =>
 		selectedDay.jobIds.includes(job.id)
@@ -42,7 +43,7 @@ export default function CalendarTab() {
 	return (
 		<EngineerScreen>
 			<ShiftStatus />
-			<ScreenHeader subtitle="May 2026" title="Calendar" />
+			<ScreenHeader subtitle={calendarMonthLabel} title="Calendar" />
 			<Card>
 				<Text
 					style={{
@@ -53,7 +54,7 @@ export default function CalendarTab() {
 						textAlign: "center",
 					}}
 				>
-					May 2026
+					{calendarMonthLabel}
 				</Text>
 				<View style={{ flexDirection: "row" }}>
 					{weekdays.map((weekday) => (
@@ -201,7 +202,7 @@ function getSelectedDayLabel(
 	locale: "en" | "zh-Hans" | "zh-Hant"
 ) {
 	if (selectedDay.isToday) {
-		return `${translateServiceText(locale, "Today")} - ${translateServiceText(locale, "27 May")}`;
+		return translateServiceText(locale, "Today");
 	}
 	if (selectedDay.day) {
 		return `${translateServiceText(locale, "May")} ${selectedDay.day}`;

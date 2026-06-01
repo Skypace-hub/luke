@@ -15,7 +15,6 @@ import {
 } from "@/components/engineer-app/engineer-ui";
 import { JobCard } from "@/components/engineer-app/job-card";
 import { useI18n } from "@/contexts/i18n-context";
-import { installationJobs } from "@/lib/engineer-app-data";
 
 export default function AddDeviceTab() {
 	const { addDeviceStage } = useEngineerApp();
@@ -33,7 +32,8 @@ export default function AddDeviceTab() {
 }
 
 function AddDeviceHomeScreen() {
-	const { setAddDeviceStage } = useEngineerApp();
+	const { installationJobs, selectInstallationJob, setAddDeviceStage } =
+		useEngineerApp();
 	const { locale } = useI18n();
 
 	return (
@@ -43,20 +43,31 @@ function AddDeviceHomeScreen() {
 				title="Add Device"
 			/>
 			<SectionLabel>Your installation jobs</SectionLabel>
-			{installationJobs.map((job) => (
-				<View key={job.id}>
-					<JobCard
-						compact
-						job={job}
-						onPress={() => setAddDeviceStage("commission")}
-					/>
-					<ActionButton
-						icon="radio"
-						label="Commission NFC Tag"
-						onPress={() => setAddDeviceStage("commission")}
-					/>
-				</View>
-			))}
+			{installationJobs.length > 0 ? (
+				installationJobs.map((job) => (
+					<View key={job.id}>
+						<JobCard
+							compact
+							job={job}
+							onPress={() => selectInstallationJob(job.id)}
+						/>
+						<ActionButton
+							icon="radio"
+							label="Commission NFC Tag"
+							onPress={() => selectInstallationJob(job.id)}
+						/>
+					</View>
+				))
+			) : (
+				<Card>
+					<Text style={{ color: colors.text2, fontSize: 13 }}>
+						{translateServiceText(
+							locale,
+							"No installation jobs assigned from backend."
+						)}
+					</Text>
+				</Card>
+			)}
 			<Card style={{ marginTop: 12 }}>
 				<Text style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>
 					{translateServiceText(locale, "Device not in your job list?")}
@@ -86,16 +97,20 @@ function AddDeviceHomeScreen() {
 }
 
 function CommissionTagScreen() {
-	const { setAddDeviceStage } = useEngineerApp();
+	const {
+		commissionSelectedInstallationTag,
+		isActionPending,
+		selectedJob,
+		setAddDeviceStage,
+	} = useEngineerApp();
 	const { locale } = useI18n();
-	const job = installationJobs[0];
 
 	return (
 		<EngineerScreen>
 			<ScreenHeader
 				backLabel="Add Device"
 				onBack={() => setAddDeviceStage("list")}
-				subtitle={`${translateServiceText(locale, "Job")} #${job.id} · ${job.site}`}
+				subtitle={`${translateServiceText(locale, "Job")} #${selectedJob.id} · ${selectedJob.site}`}
 				title="Commission Tag"
 			/>
 			<View style={{ alignItems: "center", paddingVertical: 20 }}>
@@ -139,7 +154,7 @@ function CommissionTagScreen() {
 				</Text>
 			</View>
 			<Card>
-				<InfoRow label="Asset UUID" value={`${job.assetId}...`} />
+				<InfoRow label="Asset UUID" value={`${selectedJob.assetId}...`} />
 				<InfoRow label="Writing" tone="blue" value="NDEF record v1" />
 				<InfoRow isLast label="Tag format" value="NTAG213 / 215 / 216" />
 			</Card>
@@ -150,9 +165,10 @@ function CommissionTagScreen() {
 				)}
 			</Text>
 			<ActionButton
+				disabled={isActionPending || !selectedJob.recordId}
 				icon="checkmark-circle"
-				label="Simulate Write Success"
-				onPress={() => setAddDeviceStage("success")}
+				label="Write Tag to Backend"
+				onPress={commissionSelectedInstallationTag}
 				tone="green"
 			/>
 		</EngineerScreen>
@@ -160,7 +176,7 @@ function CommissionTagScreen() {
 }
 
 function ManualDeviceEntryScreen() {
-	const { setAddDeviceStage } = useEngineerApp();
+	const { currentDevice, setAddDeviceStage } = useEngineerApp();
 	const { locale } = useI18n();
 
 	return (
@@ -189,7 +205,7 @@ function ManualDeviceEntryScreen() {
 				placeholder="e.g. Drager Evita 600"
 			/>
 			<TextField label="Serial number" placeholder="From label on device" />
-			<TextField label="Hospital" value="St. Mary's Hospital" />
+			<TextField label="Hospital" value={currentDevice.site} />
 			<TextField label="Floor" placeholder="e.g. Floor 3, ICU" />
 			<TextField label="Room / location" placeholder="e.g. Room 302, Bay B" />
 			<TextField
@@ -207,7 +223,7 @@ function ManualDeviceEntryScreen() {
 }
 
 function TagWriteSuccessScreen() {
-	const { setAddDeviceStage } = useEngineerApp();
+	const { selectedJob, setAddDeviceStage } = useEngineerApp();
 	const { locale } = useI18n();
 
 	return (
@@ -246,8 +262,8 @@ function TagWriteSuccessScreen() {
 				</Text>
 			</View>
 			<Card style={{ marginTop: 24 }}>
-				<InfoRow label="Asset" value="New Ventilator - ICU" />
-				<InfoRow label="Tag payload" tone="blue" value='{"uid":"a3f2bc91"}' />
+				<InfoRow label="Asset" value={selectedJob.device} />
+				<InfoRow label="Tag payload" tone="blue" value={selectedJob.nfcUid} />
 				<InfoRow isLast label="Status" tone="green" value="Commissioned" />
 			</Card>
 			<ActionButton

@@ -1,4 +1,5 @@
 import type { Ionicons } from "@expo/vector-icons";
+import type { ServiceOpsSnapshot } from "@luke/api/types/service-ops";
 import type { ComponentProps } from "react";
 
 export type IconName = ComponentProps<typeof Ionicons>["name"];
@@ -27,8 +28,11 @@ export interface EngineerJob {
 	duration: string;
 	id: string;
 	location: string;
+	nfcUid: string;
 	parts: EngineerPart[];
+	recordId: string;
 	reportedFault: string;
+	scheduledDate: null | string;
 	scheduledTime: string;
 	serial: string;
 	site: string;
@@ -46,12 +50,15 @@ export interface ServiceEvent {
 }
 
 export interface DeviceRecord {
+	assetId: string;
 	category: string;
 	history: ServiceEvent[];
 	id: string;
 	lastServiced: string;
 	location: string;
+	manualFileUrl: null | string;
 	name: string;
+	nfcUid: string;
 	parts: EngineerPart[];
 	serial: string;
 	site: string;
@@ -74,200 +81,369 @@ export interface ExpenseEntry {
 	value: string;
 }
 
-export const engineerProfile = {
-	name: "James Chen",
-	initials: "JC",
-	role: "Senior Engineer",
-	region: "North Region",
-	clockedInAt: "08:23",
-	shiftDuration: "1h 18m",
-	jobsThisMonth: "14",
-	averageResolution: "2h 08m",
-	firstFixRate: "91%",
+export interface EngineerProfile {
+	averageResolution: string;
+	clockedInAt: string;
+	firstFixRate: string;
+	initials: string;
+	jobsThisMonth: string;
+	name: string;
+	region: string;
+	role: string;
+	shiftDuration: string;
+}
+
+type SnapshotAsset = ServiceOpsSnapshot["assets"][number];
+type SnapshotEngineer = ServiceOpsSnapshot["engineers"][number];
+type SnapshotJob = ServiceOpsSnapshot["jobs"][number];
+type SnapshotProduct = ServiceOpsSnapshot["products"][number];
+
+const fallbackPartCount = 3;
+const minutesPerHour = 60;
+const calendarWeekLength = 7;
+const durationHourRegex = /(\d+)h/;
+const durationMinuteRegex = /(\d+)m/;
+
+export const emptyEngineerProfile: EngineerProfile = {
+	averageResolution: "0m",
+	clockedInAt: "Not clocked in",
+	firstFixRate: "0%",
+	initials: "--",
+	jobsThisMonth: "0",
+	name: "No engineer profile",
+	region: "No region",
+	role: "Engineer",
+	shiftDuration: "0m",
 };
 
-export const commonParts: EngineerPart[] = [
-	{
-		id: "expiratory-valve",
-		name: "Expiratory Valve Kit",
-		partNumber: "8414562",
-		status: "in-contract",
-		defaultQuantity: 1,
-	},
-	{
-		id: "flow-sensor",
-		name: "Flow Sensor",
-		partNumber: "8414891",
-		status: "billable",
-		defaultQuantity: 0,
-	},
-	{
-		id: "o2-cell",
-		name: "O2 Cell",
-		partNumber: "8411203",
-		status: "in-contract",
-		defaultQuantity: 0,
-	},
-];
-
-export const initialEngineerJobs: EngineerJob[] = [
-	{
-		id: "1042",
-		type: "urgent",
-		status: "assigned",
-		title: "Ventilator Repair",
-		site: "St. Mary's Hospital",
-		location: "ICU Floor 3, Room 302",
-		device: "Drager Evita 600",
-		serial: "EVT-20892-B",
-		reportedFault: "Alarm fault E-401",
-		scheduledTime: "09:00",
-		duration: "2h 14m",
-		assetId: "asset-vent-600",
-		parts: commonParts,
-	},
-	{
-		id: "1045",
-		type: "repair",
-		status: "assigned",
-		title: "Infusion Pump Service",
-		site: "City General",
-		location: "Ward 7, Bay 12",
-		device: "Alaris GP Plus",
-		serial: "ALR-7761-K",
-		reportedFault: "Occlusion alarm repeat",
-		scheduledTime: "13:00",
-		duration: "1h 05m",
-		assetId: "asset-pump-7761",
-		parts: commonParts.slice(0, 2),
-	},
-	{
-		id: "1048",
-		type: "preventive-maintenance",
-		status: "assigned",
-		title: "MRI Scanner Annual",
-		site: "North Clinic",
-		location: "MRI Suite",
-		device: "Magnetom Sola",
-		serial: "MRI-3882-A",
-		reportedFault: "Annual preventive maintenance",
-		scheduledTime: "15:30",
-		duration: "3h 40m",
-		assetId: "asset-mri-3882",
-		parts: commonParts.slice(1),
-	},
-];
-
-export const installationJobs: EngineerJob[] = [
-	{
-		id: "1031",
-		type: "installation",
-		status: "assigned",
-		title: "New Ventilator - ICU",
-		site: "St. Mary's Hospital",
-		location: "ICU Floor 3",
-		device: "Drager Evita 600",
-		serial: "Pending on install",
-		reportedFault: "Asset pre-registered",
-		scheduledTime: "11:00",
-		duration: "1h 30m",
-		assetId: "a3f2bc91-4e1d",
-		parts: commonParts,
-	},
-	{
-		id: "1036",
-		type: "installation",
-		status: "assigned",
-		title: "Infusion Pump Install",
-		site: "City General",
-		location: "Ward 4",
-		device: "Alaris GP Plus",
-		serial: "Pending on install",
-		reportedFault: "New ward deployment",
-		scheduledTime: "16:00",
-		duration: "1h 00m",
-		assetId: "b5d91fa0-17c2",
-		parts: commonParts.slice(0, 2),
-	},
-];
-
-export const knownDevice: DeviceRecord = {
-	id: "asset-vent-600",
-	name: "Drager Evita 600",
-	category: "Ventilator",
-	site: "St. Mary's Hospital",
-	location: "ICU Floor 3, Room 302",
-	serial: "EVT-20892-B",
-	status: "active",
-	lastServiced: "12 Mar 2026",
-	parts: commonParts,
-	history: [
-		{
-			id: "service-1042",
-			title: "Valve kit replacement",
-			date: "08 May 2026",
-			engineer: "James Chen",
-			duration: "2h 14m",
-		},
-		{
-			id: "service-998",
-			title: "Annual preventive maintenance",
-			date: "12 Mar 2026",
-			engineer: "Sarah K.",
-			duration: "3h 40m",
-		},
-	],
+export const emptyDeviceRecord: DeviceRecord = {
+	assetId: "",
+	category: "Unknown",
+	history: [],
+	id: "unknown-device",
+	lastServiced: "Not serviced",
+	location: "Unknown location",
+	manualFileUrl: null,
+	name: "Unknown Device",
+	nfcUid: "",
+	parts: [],
+	serial: "Unknown serial",
+	site: "Unknown hospital",
+	status: "unknown",
 };
 
-export const calendarDays: CalendarDay[] = [
-	{ id: "blank-1", day: 0, hasJobs: false, jobIds: [] },
-	{ id: "blank-2", day: 0, hasJobs: false, jobIds: [] },
-	{ id: "blank-3", day: 0, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-01", day: 1, hasJobs: true, jobIds: ["1031"] },
-	{ id: "2026-05-02", day: 2, hasJobs: true, jobIds: ["1045"] },
-	{ id: "2026-05-03", day: 3, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-04", day: 4, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-05", day: 5, hasJobs: true, jobIds: ["1048"] },
-	{ id: "2026-05-06", day: 6, hasJobs: true, jobIds: ["1045"] },
-	{ id: "2026-05-07", day: 7, hasJobs: true, jobIds: ["1048"] },
-	{
-		id: "2026-05-08",
-		day: 8,
-		hasJobs: true,
-		isToday: true,
-		jobIds: ["1042", "1045", "1048"],
-	},
-	{ id: "2026-05-09", day: 9, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-10", day: 10, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-11", day: 11, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-12", day: 12, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-13", day: 13, hasJobs: true, jobIds: ["1036"] },
-	{ id: "2026-05-14", day: 14, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-15", day: 15, hasJobs: true, jobIds: ["1042"] },
-	{ id: "2026-05-16", day: 16, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-17", day: 17, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-18", day: 18, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-19", day: 19, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-20", day: 20, hasJobs: true, jobIds: ["1045"] },
-	{ id: "2026-05-21", day: 21, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-22", day: 22, hasJobs: true, jobIds: ["1048"] },
-	{ id: "2026-05-23", day: 23, hasJobs: true, jobIds: ["1042"] },
-	{ id: "2026-05-24", day: 24, hasJobs: false, jobIds: [] },
-	{ id: "2026-05-25", day: 25, hasJobs: false, jobIds: [] },
-];
+export const initialExpenses: ExpenseEntry[] = [];
 
-export const initialExpenses: ExpenseEntry[] = [
-	{
-		id: "mileage-47",
-		category: "Mileage",
-		detail: "47 km",
-		value: "GBP 21.15",
-		linkedJob: "Job #1042",
-	},
-	{
-		id: "food-day",
-		category: "Food",
-		detail: "1 day",
-		value: "GBP 15.00",
-	},
-];
+export function getCurrentEngineer(
+	snapshot: ServiceOpsSnapshot | undefined,
+	userEmail?: null | string
+): SnapshotEngineer | null {
+	if (!snapshot || snapshot.engineers.length === 0) {
+		return null;
+	}
+
+	const normalizedEmail = userEmail?.trim().toLowerCase();
+	if (normalizedEmail) {
+		const matchedEngineer = snapshot.engineers.find(
+			(engineer) => engineer.email?.trim().toLowerCase() === normalizedEmail
+		);
+		if (matchedEngineer) {
+			return matchedEngineer;
+		}
+	}
+
+	const activeEngineer = snapshot.engineers.find(
+		(engineer) => engineer.status !== "Off duty"
+	);
+
+	return activeEngineer ?? snapshot.engineers[0];
+}
+
+export function buildEngineerJobs(
+	snapshot: ServiceOpsSnapshot | undefined,
+	engineerId: null | string | undefined
+): EngineerJob[] {
+	if (!snapshot) {
+		return [];
+	}
+
+	const jobs = engineerId
+		? snapshot.jobs.filter((job) => job.engineerId === engineerId)
+		: snapshot.jobs;
+
+	return jobs.map((job) => mapSnapshotJob(snapshot, job));
+}
+
+export function buildInstallationJobs(jobs: EngineerJob[]): EngineerJob[] {
+	return jobs.filter(
+		(job) => job.type === "installation" && job.status !== "complete"
+	);
+}
+
+export function buildKnownDevice(
+	snapshot: ServiceOpsSnapshot | undefined,
+	selectedJob: EngineerJob | undefined
+): DeviceRecord {
+	if (!snapshot) {
+		return emptyDeviceRecord;
+	}
+
+	const asset = selectedJob
+		? snapshot.assets.find((record) => record.id === selectedJob.assetId)
+		: snapshot.assets[0];
+
+	if (!asset) {
+		return emptyDeviceRecord;
+	}
+
+	return mapAssetToDevice(snapshot, asset);
+}
+
+export function buildEngineerProfile(
+	engineer: SnapshotEngineer | null,
+	jobs: EngineerJob[]
+): EngineerProfile {
+	if (!engineer) {
+		return emptyEngineerProfile;
+	}
+
+	const completedJobs = jobs.filter((job) => job.status === "complete");
+	const completedDurations = completedJobs
+		.map((job) => durationToMinutes(job.duration))
+		.filter((duration) => duration > 0);
+	const averageMinutes = completedDurations.length
+		? Math.round(
+				completedDurations.reduce((total, duration) => total + duration, 0) /
+					completedDurations.length
+			)
+		: 0;
+	const firstFixRate = jobs.length
+		? Math.round((completedJobs.length / jobs.length) * 100)
+		: 0;
+
+	return {
+		averageResolution: formatDuration(averageMinutes),
+		clockedInAt: engineer.status === "Off duty" ? "Off duty" : "Active now",
+		firstFixRate: `${firstFixRate}%`,
+		initials: getInitials(engineer.name),
+		jobsThisMonth: String(jobs.length),
+		name: engineer.name,
+		region: engineer.region,
+		role: engineer.grade,
+		shiftDuration: engineer.status === "Off duty" ? "0m" : "Live",
+	};
+}
+
+export function buildCalendarDays(jobs: EngineerJob[]): CalendarDay[] {
+	const now = new Date();
+	const year = now.getFullYear();
+	const month = now.getMonth();
+	const daysInMonth = new Date(year, month + 1, 0).getDate();
+	const firstDay = new Date(year, month, 1).getDay();
+	const mondayOffset = (firstDay + 6) % calendarWeekLength;
+	const days: CalendarDay[] = [];
+
+	for (let index = 0; index < mondayOffset; index += 1) {
+		days.push({ day: 0, hasJobs: false, id: `blank-${index}`, jobIds: [] });
+	}
+
+	for (let day = 1; day <= daysInMonth; day += 1) {
+		const date = new Date(year, month, day);
+		const id = toDateKey(date);
+		const dayJobs = jobs.filter((job) => job.scheduledDate === id);
+		days.push({
+			day,
+			hasJobs: dayJobs.length > 0,
+			id,
+			isToday: id === toDateKey(now),
+			jobIds: dayJobs.map((job) => job.id),
+		});
+	}
+
+	return days;
+}
+
+export function getCalendarMonthLabel() {
+	const now = new Date();
+	return `${new Intl.DateTimeFormat("en-HK", {
+		month: "long",
+		timeZone: "Asia/Hong_Kong",
+	}).format(now)} ${now.getFullYear()}`;
+}
+
+function mapSnapshotJob(
+	snapshot: ServiceOpsSnapshot,
+	job: SnapshotJob
+): EngineerJob {
+	const asset = snapshot.assets.find((record) => record.id === job.assetId);
+	const product = asset
+		? snapshot.products.find((record) => record.id === asset.productModelId)
+		: undefined;
+	const parts = product ? buildPartsForProduct(snapshot, product, asset) : [];
+	const scheduledDate = getScheduledDateKey(job.scheduledStartAt);
+	const fallbackTitle = `${job.type} ${asset?.model ?? job.asset}`;
+
+	return {
+		assetId: job.assetId,
+		device: asset?.model ?? job.asset,
+		duration: formatDuration(job.timerMinutes),
+		id: job.id,
+		location: asset?.location ?? "No location",
+		nfcUid: job.nfcUid,
+		parts,
+		recordId: job.recordId,
+		reportedFault: job.description,
+		scheduledDate,
+		scheduledTime: getScheduledTime(job.scheduledStartAt, job.scheduledFor),
+		serial: asset?.serial ?? "No serial",
+		site: job.hospital,
+		status: mapJobStatus(job.statusValue),
+		title: job.description || fallbackTitle,
+		type: mapJobType(job),
+	};
+}
+
+function mapAssetToDevice(
+	snapshot: ServiceOpsSnapshot,
+	asset: SnapshotAsset
+): DeviceRecord {
+	const product = snapshot.products.find(
+		(record) => record.id === asset.productModelId
+	);
+	const parts = product ? buildPartsForProduct(snapshot, product, asset) : [];
+	const history = snapshot.jobs
+		.filter(
+			(job) => job.assetId === asset.id && job.statusValue === "completed"
+		)
+		.map((job) => ({
+			date: job.scheduledFor,
+			duration: formatDuration(job.timerMinutes),
+			engineer: job.engineer,
+			id: job.recordId,
+			title: job.description,
+		}));
+
+	return {
+		assetId: asset.recordId,
+		category: product?.category ?? "Device",
+		history,
+		id: asset.id,
+		lastServiced: history[0]?.date ?? "Not serviced",
+		location: asset.location,
+		manualFileUrl: product?.manualFileUrl ?? null,
+		name: asset.model,
+		nfcUid: asset.nfcUid,
+		parts,
+		serial: asset.serial,
+		site: asset.hospital,
+		status: asset.isActive ? "active" : "unknown",
+	};
+}
+
+function buildPartsForProduct(
+	snapshot: ServiceOpsSnapshot,
+	product: SnapshotProduct,
+	asset: SnapshotAsset | undefined
+): EngineerPart[] {
+	const matchedParts = snapshot.parts.filter((part) =>
+		part.productModelIds.includes(product.id)
+	);
+	const sourceParts = matchedParts.length
+		? matchedParts
+		: snapshot.parts.slice(0, fallbackPartCount);
+
+	return sourceParts.map((part) => ({
+		defaultQuantity: 0,
+		id: part.recordId,
+		name: part.name,
+		partNumber: part.id,
+		status:
+			asset?.contractCoverageValue === "in_contract"
+				? "in-contract"
+				: "billable",
+	}));
+}
+
+function mapJobStatus(status: string): JobStatus {
+	if (status === "in_progress" || status === "resumed") {
+		return "active";
+	}
+	if (status === "paused" || status === "timer_anomaly") {
+		return "paused";
+	}
+	if (status === "completed") {
+		return "complete";
+	}
+	return "assigned";
+}
+
+function mapJobType(job: SnapshotJob): JobType {
+	if (job.priorityValue === "urgent") {
+		return "urgent";
+	}
+	if (job.typeValue === "preventive_maintenance") {
+		return "preventive-maintenance";
+	}
+	if (job.typeValue === "installation") {
+		return "installation";
+	}
+	return "repair";
+}
+
+function getScheduledDateKey(value: null | string): null | string {
+	if (!value) {
+		return null;
+	}
+	return toDateKey(new Date(value));
+}
+
+function getScheduledTime(value: null | string, fallback: string): string {
+	if (!value) {
+		return fallback;
+	}
+	return new Intl.DateTimeFormat("en-HK", {
+		hour: "2-digit",
+		hour12: false,
+		minute: "2-digit",
+		timeZone: "Asia/Hong_Kong",
+	}).format(new Date(value));
+}
+
+function toDateKey(value: Date): string {
+	const year = value.getFullYear();
+	const month = String(value.getMonth() + 1).padStart(2, "0");
+	const day = String(value.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
+function durationToMinutes(value: string): number {
+	const hourMatch = durationHourRegex.exec(value);
+	const minuteMatch = durationMinuteRegex.exec(value);
+	const hours = hourMatch ? Number.parseInt(hourMatch[1], 10) : 0;
+	const minutes = minuteMatch ? Number.parseInt(minuteMatch[1], 10) : 0;
+	return hours * minutesPerHour + minutes;
+}
+
+function formatDuration(minutes: number): string {
+	if (minutes <= 0) {
+		return "0m";
+	}
+
+	const hours = Math.floor(minutes / minutesPerHour);
+	const remainingMinutes = minutes % minutesPerHour;
+
+	if (hours === 0) {
+		return `${remainingMinutes}m`;
+	}
+
+	return `${hours}h ${String(remainingMinutes).padStart(2, "0")}m`;
+}
+
+function getInitials(name: string): string {
+	return name
+		.split(" ")
+		.filter(Boolean)
+		.slice(0, 2)
+		.map((part) => part.charAt(0).toUpperCase())
+		.join("");
+}

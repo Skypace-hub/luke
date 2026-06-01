@@ -21,7 +21,6 @@ import {
 	TextField,
 } from "@/components/engineer-app/engineer-ui";
 import { useI18n } from "@/contexts/i18n-context";
-import { engineerProfile, initialEngineerJobs } from "@/lib/engineer-app-data";
 
 export default function ProfileTab() {
 	const { profileStage } = useEngineerApp();
@@ -45,7 +44,8 @@ export default function ProfileTab() {
 }
 
 function ProfileHomeScreen() {
-	const { setProfileStage } = useEngineerApp();
+	const { clockOut, isActionPending, profile, setProfileStage } =
+		useEngineerApp();
 	const { locale, t } = useI18n();
 
 	return (
@@ -71,42 +71,39 @@ function ProfileHomeScreen() {
 					<Text
 						style={{ color: colors.white, fontSize: 20, fontWeight: "900" }}
 					>
-						{engineerProfile.initials}
+						{profile.initials}
 					</Text>
 				</View>
 				<View style={{ flex: 1 }}>
 					<Text style={{ color: colors.text, fontSize: 20, fontWeight: "900" }}>
-						{engineerProfile.name}
+						{profile.name}
 					</Text>
 					<Text style={{ color: colors.text2, fontSize: 13, marginTop: 3 }}>
-						{translateServiceText(locale, engineerProfile.role)} ·{" "}
-						{translateServiceText(locale, engineerProfile.region)}
+						{translateServiceText(locale, profile.role)} ·{" "}
+						{translateServiceText(locale, profile.region)}
 					</Text>
 					<View style={{ marginTop: 7 }}>
 						<Badge tone="green">
-							{t("native.shiftActive")} · {engineerProfile.shiftDuration}
+							{t("native.shiftActive")} · {profile.shiftDuration}
 						</Badge>
 					</View>
 				</View>
 			</View>
 			<View style={{ flexDirection: "row", gap: 9, marginBottom: 10 }}>
-				<Metric label="Jobs this month" value={engineerProfile.jobsThisMonth} />
+				<Metric label="Jobs this month" value={profile.jobsThisMonth} />
 				<Metric
 					label="First-fix rate"
 					tone="green"
-					value={engineerProfile.firstFixRate}
+					value={profile.firstFixRate}
 				/>
 			</View>
 			<Card>
-				<InfoRow
-					label="Average resolution"
-					value={engineerProfile.averageResolution}
-				/>
+				<InfoRow label="Average resolution" value={profile.averageResolution} />
 				<InfoRow
 					isLast
 					label="Clocked in"
 					tone="green"
-					value={engineerProfile.clockedInAt}
+					value={profile.clockedInAt}
 				/>
 			</Card>
 			<View
@@ -154,9 +151,10 @@ function ProfileHomeScreen() {
 				/>
 			</View>
 			<ActionButton
+				disabled={isActionPending}
 				icon="log-out"
 				label="Clock Out for Today"
-				onPress={() => undefined}
+				onPress={clockOut}
 				tone="red"
 			/>
 		</EngineerScreen>
@@ -164,28 +162,37 @@ function ProfileHomeScreen() {
 }
 
 function DailyExpensesScreen() {
-	const { addExpense, expenses, setProfileStage } = useEngineerApp();
+	const {
+		expenses,
+		isActionPending,
+		selectedJob,
+		setProfileStage,
+		submitExpense: submitExpenseToBackend,
+	} = useEngineerApp();
 	const { locale } = useI18n();
 	const [selectedCategory, setSelectedCategory] = useState("Mileage");
 	const [distance, setDistance] = useState("47");
 	const total = useMemo(() => {
 		const numericDistance = Number.parseFloat(distance);
 		if (Number.isNaN(numericDistance)) {
-			return "GBP 0.00";
+			return "HKD 0.00";
 		}
-		return `GBP ${(numericDistance * 0.45).toFixed(2)}`;
+		return `HKD ${(numericDistance * 4.8).toFixed(2)}`;
 	}, [distance]);
 
-	const submitExpense = () => {
-		addExpense({
-			id: `expense-${Date.now()}`,
-			category: selectedCategory,
-			detail:
-				selectedCategory === "Mileage"
-					? `${distance} km`
-					: translateServiceText(locale, "1 day"),
-			value: total,
-			linkedJob: `${translateServiceText(locale, "Job")} #1042`,
+	const submitCurrentExpense = () => {
+		const numericDistance = Number.parseFloat(distance);
+		const normalizedDistance = Number.isNaN(numericDistance)
+			? 0
+			: numericDistance;
+		submitExpenseToBackend({
+			amount: normalizedDistance * 4.8,
+			category: selectedCategory as
+				| "Accommodation"
+				| "Food"
+				| "Mileage"
+				| "Other",
+			distance: normalizedDistance,
 		});
 	};
 
@@ -218,11 +225,11 @@ function DailyExpensesScreen() {
 				/>
 			</View>
 			<Text style={{ color: colors.text3, fontSize: 12, marginBottom: 10 }}>
-				GBP 0.45/km · {translateServiceText(locale, "Total")}: {total}
+				HKD 4.80/km · {translateServiceText(locale, "Total")}: {total}
 			</Text>
 			<TextField
 				label="Link to job"
-				value={`${translateServiceText(locale, "Job")} #1042 - ${translateServiceText(locale, "Ventilator Repair")}`}
+				value={`${translateServiceText(locale, "Job")} #${selectedJob.id} - ${translateServiceText(locale, selectedJob.title)}`}
 			/>
 			<SectionLabel>Today's logged expenses</SectionLabel>
 			<Card>
@@ -250,16 +257,17 @@ function DailyExpensesScreen() {
 				))}
 			</Card>
 			<ActionButton
+				disabled={isActionPending}
 				icon="add-circle"
 				label="Add Expense"
-				onPress={submitExpense}
+				onPress={submitCurrentExpense}
 			/>
 		</EngineerScreen>
 	);
 }
 
 function JobHistoryScreen() {
-	const { setProfileStage } = useEngineerApp();
+	const { jobs, setProfileStage } = useEngineerApp();
 	const { locale } = useI18n();
 
 	return (
@@ -270,7 +278,7 @@ function JobHistoryScreen() {
 				subtitle="Completed and paused work"
 				title="Job History"
 			/>
-			{initialEngineerJobs.map((job) => (
+			{jobs.map((job) => (
 				<Card key={job.id}>
 					<View
 						style={{
@@ -300,7 +308,8 @@ function JobHistoryScreen() {
 }
 
 function PerformanceScreen() {
-	const { setProfileStage } = useEngineerApp();
+	const { jobs, profile, setProfileStage } = useEngineerApp();
+	const pausedJobs = jobs.filter((job) => job.status === "paused").length;
 
 	return (
 		<EngineerScreen>
@@ -311,12 +320,20 @@ function PerformanceScreen() {
 				title="Performance"
 			/>
 			<View style={{ flexDirection: "row", gap: 9, marginBottom: 10 }}>
-				<Metric label="Jobs complete" value="14" />
-				<Metric label="First-fix rate" tone="green" value="91%" />
+				<Metric label="Jobs complete" value={profile.jobsThisMonth} />
+				<Metric
+					label="First-fix rate"
+					tone="green"
+					value={profile.firstFixRate}
+				/>
 			</View>
 			<View style={{ flexDirection: "row", gap: 9, marginBottom: 10 }}>
-				<Metric label="Average time" tone="amber" value="2h 08m" />
-				<Metric label="Paused jobs" tone="purple" value="2" />
+				<Metric
+					label="Average time"
+					tone="amber"
+					value={profile.averageResolution}
+				/>
+				<Metric label="Paused jobs" tone="purple" value={String(pausedJobs)} />
 			</View>
 			<Card>
 				<InfoRow label="Urgent response average" tone="green" value="22 min" />
@@ -333,7 +350,7 @@ function PerformanceScreen() {
 }
 
 function ServiceManualScreen() {
-	const { setProfileStage } = useEngineerApp();
+	const { currentDevice, setProfileStage } = useEngineerApp();
 	const { locale } = useI18n();
 
 	return (
@@ -341,7 +358,7 @@ function ServiceManualScreen() {
 			<ScreenHeader
 				backLabel="Profile"
 				onBack={() => setProfileStage("home")}
-				subtitle="Drager Evita 600"
+				subtitle={currentDevice.name}
 				title="Service Manual"
 			/>
 			<Card style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
@@ -352,8 +369,10 @@ function ServiceManualScreen() {
 			</Card>
 			<Card>
 				<Badge tone="blue">
-					{translateServiceText(locale, "Page 47")} ·{" "}
-					{translateServiceText(locale, "Maintenance Procedures")}
+					{translateServiceText(locale, "Manual")} ·{" "}
+					{currentDevice.manualFileUrl
+						? translateServiceText(locale, "Uploaded")
+						: translateServiceText(locale, "Not uploaded")}
 				</Badge>
 				<Text
 					style={{

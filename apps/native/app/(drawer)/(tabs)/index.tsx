@@ -50,19 +50,47 @@ export default function JobsTab() {
 
 function JobListScreen() {
 	const { locale, t } = useI18n();
-	const { jobs, selectJob } = useEngineerApp();
+	const { isLoading, jobs, lastError, refresh, selectJob } = useEngineerApp();
 
 	return (
 		<EngineerScreen>
 			<BrandHeader />
 			<ShiftStatus />
 			<ScreenHeader
-				subtitle="Wednesday, 27 May · 3 assigned"
+				subtitle={
+					isLoading
+						? "Loading assigned jobs"
+						: `${jobs.length} assigned from backend`
+				}
 				title={t("native.todayJobs")}
 			/>
-			{jobs.map((job) => (
-				<JobCard job={job} key={job.id} onPress={() => selectJob(job.id)} />
-			))}
+			{lastError ? (
+				<Card
+					style={{ borderColor: colors.red, backgroundColor: colors.redDim }}
+				>
+					<Text style={{ color: colors.red, fontSize: 13, fontWeight: "800" }}>
+						{translateServiceText(locale, lastError)}
+					</Text>
+					<GhostButton label={t("common.retry")} onPress={refresh} />
+				</Card>
+			) : null}
+			{jobs.length > 0 ? (
+				jobs.map((job) => (
+					<JobCard job={job} key={job.id} onPress={() => selectJob(job.id)} />
+				))
+			) : (
+				<Card style={{ alignItems: "center", paddingVertical: 28 }}>
+					<Badge>{isLoading ? "Loading" : "No assigned jobs"}</Badge>
+					<Text style={{ color: colors.text2, fontSize: 12, marginTop: 8 }}>
+						{translateServiceText(
+							locale,
+							isLoading
+								? "Fetching service operations from backend."
+								: "No jobs assigned to this engineer yet."
+						)}
+					</Text>
+				</Card>
+			)}
 			<Card
 				style={{
 					backgroundColor: "rgba(43,142,240,0.08)",
@@ -92,7 +120,8 @@ function JobListScreen() {
 
 function JobDetailScreen() {
 	const { locale, t } = useI18n();
-	const { selectedJob, setJobStage, startSelectedJob } = useEngineerApp();
+	const { isActionPending, selectedJob, setJobStage, startSelectedJob } =
+		useEngineerApp();
 	const tone = jobTone(selectedJob.type);
 	const isInstallation = selectedJob.type === "installation";
 	const getJobTypeLabel = useJobTypeLabel();
@@ -136,6 +165,7 @@ function JobDetailScreen() {
 				/>
 			</Card>
 			<ActionButton
+				disabled={isActionPending || !selectedJob.recordId}
 				icon={isInstallation ? "play-circle" : "scan"}
 				label={
 					isInstallation
@@ -166,7 +196,7 @@ function JobDetailScreen() {
 
 function ActiveJobScreen() {
 	const { locale, t } = useI18n();
-	const { selectedJob, setJobStage } = useEngineerApp();
+	const { isActionPending, selectedJob, setJobStage } = useEngineerApp();
 
 	return (
 		<EngineerScreen>
@@ -245,12 +275,14 @@ function ActiveJobScreen() {
 				</View>
 			</View>
 			<ActionButton
+				disabled={isActionPending}
 				icon="pause-circle"
 				label={t("native.pauseJob")}
 				onPress={() => setJobStage("pause")}
 				tone="amber"
 			/>
 			<ActionButton
+				disabled={isActionPending}
 				icon="scan-circle"
 				label={t("native.scanCompleteJob")}
 				onPress={() => setJobStage("submit-record")}
@@ -261,10 +293,11 @@ function ActiveJobScreen() {
 
 function PauseJobScreen() {
 	const { locale } = useI18n();
-	const { selectedJob, setJobStage, pauseSelectedJob } = useEngineerApp();
+	const { isActionPending, selectedJob, setJobStage, pauseSelectedJob } =
+		useEngineerApp();
 	const [reason, setReason] = useState("Parts not available");
 	const [selectedParts, setSelectedParts] = useState(
-		() => new Set(["flow-sensor"])
+		() => new Set(selectedJob.parts[0] ? [selectedJob.parts[0].id] : [])
 	);
 	const [notes, setNotes] = useState("");
 	const quantities = useMemo(
@@ -342,10 +375,15 @@ function PauseJobScreen() {
 				/>
 			</View>
 			<ActionButton
-				disabled={notes.trim().length === 0}
+				disabled={isActionPending || notes.trim().length === 0}
 				icon="send"
 				label="Confirm Pause - Send Report"
-				onPress={pauseSelectedJob}
+				onPress={() =>
+					pauseSelectedJob({
+						notes: `${reason}: ${notes}`,
+						partIds: Array.from(selectedParts),
+					})
+				}
 				tone="amber"
 			/>
 			<GhostButton label="Cancel" onPress={() => setJobStage("active")} />
@@ -431,7 +469,8 @@ function SubmitRecordScreen() {
 
 function LogPartsScreen() {
 	const { locale, t } = useI18n();
-	const { selectedJob, setJobStage, completeSelectedJob } = useEngineerApp();
+	const { isActionPending, selectedJob, setJobStage, completeSelectedJob } =
+		useEngineerApp();
 	const [quantities, setQuantities] = useState<Record<string, number>>(() =>
 		Object.fromEntries(
 			selectedJob.parts.map((part) => [part.id, part.defaultQuantity])
@@ -483,9 +522,10 @@ function LogPartsScreen() {
 				quantities={quantities}
 			/>
 			<ActionButton
+				disabled={isActionPending}
 				icon="save"
 				label={`${translateServiceText(locale, "Save Parts")} (${translateServiceText(locale, totalItems === 1 ? "1 item" : "{count} items").replace("{count}", String(totalItems))})`}
-				onPress={completeSelectedJob}
+				onPress={() => completeSelectedJob(quantities)}
 			/>
 		</EngineerScreen>
 	);

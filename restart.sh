@@ -6,10 +6,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_PORTS=(27099 3001 8081 8082 19000 19001 19002)
 MODE="dev"
 DETACHED=false
+NATIVE_PROFILE=""
 
 cd "$ROOT_DIR"
 
 parse_args() {
+	local mode_set=false
+
 	for arg in "$@"; do
 		case "$arg" in
 			-d | --detach | --detached)
@@ -17,9 +20,28 @@ parse_args() {
 				;;
 			-h | --help | help)
 				MODE="help"
+				mode_set=true
 				;;
-			dev | native-dev-client | ios-dev-client-build | testflight | testflight-build | testflight-submit)
-				MODE="$arg"
+			dev | native-dev-client | ios-dev-client-build | native-check | native-doctor | native-prebuild | native-build | native-build-ios | native-build-android | native-submit | native-submit-ios | native-submit-android | testflight | testflight-build | testflight-submit)
+				if [[ "$mode_set" == true && "$arg" == "testflight" ]]; then
+					NATIVE_PROFILE="$arg"
+				elif [[ "$mode_set" == true ]]; then
+					echo "Unexpected extra mode argument: $arg"
+					print_usage
+					exit 1
+				else
+					MODE="$arg"
+					mode_set=true
+				fi
+				;;
+			development | production)
+				if [[ "$mode_set" == false ]]; then
+					echo "Profile requires a native mode: $arg"
+					print_usage
+					exit 1
+				fi
+
+				NATIVE_PROFILE="$arg"
 				;;
 			*)
 				echo "Unknown argument: $arg"
@@ -42,7 +64,12 @@ run_detached() {
 	echo "Log: $log_file"
 	echo "PID: $pid_file"
 
-	nohup "$0" "$MODE" >"$log_file" 2>&1 &
+	if [[ -n "$NATIVE_PROFILE" ]]; then
+		nohup "$0" "$MODE" "$NATIVE_PROFILE" >"$log_file" 2>&1 &
+	else
+		nohup "$0" "$MODE" >"$log_file" 2>&1 &
+	fi
+
 	echo "$!" >"$pid_file"
 }
 
@@ -72,23 +99,81 @@ wait_for_ports_to_clear() {
 
 print_usage() {
 	cat <<'USAGE'
-Usage:
-  ./restart.sh                      Build iOS dev client, then restart all dev servers
-  ./restart.sh -d                   Same as default, but run in the background
-  ./restart.sh dev                  Same as default
-  ./restart.sh dev -d               Restart all dev servers in the background
-  ./restart.sh native-dev-client    Start Expo dev client server for iPhone
-  ./restart.sh ios-dev-client-build Build/install the iOS development client
-  ./restart.sh testflight           Guided TestFlight build/sign/submit flow
-  ./restart.sh testflight-build     Build an iOS TestFlight archive with EAS
-  ./restart.sh testflight-submit    Submit the latest EAS iOS build to TestFlight
+用法:
+  ./restart.sh
+      默认开发流程。先尝试构建/安装 iOS development client，然后重启数据库和所有开发服务。
 
-iPhone development build flow:
-  1. Run: ./restart.sh
-  2. Open the installed dev client app on the iPhone
+  ./restart.sh -d
+      默认开发流程的后台模式。日志写入 logs/restart-dev.log，PID 写入 tmp/restart-dev.pid。
 
-Note: native-dev-client requires expo-dev-client in apps/native/package.json.
-Note: TestFlight requires a paid Apple Developer account and an Expo account.
+  ./restart.sh dev
+      和默认命令一样。适合日常开发时一键重启全部服务。
+
+  ./restart.sh dev -d
+      后台运行 dev 模式。
+
+本地开发:
+  ./restart.sh native-dev-client
+      只启动 Expo dev client server，端口 8082。适合手机上已经安装 development client，只需要连接 Metro 时使用。
+
+  ./restart.sh ios-dev-client-build
+      只构建并安装 iOS development client，不启动全部 Web/DB 开发服务。
+
+检查与同步:
+  ./restart.sh native-check
+      本地检查 Native 项目。会跑 TypeScript 类型检查，并解析 Expo config。不会访问 EAS，不会真正构建。
+
+  ./restart.sh native-doctor
+      跑 Expo Doctor。用于检查 Expo 依赖版本和配置问题。这个命令可能需要访问 npm registry。
+
+  ./restart.sh native-prebuild
+      重新同步 ios/ 和 android/ 原生工程。改过 app.json 里的 ios/android/plugin 原生字段后，需要跑这个。
+
+EAS 云构建:
+  ./restart.sh native-build-ios
+      用 EAS 构建 iOS，默认 profile 是 production。
+
+  ./restart.sh native-build-android
+      用 EAS 构建 Android，默认 profile 是 production。
+
+  ./restart.sh native-build
+      依次构建 iOS 和 Android，默认 profile 是 production。
+
+EAS 提交商店:
+  ./restart.sh native-submit-ios
+      提交最新的 iOS EAS build。默认 profile 是 production。
+
+  ./restart.sh native-submit-android
+      提交最新的 Android EAS build。默认 profile 是 production。
+
+  ./restart.sh native-submit
+      依次提交最新的 iOS 和 Android EAS build。默认 profile 是 production。
+
+指定 EAS profile:
+  ./restart.sh native-build-ios testflight
+      用 testflight profile 构建 iOS。
+
+  ./restart.sh native-build-android production
+      用 production profile 构建 Android。
+
+  ./restart.sh native-submit-ios testflight
+      用 testflight profile 提交最新 iOS build。
+
+旧 TestFlight 快捷命令:
+  ./restart.sh testflight
+      旧的引导式 TestFlight 构建/签名/提交流程。
+
+  ./restart.sh testflight-build
+      只用 EAS 构建 iOS TestFlight 包。
+
+  ./restart.sh testflight-submit
+      只提交最新的 EAS iOS build 到 TestFlight。
+
+注意:
+  - EAS 构建/提交需要先登录 Expo 账号。
+  - iOS 提交 TestFlight 需要 Apple Developer 账号。
+  - Android 本地运行需要 JDK 17 和 Android SDK；EAS 云构建不依赖本机 Android SDK。
+  - 当前包名还是 com.anonymous.luke，正式上架前建议换成你的真实 Bundle ID / Android package。
 USAGE
 }
 
@@ -99,6 +184,10 @@ ensure_native_dev_client_dependency() {
 		echo "  cd apps/native && npx expo install expo-dev-client"
 		exit 1
 	fi
+}
+
+run_native_script() {
+	"$ROOT_DIR/scripts/native.sh" "$@"
 }
 
 warn_testflight_bundle_identifier() {
@@ -206,7 +295,7 @@ case "$MODE" in
 		print_usage
 		exit 0
 		;;
-	dev | native-dev-client | ios-dev-client-build | testflight | testflight-build | testflight-submit)
+	dev | native-dev-client | ios-dev-client-build | native-check | native-doctor | native-prebuild | native-build | native-build-ios | native-build-android | native-submit | native-submit-ios | native-submit-android | testflight | testflight-build | testflight-submit)
 		;;
 	*)
 		echo "Unknown mode: $MODE"
@@ -216,6 +305,42 @@ case "$MODE" in
 esac
 
 case "$MODE" in
+	native-check)
+		run_native_script check
+		exit 0
+		;;
+	native-doctor)
+		run_native_script doctor
+		exit 0
+		;;
+	native-prebuild)
+		run_native_script prebuild
+		exit 0
+		;;
+	native-build)
+		run_native_script build all "${NATIVE_PROFILE:-production}"
+		exit 0
+		;;
+	native-build-ios)
+		run_native_script build ios "${NATIVE_PROFILE:-production}"
+		exit 0
+		;;
+	native-build-android)
+		run_native_script build android "${NATIVE_PROFILE:-production}"
+		exit 0
+		;;
+	native-submit)
+		run_native_script submit all "${NATIVE_PROFILE:-production}"
+		exit 0
+		;;
+	native-submit-ios)
+		run_native_script submit ios "${NATIVE_PROFILE:-production}"
+		exit 0
+		;;
+	native-submit-android)
+		run_native_script submit android "${NATIVE_PROFILE:-production}"
+		exit 0
+		;;
 	testflight)
 		run_testflight_flow
 		exit 0

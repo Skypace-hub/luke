@@ -28,10 +28,12 @@
   },
   "submit": {
     "testflight": {
-      "ios": {}
+      "ios": {},
+      "android": {}
     },
     "production": {
-      "ios": {}
+      "ios": {},
+      "android": {}
     }
   }
 }
