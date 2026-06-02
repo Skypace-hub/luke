@@ -22,7 +22,7 @@ parse_args() {
 				MODE="help"
 				mode_set=true
 				;;
-			dev | native-dev-client | ios-dev-client-build | native-check | native-doctor | native-prebuild | native-build | native-build-ios | native-build-android | native-submit | native-submit-ios | native-submit-android | testflight | testflight-build | testflight-submit)
+			dev | web | native-dev-client | ios-dev-client-build | native-check | native-doctor | native-prebuild | native-build | native-build-ios | native-build-android | native-submit | native-submit-ios | native-submit-android | testflight | testflight-build | testflight-submit)
 				if [[ "$mode_set" == true && "$arg" == "testflight" ]]; then
 					NATIVE_PROFILE="$arg"
 				elif [[ "$mode_set" == true ]]; then
@@ -73,10 +73,16 @@ run_detached() {
 	echo "$!" >"$pid_file"
 }
 
+list_listening_pids_on_port() {
+	local port="$1"
+
+	lsof -tiTCP:"${port}" -sTCP:LISTEN || true
+}
+
 stop_processes_on_ports() {
 	for port in "${DEV_PORTS[@]}"; do
 		local pids
-		pids="$(lsof -ti "tcp:${port}" || true)"
+		pids="$(list_listening_pids_on_port "$port")"
 
 		if [[ -n "$pids" ]]; then
 			echo "Stopping processes on port ${port}: ${pids}"
@@ -88,13 +94,49 @@ stop_processes_on_ports() {
 wait_for_ports_to_clear() {
 	for port in "${DEV_PORTS[@]}"; do
 		for _ in {1..10}; do
-			if ! lsof -ti "tcp:${port}" >/dev/null; then
+			if [[ -z "$(list_listening_pids_on_port "$port")" ]]; then
 				break
 			fi
 
 			sleep 0.5
 		done
 	done
+}
+
+force_stop_processes_on_ports() {
+	for port in "${DEV_PORTS[@]}"; do
+		local pids
+		pids="$(list_listening_pids_on_port "$port")"
+
+		if [[ -n "$pids" ]]; then
+			echo "Force stopping processes on port ${port}: ${pids}"
+			kill -9 $pids || true
+		fi
+	done
+}
+
+ensure_ports_are_clear() {
+	for port in "${DEV_PORTS[@]}"; do
+		if [[ -n "$(list_listening_pids_on_port "$port")" ]]; then
+			echo "Port ${port} is still in use after cleanup."
+			echo "Run this on the server to inspect it:"
+			echo "  lsof -nP -iTCP:${port} -sTCP:LISTEN"
+			exit 1
+		fi
+	done
+}
+
+clear_dev_ports() {
+	echo "Clearing development ports..."
+	stop_processes_on_ports
+	wait_for_ports_to_clear
+	force_stop_processes_on_ports
+	wait_for_ports_to_clear
+	ensure_ports_are_clear
+}
+
+is_macos() {
+	[[ "$(uname -s)" == "Darwin" ]]
 }
 
 print_usage() {
@@ -113,6 +155,12 @@ print_usage() {
       后台运行 dev 模式。
 
 本地开发:
+  ./restart.sh web
+      只重启数据库和 Web 开发服务，端口 27099。适合云服务器上只预览网页时使用。
+
+  ./restart.sh web -d
+      后台运行 Web 开发服务。日志写入 logs/restart-web.log，PID 写入 tmp/restart-web.pid。
+
   ./restart.sh native-dev-client
       只启动 Expo dev client server，端口 8082。适合手机上已经安装 development client，只需要连接 Metro 时使用。
 
@@ -226,6 +274,11 @@ start_dev_servers() {
 	npm run dev
 }
 
+start_web_dev_server() {
+	echo "Starting web development server..."
+	npm run dev:web
+}
+
 start_native_dev_client_server() {
 	ensure_native_dev_client_dependency
 	echo "Starting Expo dev client server on port 8082..."
@@ -237,6 +290,13 @@ start_native_dev_client_server() {
 
 build_ios_dev_client() {
 	ensure_native_dev_client_dependency
+
+	if ! is_macos; then
+		echo "Skipping iOS development client build because local iOS builds require macOS."
+		echo "Use ./restart.sh native-build-ios to build iOS with EAS cloud builds."
+		return
+	fi
+
 	echo "Building and installing iOS development client..."
 
 	set +e
@@ -295,7 +355,7 @@ case "$MODE" in
 		print_usage
 		exit 0
 		;;
-	dev | native-dev-client | ios-dev-client-build | native-check | native-doctor | native-prebuild | native-build | native-build-ios | native-build-android | native-submit | native-submit-ios | native-submit-android | testflight | testflight-build | testflight-submit)
+	dev | web | native-dev-client | ios-dev-client-build | native-check | native-doctor | native-prebuild | native-build | native-build-ios | native-build-android | native-submit | native-submit-ios | native-submit-android | testflight | testflight-build | testflight-submit)
 		;;
 	*)
 		echo "Unknown mode: $MODE"
@@ -359,9 +419,7 @@ echo "Restarting luke (${MODE})..."
 
 stop_database
 
-echo "Clearing development ports..."
-stop_processes_on_ports
-wait_for_ports_to_clear
+clear_dev_ports
 
 start_database
 
@@ -369,6 +427,9 @@ case "$MODE" in
 	dev)
 		build_ios_dev_client
 		start_dev_servers
+		;;
+	web)
+		start_web_dev_server
 		;;
 	native-dev-client)
 		start_native_dev_client_server
