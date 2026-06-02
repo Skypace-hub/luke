@@ -420,36 +420,6 @@ const dashboardCategoryItems = [
 
 type DashboardCategory = (typeof dashboardCategoryItems)[number]["id"];
 
-const dashboardCategoryMeta = {
-	analytics: {
-		description:
-			"Trend service volume, urgent workload, completion momentum, and release coverage.",
-		eyebrow: "Service Analytics",
-		title: "Operational signals",
-	},
-	notifications: {
-		description:
-			"Review live exceptions, schedule pressure, and alerts that need service attention.",
-		eyebrow: "Notification Center",
-		title: "Exceptions and alerts",
-	},
-	overview: {
-		description:
-			"Keep tabs on service demand, open exceptions, contract risk, and field execution across the current release.",
-		eyebrow: "Service Command",
-		title: "Operations Overview",
-	},
-	reports: {
-		description:
-			"Inspect job-level reporting, close-out status, and the current service execution scope.",
-		eyebrow: "Service Reports",
-		title: "Jobs and release scope",
-	},
-} satisfies Record<
-	DashboardCategory,
-	{ description: string; eyebrow: string; title: string }
->;
-
 const getBackOfficeTitle = (view: BackOfficeView) => backOfficeTitles[view];
 
 const getNavigationItem = (view: BackOfficeView) =>
@@ -4282,7 +4252,6 @@ function DashboardView({
 	const completedJobs = jobs.filter((job) => job.status === "Completed").length;
 	const [activeCategory, setActiveCategory] =
 		useState<DashboardCategory>("overview");
-	const categoryMeta = dashboardCategoryMeta[activeCategory];
 	const handleCategoryChange = (category: DashboardCategory) => {
 		setActiveCategory(category);
 
@@ -4298,12 +4267,7 @@ function DashboardView({
 	};
 
 	return (
-		<PageFrame
-			description={categoryMeta.description}
-			eyebrow={categoryMeta.eyebrow}
-			hideHeader={activeCategory === "overview"}
-			title={categoryMeta.title}
-		>
+		<PageFrame eyebrow="Service Command" hideHeader title="Operations Overview">
 			<DashboardCategoryTabs
 				activeCategory={activeCategory}
 				onCategoryChange={handleCategoryChange}
