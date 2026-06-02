@@ -312,6 +312,11 @@ export const productModels = pgTable(
 		manufacturer: text("manufacturer").notNull(),
 		category: text("category").notNull(),
 		defaultPmCycleMonths: integer("default_pm_cycle_months").notNull(),
+		warrantyMonths: integer("warranty_months").default(12).notNull(),
+		listPrice: numeric("list_price", { precision: 12, scale: 2 })
+			.default("0")
+			.notNull(),
+		description: text("description"),
 		isEngineerReadOnly: boolean("is_engineer_read_only")
 			.default(true)
 			.notNull(),

@@ -5897,13 +5897,23 @@ function ProductInformationCard({
 				<CardTitle>Product Information</CardTitle>
 			</CardHeader>
 			<CardContent className="grid gap-6 sm:grid-cols-2">
-				<PartDetailField label="Warranty" value="12 months" />
+				<PartDetailField
+					label="Warranty"
+					value={`${product.warrantyMonths} months`}
+				/>
 				<PartDetailField
 					label="PM Interval"
 					value={formatPmInterval(product.defaultPmCycleMonths)}
 				/>
-				<PartDetailField label="List Price" value="-" />
+				<PartDetailField
+					label="List Price"
+					value={hongKongDollarFormatter.format(product.listPrice)}
+				/>
 				<PartDetailField label="Repair Jobs" value={repairJobCount} />
+				<PartDetailField
+					label="Description"
+					value={product.description ?? "Not set"}
+				/>
 			</CardContent>
 		</Card>
 	);
@@ -6700,6 +6710,10 @@ function getCrudDialogTitle(state: CrudState) {
 		return "Add New Part";
 	}
 
+	if (state.entity === "product" && state.mode === "create") {
+		return "Add New Product";
+	}
+
 	return state.mode === "create"
 		? `New ${entityLabels[state.entity]}`
 		: `Edit ${entityLabels[state.entity]}`;
@@ -7007,7 +7021,7 @@ function FormField({
 	if (field.type === "hidden") {
 		return (
 			<input
-				defaultValue={getInputDefaultValue(defaultValue)}
+				defaultValue={getHiddenDefaultValue(defaultValue)}
 				name={field.name}
 				type="hidden"
 			/>
@@ -7915,6 +7929,14 @@ function getInputDefaultValue(defaultValue: FormDefaultValue | undefined) {
 	}
 
 	return String(defaultValue ?? "");
+}
+
+function getHiddenDefaultValue(defaultValue: FormDefaultValue | undefined) {
+	if (typeof defaultValue === "boolean") {
+		return String(defaultValue);
+	}
+
+	return getInputDefaultValue(defaultValue);
 }
 
 function getSelectDefaultValue(

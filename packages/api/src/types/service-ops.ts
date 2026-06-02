@@ -168,15 +168,18 @@ export interface ProductModel {
 	category: string;
 	code: string;
 	defaultPmCycleMonths: number;
+	description: null | string;
 	engineerAccess: string;
 	id: string;
 	isEngineerReadOnly: boolean;
+	listPrice: number;
 	manualFileName: string;
 	manualFileUrl: null | string;
 	manufacturer: string;
 	modelName: string;
 	partIds: string[];
 	partsList: string[];
+	warrantyMonths: number;
 }
 
 export interface Contract {

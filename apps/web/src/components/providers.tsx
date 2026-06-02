@@ -8,7 +8,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "@/utils/trpc";
 
 import { I18nProvider, useI18n } from "./i18n-provider";
-import { ThemeProvider } from "./theme-provider";
+import { ThemeProvider, useAppTheme } from "./theme-provider";
 
 const shouldShowQueryDevtools =
 	process.env.NEXT_PUBLIC_QUERY_DEVTOOLS === "true";
@@ -22,12 +22,7 @@ export default function Providers({
 }) {
 	return (
 		<I18nProvider initialLocale={initialLocale}>
-			<ThemeProvider
-				attribute="class"
-				defaultTheme="system"
-				disableTransitionOnChange
-				enableSystem
-			>
+			<ThemeProvider>
 				<QueryClientProvider client={queryClient}>
 					{children}
 					{shouldShowQueryDevtools ? <ReactQueryDevtools /> : null}
@@ -40,12 +35,14 @@ export default function Providers({
 
 function LocalizedToaster() {
 	const { t } = useI18n();
+	const { resolvedTheme } = useAppTheme();
 
 	return (
 		<Toaster
 			containerAriaLabel={t("service.notifications")}
 			position="top-right"
 			richColors
+			theme={resolvedTheme}
 		/>
 	);
 }

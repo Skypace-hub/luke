@@ -378,6 +378,9 @@ async function seedReferenceData(adminId: string) {
 			manufacturer: "Arjo",
 			category: "Patient lift",
 			defaultPmCycleMonths: 6,
+			warrantyMonths: 12,
+			listPrice: "0",
+			description: "Floor lift model for patient transfer workflows.",
 		},
 		{
 			id: ids.productModels.saraFlex,
@@ -387,6 +390,9 @@ async function seedReferenceData(adminId: string) {
 			manufacturer: "Arjo",
 			category: "Standing aid",
 			defaultPmCycleMonths: 6,
+			warrantyMonths: 12,
+			listPrice: "0",
+			description: "Standing aid model for assisted mobility workflows.",
 		},
 		{
 			id: ids.productModels.citadel,
@@ -396,6 +402,9 @@ async function seedReferenceData(adminId: string) {
 			manufacturer: "Arjo",
 			category: "Therapy system",
 			defaultPmCycleMonths: 3,
+			warrantyMonths: 12,
+			listPrice: "0",
+			description: "Patient therapy system model for ICU support.",
 		},
 		{
 			id: ids.productModels.alenti,
@@ -405,6 +414,9 @@ async function seedReferenceData(adminId: string) {
 			manufacturer: "Arjo",
 			category: "Hygiene chair",
 			defaultPmCycleMonths: 6,
+			warrantyMonths: 12,
+			listPrice: "0",
+			description: "Hygiene chair model for assisted bathing workflows.",
 		},
 	]);
 

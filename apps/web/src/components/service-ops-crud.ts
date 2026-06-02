@@ -216,7 +216,9 @@ interface ProductPayload {
 	category: string;
 	code: string;
 	defaultPmCycleMonths: number;
+	description: null | string;
 	isEngineerReadOnly: boolean;
+	listPrice: number;
 	manufacturer: string;
 	modelName: string;
 	partIds: string[];
@@ -227,6 +229,7 @@ interface ProductPayload {
 		storageKey: null | string;
 		version: null | string;
 	};
+	warrantyMonths: number;
 }
 
 export interface TenantPayload {
@@ -905,21 +908,70 @@ export function getFieldConfigs(
 			},
 		],
 		product: [
-			{ label: "Code", name: "code", required: true },
-			{ label: "Model name", name: "modelName", required: true },
-			{ label: "Manufacturer", name: "manufacturer", required: true },
-			{ label: "Category", name: "category", required: true },
 			{
-				label: "Default PM cycle",
+				label: "Product Information",
+				name: "productInformation",
+				type: "section",
+			},
+			{
+				label: "Product Name",
+				name: "modelName",
+				placeholder: "e.g. Ventilator Pro X200",
+				required: true,
+				span: "full",
+			},
+			{
+				label: "Model Number",
+				name: "code",
+				placeholder: "e.g. VPX-200",
+				required: true,
+			},
+			{
+				label: "Manufacturer",
+				name: "manufacturer",
+				placeholder: "e.g. MedTech Solutions",
+				required: true,
+			},
+			{
+				label: "Category",
+				name: "category",
+				placeholder: "e.g. Respiratory, Cardiac, ICU",
+				required: true,
+				span: "full",
+			},
+			{
+				label: "Warranty",
+				name: "warrantyMonths",
+				placeholder: "e.g. 12",
+				suffix: "months",
+				type: "number",
+			},
+			{
+				label: "PM Interval",
 				name: "defaultPmCycleMonths",
+				placeholder: "e.g. 12",
 				required: true,
 				suffix: "months",
 				type: "number",
 			},
 			{
+				label: "List Price",
+				name: "listPrice",
+				placeholder: "0.00",
+				suffix: "HKD",
+				type: "number",
+			},
+			{
+				label: "Description",
+				name: "description",
+				placeholder: "Product description...",
+				span: "full",
+				type: "textarea",
+			},
+			{
 				label: "Engineer read only",
 				name: "isEngineerReadOnly",
-				type: "checkbox",
+				type: "hidden",
 			},
 			{
 				label: "Standard parts",
@@ -1079,7 +1131,9 @@ function optionalNumberFromForm(formData: FormData, name: string) {
 }
 
 function boolFromForm(formData: FormData, name: string) {
-	return formData.get(name) === "on";
+	const value = formData.get(name);
+
+	return value === "on" || value === "true";
 }
 
 function datetimeLocalValue(value: null | string | undefined) {
@@ -1387,7 +1441,9 @@ function getProductDefaults(
 			category: record.category,
 			code: record.code,
 			defaultPmCycleMonths: record.defaultPmCycleMonths,
+			description: record.description ?? "",
 			isEngineerReadOnly: record.isEngineerReadOnly,
+			listPrice: record.listPrice,
 			manualFileName:
 				record.manualFileName === "Not uploaded" ? "" : record.manualFileName,
 			manualFileUrl: record.manualFileUrl ?? "",
@@ -1397,6 +1453,7 @@ function getProductDefaults(
 			manufacturer: record.manufacturer,
 			modelName: record.modelName,
 			partIds: record.partIds,
+			warrantyMonths: record.warrantyMonths,
 		};
 	}
 
@@ -1463,13 +1520,13 @@ function getCreateDefaults(entity: CrudEntity) {
 	}
 
 	if (entity === "product") {
-		defaults.code = `MODEL-${suffix}`;
-		defaults.defaultPmCycleMonths = 6;
+		defaults.defaultPmCycleMonths = 12;
 		defaults.isEngineerReadOnly = true;
+		defaults.listPrice = 0;
+		defaults.warrantyMonths = 12;
 	}
 
 	if (entity === "part") {
-		defaults.partNumber = `P-${suffix}`;
 		defaults.productModelIds = [];
 	}
 
@@ -1649,7 +1706,9 @@ export function buildProductPayload(formData: FormData): ProductPayload {
 		category: valueFromForm(formData, "category"),
 		code: valueFromForm(formData, "code"),
 		defaultPmCycleMonths: numberFromForm(formData, "defaultPmCycleMonths"),
+		description: nullableValueFromForm(formData, "description"),
 		isEngineerReadOnly: boolFromForm(formData, "isEngineerReadOnly"),
+		listPrice: numberFromForm(formData, "listPrice"),
 		manufacturer: valueFromForm(formData, "manufacturer"),
 		modelName: valueFromForm(formData, "modelName"),
 		partIds: valuesFromForm(formData, "partIds"),
@@ -1662,6 +1721,7 @@ export function buildProductPayload(formData: FormData): ProductPayload {
 					version: manualVersion,
 				}
 			: null,
+		warrantyMonths: numberFromForm(formData, "warrantyMonths"),
 	};
 }
 

@@ -20,9 +20,9 @@ import {
 	PaletteIcon,
 	SunIcon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/components/i18n-provider";
+import { useAppTheme } from "@/components/theme-provider";
 
 const colorThemeStorageKey = "luke-color-theme";
 
@@ -60,7 +60,7 @@ const applyColorTheme = (theme: ColorTheme) => {
 
 export function ThemeColorSwitcher({ className }: { className?: string }) {
 	const { locale } = useI18n();
-	const { setTheme, theme } = useTheme();
+	const { setTheme, theme } = useAppTheme();
 	const [colorTheme, setColorThemeState] = useState<ColorTheme>("neutral");
 
 	useEffect(() => {

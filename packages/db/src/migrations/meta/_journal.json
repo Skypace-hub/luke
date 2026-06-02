@@ -36,6 +36,13 @@
       "when": 1779790003000,
       "tag": "0004_hospital_region_province",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779790004000,
+      "tag": "0005_product_commercial_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -146,11 +146,14 @@ export interface ProductMutationInput {
 	category: string;
 	code: string;
 	defaultPmCycleMonths: number;
+	description?: null | string;
 	isEngineerReadOnly: boolean;
+	listPrice: number;
 	manufacturer: string;
 	modelName: string;
 	partIds: string[];
 	serviceManual?: null | ServiceManualMutationInput;
+	warrantyMonths: number;
 }
 
 export interface PartMutationInput {
@@ -1595,7 +1598,9 @@ const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
 			category: productModels.category,
 			code: productModels.code,
 			defaultPmCycleMonths: productModels.defaultPmCycleMonths,
+			description: productModels.description,
 			isEngineerReadOnly: productModels.isEngineerReadOnly,
+			listPrice: productModels.listPrice,
 			manufacturer: productModels.manufacturer,
 			manualFileName: serviceManuals.fileName,
 			manualFileUrl: serviceManuals.fileUrl,
@@ -1603,6 +1608,7 @@ const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
 			partId: parts.id,
 			partName: parts.name,
 			productModelId: productModels.id,
+			warrantyMonths: productModels.warrantyMonths,
 		})
 		.from(productModels)
 		.leftJoin(
@@ -1638,15 +1644,18 @@ const getProducts = async (tenantId: string): Promise<ProductModel[]> => {
 			category: row.category,
 			code: row.code,
 			defaultPmCycleMonths: row.defaultPmCycleMonths,
+			description: row.description,
 			engineerAccess: row.isEngineerReadOnly ? "Read-only" : "Editable",
 			id: row.productModelId,
 			isEngineerReadOnly: row.isEngineerReadOnly,
+			listPrice: Number(row.listPrice),
 			manufacturer: row.manufacturer,
 			manualFileName: row.manualFileName ?? "Not uploaded",
 			manualFileUrl: row.manualFileUrl,
 			modelName: row.modelName,
 			partIds: row.partId ? [row.partId] : [],
 			partsList: row.partName ? [row.partName] : [],
+			warrantyMonths: row.warrantyMonths,
 		});
 	}
 
@@ -2165,9 +2174,12 @@ export async function getNfcDeviceInfo(
 			productCategory: productModels.category,
 			productCode: productModels.code,
 			productDefaultPmCycleMonths: productModels.defaultPmCycleMonths,
+			productDescription: productModels.description,
 			productIsEngineerReadOnly: productModels.isEngineerReadOnly,
+			productListPrice: productModels.listPrice,
 			productManufacturer: productModels.manufacturer,
 			productModelId: assets.productModelId,
+			productWarrantyMonths: productModels.warrantyMonths,
 			serialNumber: assets.serialNumber,
 			warrantyExpiryDate: assets.warrantyExpiryDate,
 		})
@@ -2271,17 +2283,20 @@ export async function getNfcDeviceInfo(
 			category: assetRow.productCategory,
 			code: assetRow.productCode,
 			defaultPmCycleMonths: assetRow.productDefaultPmCycleMonths,
+			description: assetRow.productDescription,
 			engineerAccess: assetRow.productIsEngineerReadOnly
 				? "Read-only"
 				: "Editable",
 			id: asset.productModelId,
 			isEngineerReadOnly: assetRow.productIsEngineerReadOnly,
+			listPrice: Number(assetRow.productListPrice),
 			manualFileName: manual?.fileName ?? "Not uploaded",
 			manualFileUrl: manual?.fileUrl ?? null,
 			manufacturer: assetRow.productManufacturer,
 			modelName: assetRow.modelName,
 			partIds: [],
 			partsList: [],
+			warrantyMonths: assetRow.productWarrantyMonths,
 		},
 	};
 }
@@ -2979,10 +2994,13 @@ export async function createProduct(
 				category: input.category,
 				code: input.code,
 				defaultPmCycleMonths: input.defaultPmCycleMonths,
+				description: input.description ?? null,
 				isEngineerReadOnly: input.isEngineerReadOnly,
+				listPrice: input.listPrice.toFixed(2),
 				manufacturer: input.manufacturer,
 				modelName: input.modelName,
 				tenantId,
+				warrantyMonths: input.warrantyMonths,
 			} satisfies ProductInsert)
 			.returning({ id: productModels.id });
 
@@ -3032,9 +3050,12 @@ export async function updateProduct(
 				category: input.category,
 				code: input.code,
 				defaultPmCycleMonths: input.defaultPmCycleMonths,
+				description: input.description ?? null,
 				isEngineerReadOnly: input.isEngineerReadOnly,
+				listPrice: input.listPrice.toFixed(2),
 				manufacturer: input.manufacturer,
 				modelName: input.modelName,
+				warrantyMonths: input.warrantyMonths,
 			})
 			.where(
 				and(eq(productModels.id, id), eq(productModels.tenantId, tenantId))

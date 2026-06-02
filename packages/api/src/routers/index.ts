@@ -138,11 +138,14 @@ const productSchema = z.object({
 	category: z.string().trim().min(1),
 	code: z.string().trim().min(1),
 	defaultPmCycleMonths: z.number().int().min(1),
+	description: optionalTextSchema,
 	isEngineerReadOnly: z.boolean(),
+	listPrice: z.number().min(0),
 	manufacturer: z.string().trim().min(1),
 	modelName: z.string().trim().min(1),
 	partIds: z.array(z.string().min(1)).default([]),
 	serviceManual: serviceManualSchema.nullable().optional(),
+	warrantyMonths: z.number().int().min(0),
 });
 
 const partSchema = z.object({
