@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { protectedProcedure, publicProcedure, router } from "../index";
+import { protectedProcedure, router } from "../index";
 import {
 	addJobPartUsage,
 	approvePmOpportunity,
@@ -319,11 +319,6 @@ const ensureTenantAccess = async (
 };
 
 export const appRouter = router({
-	healthCheck: publicProcedure.query(() => "OK"),
-	privateData: protectedProcedure.query(({ ctx }) => ({
-		message: "This is private",
-		user: ctx.session.user,
-	})),
 	serviceOps: router({
 		snapshot: protectedProcedure
 			.input(

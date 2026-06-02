@@ -1,9 +1,8 @@
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { Link } from "expo-router";
 import { Drawer } from "expo-router/drawer";
 import { useThemeColor } from "heroui-native";
 import { useCallback } from "react";
-import { Pressable, Text } from "react-native";
+import { Text } from "react-native";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -71,17 +70,6 @@ function DrawerLayout() {
 							name="engineering"
 							size={size}
 						/>
-					),
-					headerRight: () => (
-						<Link asChild href="/modal">
-							<Pressable className="mr-4">
-								<Ionicons
-									color={themeColorForeground}
-									name="add-outline"
-									size={24}
-								/>
-							</Pressable>
-						</Link>
 					),
 				}}
 			/>

@@ -158,16 +158,15 @@ export function EngineerAppProvider({ children }: PropsWithChildren) {
 			),
 		[snapshot, selectedJob]
 	);
-	const snapshotFilter = snapshot?.tenant.id
-		? trpc.serviceOps.snapshot.queryFilter({ tenantId: snapshot.tenant.id })
-		: trpc.serviceOps.snapshot.queryFilter();
 	const mutationOptions = {
 		onError(error: unknown) {
 			setLastError(getErrorMessage(error));
 		},
 		onSuccess: async () => {
 			setLastError(null);
-			await queryClient.invalidateQueries(snapshotFilter);
+			await queryClient.invalidateQueries(
+				trpc.serviceOps.snapshot.queryFilter()
+			);
 		},
 	};
 	const startJobMutation = useMutation(
