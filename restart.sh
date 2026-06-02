@@ -73,10 +73,43 @@ run_detached() {
 	echo "$!" >"$pid_file"
 }
 
+command_exists() {
+	command -v "$1" >/dev/null 2>&1
+}
+
 list_listening_pids_on_port() {
 	local port="$1"
+	local pids=""
 
-	lsof -tiTCP:"${port}" -sTCP:LISTEN || true
+	if command_exists lsof; then
+		pids="$(lsof -nP -tiTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)"
+	fi
+
+	if [[ -z "$pids" ]] && command_exists fuser; then
+		pids="$(fuser "${port}/tcp" 2>/dev/null || true)"
+	fi
+
+	if [[ -n "$pids" ]]; then
+		printf "%s\n" $pids | sort -u
+	fi
+}
+
+port_is_listening() {
+	local port="$1"
+
+	if [[ -n "$(list_listening_pids_on_port "$port")" ]]; then
+		return 0
+	fi
+
+	if command_exists ss && [[ -n "$(ss -H -ltn "sport = :${port}" 2>/dev/null || true)" ]]; then
+		return 0
+	fi
+
+	if command_exists lsof && [[ -n "$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null || true)" ]]; then
+		return 0
+	fi
+
+	return 1
 }
 
 stop_processes_on_ports() {
@@ -94,7 +127,7 @@ stop_processes_on_ports() {
 wait_for_ports_to_clear() {
 	for port in "${DEV_PORTS[@]}"; do
 		for _ in {1..10}; do
-			if [[ -z "$(list_listening_pids_on_port "$port")" ]]; then
+			if ! port_is_listening "$port"; then
 				break
 			fi
 
@@ -117,10 +150,19 @@ force_stop_processes_on_ports() {
 
 ensure_ports_are_clear() {
 	for port in "${DEV_PORTS[@]}"; do
-		if [[ -n "$(list_listening_pids_on_port "$port")" ]]; then
+		if port_is_listening "$port"; then
+			local pids
+			pids="$(list_listening_pids_on_port "$port")"
+
 			echo "Port ${port} is still in use after cleanup."
-			echo "Run this on the server to inspect it:"
-			echo "  lsof -nP -iTCP:${port} -sTCP:LISTEN"
+
+			if [[ -n "$pids" ]]; then
+				echo "Remaining listening process IDs: ${pids}"
+			fi
+
+			echo "Run these on the server to inspect and clear it:"
+			echo "  sudo lsof -nP -iTCP:${port} -sTCP:LISTEN"
+			echo "  sudo fuser -k ${port}/tcp"
 			exit 1
 		fi
 	done
